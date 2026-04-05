@@ -1,0 +1,5 @@
+{
+  "name": "Ooglian Defense",
+  "description": "A minimalist roguelike tower defense game inspired by Ooglians. Connect machines to the core and defend against the swarm.",
+  "requestFramePermissions": []
+}
