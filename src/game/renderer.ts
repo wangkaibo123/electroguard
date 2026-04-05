@@ -284,15 +284,7 @@ export const renderGame = (
       const stats = TOWER_STATS[selectedTower];
       const rcx = (hoverPos.x + stats.width / 2) * CELL_SIZE;
       const rcy = (hoverPos.y + stats.height / 2) * CELL_SIZE;
-      ctx.beginPath();
-      ctx.arc(rcx, rcy, range, 0, TWO_PI);
-      ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-      ctx.lineWidth = 1;
-      ctx.setLineDash([4, 4]);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.fillStyle = 'rgba(255,255,255,0.03)';
-      ctx.fill();
+      drawRangeCircle(ctx, rcx, rcy, range, 0.15, 0.03);
     }
   }
 
@@ -304,15 +296,7 @@ export const renderGame = (
       if (range) {
         const rcx = (rt.x + rt.width / 2) * CELL_SIZE;
         const rcy = (rt.y + rt.height / 2) * CELL_SIZE;
-        ctx.beginPath();
-        ctx.arc(rcx, rcy, range, 0, TWO_PI);
-        ctx.strokeStyle = 'rgba(255,255,255,0.2)';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([4, 4]);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.fillStyle = 'rgba(255,255,255,0.04)';
-        ctx.fill();
+        drawRangeCircle(ctx, rcx, rcy, range, 0.2, 0.04);
       }
     }
   }
@@ -680,6 +664,44 @@ export const renderGame = (
   ctx.restore();
 };
 
+const drawPowerArc = (ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, maxPower: number, storedPower: number, color = PULSE_CLR) => {
+  if (maxPower <= 0 || storedPower <= 0) return;
+  const arcPer = TWO_PI / maxPower;
+  const startA = -Math.PI / 2;
+  ctx.fillStyle = color;
+  ctx.globalAlpha = color === PULSE_CLR ? 0.5 : 0.25;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.arc(cx, cy, r - 0.5, startA, startA + arcPer * storedPower);
+  ctx.closePath();
+  ctx.fill();
+  ctx.globalAlpha = 1;
+};
+
+const drawRangeCircle = (ctx: CanvasRenderingContext2D, cx: number, cy: number, range: number, strokeOp: number, fillOp: number) => {
+  ctx.beginPath();
+  ctx.arc(cx, cy, range, 0, TWO_PI);
+  ctx.strokeStyle = `rgba(255,255,255,${strokeOp})`;
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 4]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = `rgba(255,255,255,${fillOp})`;
+  ctx.fill();
+};
+
+const drawBarrel = (ctx: CanvasRenderingContext2D, cx: number, cy: number, localAngle: number, r: number, barrelLen: number, tColor: string, lineWidth: number, startFrac: number, muzzleR: number) => {
+  const bx = cx + Math.cos(localAngle) * r * startFrac;
+  const by = cy + Math.sin(localAngle) * r * startFrac;
+  const mx = cx + Math.cos(localAngle) * barrelLen;
+  const my = cy + Math.sin(localAngle) * barrelLen;
+  ctx.strokeStyle = tColor; ctx.lineWidth = lineWidth; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(mx, my); ctx.stroke();
+  ctx.fillStyle = tColor;
+  ctx.beginPath(); ctx.arc(mx, my, muzzleR, 0, TWO_PI); ctx.fill();
+  return { mx, my };
+};
+
 // ── Tower detail drawing (called within rotation transform) ──────────────────
 function drawTowerDetails(
   ctx: CanvasRenderingContext2D, t: Tower,
@@ -704,34 +726,15 @@ function drawTowerDetails(
     const r = Math.min(tw, th) / 4 - 1;
     ctx.strokeStyle = tColor; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.arc(cx, cy, r, 0, TWO_PI); ctx.stroke();
-    if (t.maxPower > 0 && t.storedPower > 0) {
-      const arcPer = TWO_PI / t.maxPower; const startA = -Math.PI / 2;
-      ctx.fillStyle = PULSE_CLR; ctx.globalAlpha = 0.5;
-      ctx.beginPath(); ctx.moveTo(cx, cy);
-      ctx.arc(cx, cy, r - 0.5, startA, startA + arcPer * t.storedPower);
-      ctx.closePath(); ctx.fill(); ctx.globalAlpha = 1;
-    }
+    drawPowerArc(ctx, cx, cy, r, t.maxPower, t.storedPower);
     const localAngle = t.barrelAngle - t.rotation;
     const barrelLen = Math.min(tw, th) / 2 - inset + 6;
-    const bx = cx + Math.cos(localAngle) * r * 0.3;
-    const by = cy + Math.sin(localAngle) * r * 0.3;
-    const mx = cx + Math.cos(localAngle) * barrelLen;
-    const my = cy + Math.sin(localAngle) * barrelLen;
-    ctx.strokeStyle = tColor; ctx.lineWidth = 5; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(mx, my); ctx.stroke();
-    ctx.fillStyle = tColor;
-    ctx.beginPath(); ctx.arc(mx, my, 3.5, 0, TWO_PI); ctx.fill();
+    drawBarrel(ctx, cx, cy, localAngle, r, barrelLen, tColor, 5, 0.3, 3.5);
   } else if (t.type === 'gatling') {
     const r = Math.min(tw, th) / 4 - 1;
     ctx.strokeStyle = tColor; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.arc(cx, cy, r, 0, TWO_PI); ctx.stroke();
-    if (t.maxPower > 0 && t.storedPower > 0) {
-      const arcPer = TWO_PI / t.maxPower; const startA = -Math.PI / 2;
-      ctx.fillStyle = PULSE_CLR; ctx.globalAlpha = 0.5;
-      ctx.beginPath(); ctx.moveTo(cx, cy);
-      ctx.arc(cx, cy, r - 0.5, startA, startA + arcPer * t.storedPower);
-      ctx.closePath(); ctx.fill(); ctx.globalAlpha = 1;
-    }
+    drawPowerArc(ctx, cx, cy, r, t.maxPower, t.storedPower);
     const localAngle = t.barrelAngle - t.rotation;
     const barrelLen = Math.min(tw, th) / 2 - inset + 4;
     // Heat glow on barrels
@@ -765,40 +768,21 @@ function drawTowerDetails(
     const r = Math.min(tw, th) / 5;
     ctx.strokeStyle = tColor; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.arc(cx, cy, r, 0, TWO_PI); ctx.stroke();
-    if (t.maxPower > 0 && t.storedPower > 0) {
-      const arcPer = TWO_PI / t.maxPower; const startA = -Math.PI / 2;
-      ctx.fillStyle = PULSE_CLR; ctx.globalAlpha = 0.5;
-      ctx.beginPath(); ctx.moveTo(cx, cy);
-      ctx.arc(cx, cy, r - 0.5, startA, startA + arcPer * t.storedPower);
-      ctx.closePath(); ctx.fill(); ctx.globalAlpha = 1;
-    }
+    drawPowerArc(ctx, cx, cy, r, t.maxPower, t.storedPower);
     const localAngle = t.barrelAngle - t.rotation;
     const barrelLen = Math.min(tw, th) / 2 - inset + 10;
-    const bx = cx + Math.cos(localAngle) * r * 0.2;
-    const by = cy + Math.sin(localAngle) * r * 0.2;
-    const mx = cx + Math.cos(localAngle) * barrelLen;
-    const my = cy + Math.sin(localAngle) * barrelLen;
-    ctx.strokeStyle = tColor; ctx.lineWidth = 3; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(mx, my); ctx.stroke();
+    const { mx, my } = drawBarrel(ctx, cx, cy, localAngle, r, barrelLen, tColor, 3, 0.2, 2);
     const scopeD = barrelLen * 0.7;
     const scopeX = cx + Math.cos(localAngle) * scopeD;
     const scopeY = cy + Math.sin(localAngle) * scopeD;
     ctx.strokeStyle = tColor; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.arc(scopeX, scopeY, 4, 0, TWO_PI); ctx.stroke();
-    ctx.fillStyle = tColor;
-    ctx.beginPath(); ctx.arc(mx, my, 2, 0, TWO_PI); ctx.fill();
   } else if (t.type === 'tesla') {
     const r1 = Math.min(tw, th) / 3; const r2 = Math.min(tw, th) / 5;
     ctx.strokeStyle = tColor; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.arc(cx, cy, r1, 0, TWO_PI); ctx.stroke();
     ctx.beginPath(); ctx.arc(cx, cy, r2, 0, TWO_PI); ctx.stroke();
-    if (t.maxPower > 0 && t.storedPower > 0) {
-      const arcPer = TWO_PI / t.maxPower; const startA = -Math.PI / 2;
-      ctx.fillStyle = tColor; ctx.globalAlpha = 0.25;
-      ctx.beginPath(); ctx.moveTo(cx, cy);
-      ctx.arc(cx, cy, r1 - 0.5, startA, startA + arcPer * t.storedPower);
-      ctx.closePath(); ctx.fill(); ctx.globalAlpha = 1;
-    }
+    drawPowerArc(ctx, cx, cy, r1, t.maxPower, t.storedPower, tColor);
     const now = performance.now();
     ctx.strokeStyle = tColor; ctx.lineWidth = 1; ctx.globalAlpha = 0.6;
     for (let s = 0; s < 4; s++) {

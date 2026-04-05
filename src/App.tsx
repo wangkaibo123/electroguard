@@ -4,28 +4,13 @@ import { useGameLoop } from './game/useGameLoop';
 import { TOWER_STATS, TowerType, VIEWPORT_WIDTH, VIEWPORT_HEIGHT, PickOption } from './game/types';
 import { t, getLocale, setLocale, Locale } from './game/i18n';
 
-const TOWER_ICONS: Record<string, React.ReactNode> = {
-  blaster:   <Crosshair size={22} />,
-  gatling:   <Flame size={22} />,
-  sniper:    <Focus size={22} />,
-  tesla:     <Radio size={22} />,
-  generator: <Zap size={22} />,
-  shield:    <Hexagon size={22} />,
-  battery:   <Battery size={22} />,
-  bus:       <GitMerge size={22} />,
-  target:    <Target size={22} />,
-};
-
-const SIDEBAR_ICONS: Record<string, React.ReactNode> = {
-  blaster:   <Crosshair size={16} />,
-  gatling:   <Flame size={16} />,
-  sniper:    <Focus size={16} />,
-  tesla:     <Radio size={16} />,
-  generator: <Zap size={16} />,
-  shield:    <Hexagon size={16} />,
-  battery:   <Battery size={16} />,
-  bus:       <GitMerge size={16} />,
-  target:    <Target size={16} />,
+const TowerIcon = ({ type, size = 22 }: { type: string; size?: number }) => {
+  const icons: Record<string, React.ComponentType<{ size: number }>> = {
+    blaster: Crosshair, gatling: Flame, sniper: Focus, tesla: Radio,
+    generator: Zap, shield: Hexagon, battery: Battery, bus: GitMerge, target: Target,
+  };
+  const Icon = icons[type];
+  return Icon ? <Icon size={size} /> : null;
 };
 
 const getPickColor = (opt: PickOption) => {
@@ -81,7 +66,7 @@ export default function App() {
         }`}
         title={i.towerDesc[type] ?? TOWER_STATS[type].description}
       >
-        <div className="text-gray-400 shrink-0">{SIDEBAR_ICONS[type]}</div>
+        <div className="text-gray-400 shrink-0"><TowerIcon type={type} size={16} /></div>
         <div className="flex flex-col items-start min-w-0">
           <span className="text-xs font-bold text-gray-200 leading-tight">{label}</span>
           <span className="text-[10px] text-emerald-400 font-mono leading-tight">{isCustom ? '\u221E' : `x${count}`}</span>
@@ -228,7 +213,7 @@ export default function App() {
                           className="w-12 h-12 rounded-lg flex items-center justify-center text-white"
                           style={{ backgroundColor: color + '22', color }}
                         >
-                          {opt.kind === 'wire' ? <Cable size={22} /> : TOWER_ICONS[opt.towerType!]}
+                          {opt.kind === 'wire' ? <Cable size={22} /> : <TowerIcon type={opt.towerType!} />}
                         </div>
                         <div className="text-sm font-bold text-white">{opt.label}</div>
                         <div className="text-[11px] text-gray-400 leading-snug">{opt.description}</div>

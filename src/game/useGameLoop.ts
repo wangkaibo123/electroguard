@@ -52,6 +52,44 @@ const ENEMY_SCORE: Record<string, number> = {
   scout: 5, grunt: 10, tank: 25, saboteur: 15, overlord: 100,
 };
 
+// ── Shared helpers ──────────────────────────────────────────────────────────
+
+const applyDamageToEnemy = (state: GameState, enemy: typeof state.enemies[0], damage: number, color: string, bigExplosion = false): boolean => {
+  let dmg = damage;
+  if (enemy.shieldAbsorb > 0) {
+    const absorbed = Math.min(enemy.shieldAbsorb, dmg);
+    enemy.shieldAbsorb -= absorbed;
+    dmg -= absorbed;
+  }
+  enemy.hp -= dmg;
+  createExplosion(state, enemy.x, enemy.y, color, bigExplosion ? 10 : 3);
+  if (enemy.hp <= 0) {
+    state.enemies = state.enemies.filter(e => e.id !== enemy.id);
+    state.score += (ENEMY_SCORE[enemy.enemyType] ?? 10);
+    createExplosion(state, enemy.x, enemy.y, enemy.color, bigExplosion ? 15 : 10);
+    return true; // enemy died
+  }
+  return false;
+};
+
+const findNearestEnemy = (enemies: GameState['enemies'], x: number, y: number, range: number, excludeIds?: Set<string> | string[]): typeof enemies[0] | null => {
+  let best: typeof enemies[0] | null = null;
+  let bestD = range;
+  for (const e of enemies) {
+    if (excludeIds && (excludeIds instanceof Set ? excludeIds.has(e.id) : excludeIds.includes(e.id))) continue;
+    const d = Math.hypot(e.x - x, e.y - y);
+    if (d < bestD) { bestD = d; best = e; }
+  }
+  return best;
+};
+
+const destroyTower = (state: GameState, towerId: string) => {
+  state.towers = state.towers.filter(t => t.id !== towerId);
+  state.wires = state.wires.filter(w => w.startTowerId !== towerId && w.endTowerId !== towerId);
+  rebuildTowerMap(state);
+  updatePowerGrid(state);
+};
+
 export const useGameLoop = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stateRef = useRef<GameState>(createInitialState());
@@ -87,6 +125,27 @@ export const useGameLoop = () => {
   const dragOrigInventoryRef = useRef<number>(0);
 
   const sync = () => setGameState({ ...stateRef.current });
+
+  const cancelTowerDrag = () => {
+    if (dragTowerRef.current && dragOrigPosRef.current) {
+      const state = stateRef.current;
+      const tower = state.towerMap.get(dragTowerRef.current);
+      if (tower) {
+        tower.x = dragOrigPosRef.current.x;
+        tower.y = dragOrigPosRef.current.y;
+        if (dragOrigWiresRef.current) {
+          state.wires = state.wires.filter(w => w.startTowerId !== tower.id && w.endTowerId !== tower.id);
+          state.wires.push(...dragOrigWiresRef.current);
+          state.wireInventory = dragOrigInventoryRef.current;
+          updatePowerGrid(state);
+        }
+        sync();
+      }
+    }
+    dragTowerRef.current = null;
+    dragOrigPosRef.current = null;
+    dragOrigWiresRef.current = null;
+  };
 
   const [rotatingTowerId, setRotatingTowerId] = useState<string | null>(null);
   const updateRotating = (id: string | null) => { rotatingRef.current = id; setRotatingTowerId(id); };
@@ -451,25 +510,8 @@ export const useGameLoop = () => {
   const handleCanvasMouseLeave = () => {
     hoverRef.current = null;
     // Restore tower + wires if dragging
-    if (dragTowerRef.current && dragOrigPosRef.current) {
-      const state = stateRef.current;
-      const tower = state.towerMap.get(dragTowerRef.current);
-      if (tower) {
-        tower.x = dragOrigPosRef.current.x;
-        tower.y = dragOrigPosRef.current.y;
-        if (dragOrigWiresRef.current) {
-          state.wires = state.wires.filter(w => w.startTowerId !== tower.id && w.endTowerId !== tower.id);
-          state.wires.push(...dragOrigWiresRef.current);
-          state.wireInventory = dragOrigInventoryRef.current;
-          updatePowerGrid(state);
-        }
-        sync();
-      }
-    }
+    cancelTowerDrag();
     dragWireStartRef.current = null;
-    dragTowerRef.current = null;
-    dragOrigPosRef.current = null;
-    dragOrigWiresRef.current = null;
     dragWirePathRef.current = null;
     isRotKnobRef.current = false;
     isPanningRef.current = false;
@@ -676,12 +718,7 @@ export const useGameLoop = () => {
         const bx = (t.x + t.width / 2) * CELL_SIZE, by = (t.y + t.height / 2) * CELL_SIZE;
 
         // Find first enemy in range
-        let firstEnemy: typeof state.enemies[0] | null = null;
-        let firstD = TESLA_RANGE;
-        for (const e of state.enemies) {
-          const d = Math.hypot(e.x - bx, e.y - by);
-          if (d < firstD) { firstD = d; firstEnemy = e; }
-        }
+        const firstEnemy = findNearestEnemy(state.enemies, bx, by, TESLA_RANGE);
         if (!firstEnemy) continue;
 
         const power = t.storedPower;
@@ -697,30 +734,12 @@ export const useGameLoop = () => {
 
         for (let b = 0; b < bounces && curEnemy; b++) {
           clSegments.push({ x1: cx, y1: cy, x2: curEnemy.x, y2: curEnemy.y });
-          let dmg = totalDmg / bounces;
-          if (curEnemy.shieldAbsorb > 0) {
-            const absorbed = Math.min(curEnemy.shieldAbsorb, dmg);
-            curEnemy.shieldAbsorb -= absorbed;
-            dmg -= absorbed;
-          }
-          curEnemy.hp -= dmg;
-          if (curEnemy.hp <= 0) {
-            createExplosion(state, curEnemy.x, curEnemy.y, curEnemy.color, 12);
-            state.score += (ENEMY_SCORE[curEnemy.enemyType] ?? 10);
-            state.enemies = state.enemies.filter(e => e.id !== curEnemy!.id);
-          }
+          applyDamageToEnemy(state, curEnemy, totalDmg / bounces, curEnemy.color, true);
           hitIds.add(curEnemy.id);
           cx = curEnemy.x; cy = curEnemy.y;
 
           // Find next bounce target
-          let nextEnemy: typeof state.enemies[0] | null = null;
-          let nextD = TESLA_BOUNCE_RANGE;
-          for (const e of state.enemies) {
-            if (hitIds.has(e.id)) continue;
-            const d = Math.hypot(e.x - cx, e.y - cy);
-            if (d < nextD) { nextD = d; nextEnemy = e; }
-          }
-          curEnemy = nextEnemy;
+          curEnemy = findNearestEnemy(state.enemies, cx, cy, TESLA_BOUNCE_RANGE, hitIds);
         }
 
         if (clSegments.length > 0) {
@@ -842,10 +861,7 @@ export const useGameLoop = () => {
               createExplosion(state, tgtPos.x, tgtPos.y, '#f87171', 4);
               if (tgtTower.hp <= 0) {
                 if (tgtTower.type === 'core') state.status = 'gameover';
-                state.towers = state.towers.filter(t => t.id !== tgtTower!.id);
-                state.wires = state.wires.filter(w => w.startTowerId !== tgtTower!.id && w.endTowerId !== tgtTower!.id);
-                rebuildTowerMap(state);
-                updatePowerGrid(state);
+                destroyTower(state, tgtTower.id);
               }
             }
           }
@@ -871,16 +887,7 @@ export const useGameLoop = () => {
           for (const e of state.enemies) {
             if (p.piercedIds?.includes(e.id)) continue;
             if (Math.hypot(e.x - p.x, e.y - p.y) < e.radius + 4) {
-              // Apply damage through shield absorb first
-              let dmg = p.damage;
-              if (e.shieldAbsorb > 0) {
-                const absorbed = Math.min(e.shieldAbsorb, dmg);
-                e.shieldAbsorb -= absorbed;
-                dmg -= absorbed;
-              }
-              e.hp -= dmg;
-              createExplosion(state, e.x, e.y, p.color ?? '#fbbf24', 3);
-              if (e.hp <= 0) { state.enemies = state.enemies.filter(en => en.id !== e.id); state.score += (ENEMY_SCORE[e.enemyType] ?? 10); createExplosion(state, e.x, e.y, e.color, 10); }
+              applyDamageToEnemy(state, e, p.damage, p.color ?? '#fbbf24');
               if (!p.piercing) { state.projectiles.splice(i, 1); hit = true; }
               else { p.piercedIds = p.piercedIds ?? []; p.piercedIds.push(e.id); }
               changed = true;
@@ -914,9 +921,7 @@ export const useGameLoop = () => {
               state.projectiles.splice(i, 1);
             }
             if (tgt.hp <= 0) {
-              state.towers = state.towers.filter(t => t.id !== tgt.id);
-              state.wires = state.wires.filter(w => w.startTowerId !== tgt.id && w.endTowerId !== tgt.id);
-              rebuildTowerMap(state);
+              destroyTower(state, tgt.id);
               createExplosion(state, tgtX, tgtY, '#f97316', 15);
             }
             changed = true;
@@ -927,12 +932,7 @@ export const useGameLoop = () => {
           if (!tgt) {
             // For piercing, find next enemy instead of removing
             if (p.piercing) {
-              let bestD = 300, bestE: typeof state.enemies[0] | null = null;
-              for (const e of state.enemies) {
-                if (p.piercedIds?.includes(e.id)) continue;
-                const d = Math.hypot(e.x - p.x, e.y - p.y);
-                if (d < bestD) { bestD = d; bestE = e; }
-              }
+              const bestE = findNearestEnemy(state.enemies, p.x, p.y, 300, p.piercedIds);
               if (bestE) { p.targetId = bestE.id; } else { state.projectiles.splice(i, 1); changed = true; continue; }
               const et = state.enemies.find(e => e.id === p.targetId)!;
               tgtX = et.x; tgtY = et.y; tgtFound = true;
@@ -945,29 +945,11 @@ export const useGameLoop = () => {
             tgtFound = true;
             const d = Math.hypot(tgtX - p.x, tgtY - p.y);
             if (d < tgt.radius + 4) {
-              // Apply damage through shield absorb first
-              let dmg = p.damage;
-              if (tgt.shieldAbsorb > 0) {
-                const absorbed = Math.min(tgt.shieldAbsorb, dmg);
-                tgt.shieldAbsorb -= absorbed;
-                dmg -= absorbed;
-              }
-              tgt.hp -= dmg;
-              createExplosion(state, tgt.x, tgt.y, p.color ?? '#fbbf24', 5);
-              if (tgt.hp <= 0) {
-                state.enemies = state.enemies.filter(e => e.id !== tgt.id);
-                state.score += (ENEMY_SCORE[tgt.enemyType] ?? 10);
-                createExplosion(state, tgt.x, tgt.y, tgt.color, 15);
-              }
+              applyDamageToEnemy(state, tgt, p.damage, p.color ?? '#fbbf24', true);
               if (p.piercing) {
                 p.piercedIds = p.piercedIds ?? []; p.piercedIds.push(tgt.id);
                 // Re-target next enemy
-                let bestD = 300, bestE: typeof state.enemies[0] | null = null;
-                for (const e of state.enemies) {
-                  if (p.piercedIds.includes(e.id)) continue;
-                  const d2 = Math.hypot(e.x - p.x, e.y - p.y);
-                  if (d2 < bestD) { bestD = d2; bestE = e; }
-                }
+                const bestE = findNearestEnemy(state.enemies, p.x, p.y, 300, p.piercedIds);
                 if (bestE) { p.targetId = bestE.id; } else { state.projectiles.splice(i, 1); changed = true; continue; }
               } else {
                 state.projectiles.splice(i, 1);
@@ -1056,22 +1038,7 @@ export const useGameLoop = () => {
       if (e.key === 'Escape') {
         // Cancel tower drag — restore original position and wires
         if (dragTowerRef.current && dragOrigPosRef.current) {
-          const tower = state.towerMap.get(dragTowerRef.current);
-          if (tower) {
-            tower.x = dragOrigPosRef.current.x;
-            tower.y = dragOrigPosRef.current.y;
-            // Restore saved wires
-            if (dragOrigWiresRef.current) {
-              state.wires = state.wires.filter(w => w.startTowerId !== tower.id && w.endTowerId !== tower.id);
-              state.wires.push(...dragOrigWiresRef.current);
-              state.wireInventory = dragOrigInventoryRef.current;
-              updatePowerGrid(state);
-            }
-          }
-          dragTowerRef.current = null;
-          dragOrigPosRef.current = null;
-          dragOrigWiresRef.current = null;
-          sync();
+          cancelTowerDrag();
           return;
         }
         // Cancel wire drag
