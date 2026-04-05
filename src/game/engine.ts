@@ -1,7 +1,8 @@
 import {
-  GameState, Tower, TowerType, Position, Port, PortDirection, PortType, Wire, PickOption,
+  GameState, Tower, TowerType, Position, Port, PortDirection, PortType, Wire, PickOption, EnemyType,
   GRID_WIDTH, GRID_HEIGHT, CELL_SIZE, HALF_CELL, TOWER_STATS, CANVAS_WIDTH, CANVAS_HEIGHT, WIRE_MAX_HP,
 } from './types';
+import { t, pickKey } from './i18n';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -34,21 +35,22 @@ const rotationSteps = (from: number, to: number): number => {
 export const getPortPos = (t: Tower, p: Port): Position => {
   const px = t.x * CELL_SIZE, py = t.y * CELL_SIZE;
   const tw = t.width * CELL_SIZE, th = t.height * CELL_SIZE;
+  const off = p.sideOffset ?? 0.5;
   switch (p.direction) {
-    case 'top':    return { x: px + tw / 2, y: py };
-    case 'right':  return { x: px + tw,     y: py + th / 2 };
-    case 'bottom': return { x: px + tw / 2, y: py + th };
-    case 'left':   return { x: px,          y: py + th / 2 };
+    case 'top':    return { x: px + tw * off, y: py };
+    case 'right':  return { x: px + tw,       y: py + th * off };
+    case 'bottom': return { x: px + tw * off, y: py + th };
+    case 'left':   return { x: px,            y: py + th * off };
   }
 };
 
 export const getPortCell = (t: Tower, p: Port): Position => {
-  const cx = t.x + (t.width >> 1), cy = t.y + (t.height >> 1);
+  const off = p.sideOffset ?? 0.5;
   switch (p.direction) {
-    case 'top':    return { x: cx, y: t.y - 1 };
-    case 'bottom': return { x: cx, y: t.y + t.height };
-    case 'left':   return { x: t.x - 1, y: cy };
-    case 'right':  return { x: t.x + t.width, y: cy };
+    case 'top':    return { x: t.x + Math.floor(t.width * off),  y: t.y - 1 };
+    case 'bottom': return { x: t.x + Math.floor(t.width * off),  y: t.y + t.height };
+    case 'left':   return { x: t.x - 1,                          y: t.y + Math.floor(t.height * off) };
+    case 'right':  return { x: t.x + t.width,                    y: t.y + Math.floor(t.height * off) };
   }
 };
 
@@ -184,22 +186,33 @@ export const rebuildTowerMap = (state: GameState) => {
 
 // ── Roguelike pick system ────────────────────────────────────────────────────
 
-const PICK_POOL: Omit<PickOption, 'id'>[] = [
-  { kind: 'tower', towerType: 'blaster',   count: 1, label: 'Blaster',     description: 'Fires a bullet per 2 power' },
-  { kind: 'tower', towerType: 'blaster',   count: 2, label: 'Blaster x2',  description: 'Two standard turrets' },
-  { kind: 'tower', towerType: 'gatling',   count: 1, label: 'Gatling',     description: 'Rapid spread fire, 4 bullets/power' },
-  { kind: 'tower', towerType: 'sniper',    count: 1, label: 'Sniper',      description: 'High-damage piercing shot' },
-  { kind: 'tower', towerType: 'tesla',     count: 1, label: 'Tesla',       description: 'Chain lightning between enemies' },
-  { kind: 'tower', towerType: 'generator', count: 1, label: 'Generator',   description: 'Power source for the network' },
-  { kind: 'tower', towerType: 'shield',    count: 1, label: 'Shield',      description: 'Projects a protective bubble' },
-  { kind: 'tower', towerType: 'battery',   count: 1, label: 'Battery',     description: 'Stores power, discharges rapidly' },
-  { kind: 'wire',                          count: 3, label: 'Wire x3',     description: 'Power line connectors' },
-  { kind: 'wire',                          count: 5, label: 'Wire x5',     description: 'Large bundle of power lines' },
+/** Base pick pool — labels/descriptions resolved at generation time via i18n */
+const PICK_POOL_BASE: { kind: 'tower' | 'wire'; towerType?: TowerType; count: number }[] = [
+  { kind: 'tower', towerType: 'blaster',   count: 1 },
+  { kind: 'tower', towerType: 'blaster',   count: 2 },
+  { kind: 'tower', towerType: 'gatling',   count: 1 },
+  { kind: 'tower', towerType: 'sniper',    count: 1 },
+  { kind: 'tower', towerType: 'tesla',     count: 1 },
+  { kind: 'tower', towerType: 'generator', count: 1 },
+  { kind: 'tower', towerType: 'shield',    count: 1 },
+  { kind: 'tower', towerType: 'battery',   count: 1 },
+  { kind: 'tower', towerType: 'bus',       count: 1 },
+  { kind: 'wire',                          count: 3 },
+  { kind: 'wire',                          count: 5 },
 ];
 
 export const generatePickOptions = (): PickOption[] => {
-  const shuffled = [...PICK_POOL].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, 3).map(o => ({ ...o, id: genId() }));
+  const loc = t();
+  const shuffled = [...PICK_POOL_BASE].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, 3).map(o => {
+    const key = pickKey(o.kind, o.towerType, o.count);
+    return {
+      ...o,
+      id: genId(),
+      label: loc.pickLabel[key] ?? key,
+      description: loc.pickDesc[key] ?? '',
+    };
+  });
 };
 
 // ── Initial state ────────────────────────────────────────────────────────────
@@ -217,6 +230,7 @@ export const createInitialState = (): GameState => {
     ports: PORT_DIRS.map(d => ({ id: genId(), direction: d, portType: 'output' as PortType })),
     rotation: 0,
     barrelAngle: 0,
+    heat: 0,
   };
   const towerMap = new Map<string, Tower>([[core.id, core]]);
   return {
@@ -228,7 +242,7 @@ export const createInitialState = (): GameState => {
     towerInventory: { blaster: 1, gatling: 0, sniper: 0, tesla: 0, generator: 1, shield: 0, battery: 0 },
     pickOptions: [],
     needsPick: true,
-    towers: [core], wires: [], pulses: [], enemies: [], projectiles: [], chainLightnings: [], particles: [],
+    towers: [core], wires: [], pulses: [], enemies: [], projectiles: [], chainLightnings: [], particles: [], hitEffects: [], shieldBreakEffects: [],
     waveTimer: 0, enemiesToSpawn: 0, spawnTimer: 0, score: 0, towerMap,
   };
 };
@@ -320,12 +334,24 @@ export const repathConnectedWires = (state: GameState, towerId: string) => {
     if (w.startTowerId !== towerId && w.endTowerId !== towerId) continue;
     const st = state.towerMap.get(w.startTowerId);
     const et = state.towerMap.get(w.endTowerId);
-    if (!st || !et) { state.wires.splice(i, 1); changed = true; continue; }
+    if (!st || !et) {
+      state.wires.splice(i, 1);
+      if (state.gameMode !== 'custom') state.wireInventory++;
+      changed = true; continue;
+    }
     const sp = st.ports.find(p => p.id === w.startPortId);
     const ep = et.ports.find(p => p.id === w.endPortId);
-    if (!sp || !ep) { state.wires.splice(i, 1); changed = true; continue; }
+    if (!sp || !ep) {
+      state.wires.splice(i, 1);
+      if (state.gameMode !== 'custom') state.wireInventory++;
+      changed = true; continue;
+    }
     const np = findWirePath(getPortCell(st, sp), getPortCell(et, ep), state, w.id);
-    if (np) { w.path = np; } else { state.wires.splice(i, 1); changed = true; }
+    if (np) { w.path = np; } else {
+      state.wires.splice(i, 1);
+      if (state.gameMode !== 'custom') state.wireInventory++;
+      changed = true;
+    }
   }
   if (changed) updatePowerGrid(state);
 };
@@ -358,21 +384,61 @@ export const applyTowerRotation = (
 
 // ── Enemy spawning ───────────────────────────────────────────────────────────
 
-export const spawnEnemy = (state: GameState, wave: number) => {
+const ENEMY_DEFS: Record<EnemyType, {
+  baseHp: number; speedMin: number; speedMax: number; baseDamage: number;
+  cooldown: number; radius: number; color: string; wireDamageMul: number;
+  baseShield: number;
+}> = {
+  scout:    { baseHp: 12,  speedMin: 50, speedMax: 65, baseDamage: 3,  cooldown: 800,  radius: 6,  color: '#4ade80', wireDamageMul: 1, baseShield: 0 },
+  grunt:    { baseHp: 25,  speedMin: 28, speedMax: 40, baseDamage: 6,  cooldown: 1000, radius: 8,  color: '#f87171', wireDamageMul: 1, baseShield: 0 },
+  tank:     { baseHp: 60,  speedMin: 15, speedMax: 22, baseDamage: 10, cooldown: 1200, radius: 12, color: '#a78bfa', wireDamageMul: 1, baseShield: 0 },
+  saboteur: { baseHp: 18,  speedMin: 35, speedMax: 45, baseDamage: 4,  cooldown: 600,  radius: 7,  color: '#fbbf24', wireDamageMul: 2, baseShield: 0 },
+  overlord: { baseHp: 200, speedMin: 12, speedMax: 16, baseDamage: 20, cooldown: 1500, radius: 18, color: '#ef4444', wireDamageMul: 1, baseShield: 50 },
+};
+
+/** Pick a random enemy type valid for the given wave */
+const pickEnemyType = (wave: number): EnemyType => {
+  const pool: EnemyType[] = ['scout', 'grunt'];
+  if (wave >= 3) pool.push('tank');
+  if (wave >= 5) pool.push('saboteur');
+  // Overlords are spawned explicitly, not from the random pool
+  return pool[(Math.random() * pool.length) | 0];
+};
+
+const spawnPos = (): { x: number; y: number } => {
   const side = (Math.random() * 4) | 0;
   let x = 0, y = 0;
   if (side === 0)      { x = Math.random() * CANVAS_WIDTH;  y = -CELL_SIZE; }
   else if (side === 1) { x = CANVAS_WIDTH + CELL_SIZE;      y = Math.random() * CANVAS_HEIGHT; }
   else if (side === 2) { x = Math.random() * CANVAS_WIDTH;  y = CANVAS_HEIGHT + CELL_SIZE; }
   else                 { x = -CELL_SIZE;                     y = Math.random() * CANVAS_HEIGHT; }
+  return { x, y };
+};
 
-  const hpMul = 1 + wave * 0.2;
+const pushEnemy = (state: GameState, type: EnemyType, wave: number) => {
+  const def = ENEMY_DEFS[type];
+  const hpMul = 1 + wave * 0.15;
+  const hp = def.baseHp * hpMul;
+  const { x, y } = spawnPos();
+  const shieldHp = def.baseShield * hpMul;
+  const speedBonus = 1 + wave * 0.02; // slight speed increase per wave
   state.enemies.push({
-    id: genId(), x, y,
-    hp: 20 * hpMul, maxHp: 20 * hpMul,
-    speed: 30 + Math.random() * 20, damage: 5 + wave,
-    attackCooldown: 1000, lastAttackTime: 0, targetId: null, heading: 0,
+    id: genId(), enemyType: type, x, y,
+    hp, maxHp: hp,
+    speed: (def.speedMin + Math.random() * (def.speedMax - def.speedMin)) * speedBonus,
+    damage: def.baseDamage + Math.floor(wave * 0.8),
+    attackCooldown: def.cooldown, lastAttackTime: 0, targetId: null, heading: 0,
+    radius: def.radius, color: def.color, wireDamageMul: def.wireDamageMul,
+    shieldAbsorb: shieldHp, maxShieldAbsorb: shieldHp,
   });
+};
+
+export const spawnEnemy = (state: GameState, wave: number) => {
+  pushEnemy(state, pickEnemyType(wave), wave);
+};
+
+export const spawnBoss = (state: GameState, wave: number) => {
+  pushEnemy(state, 'overlord', wave);
 };
 
 // ── Particle effects ─────────────────────────────────────────────────────────

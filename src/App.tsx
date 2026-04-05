@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Battery, Zap, Crosshair, Activity, Play, RotateCcw, Pause, Hexagon, Cable, Target, Wrench, ChevronRight, ChevronLeft, Flame, Focus, Radio } from 'lucide-react';
+import { Battery, Zap, Crosshair, Activity, Play, RotateCcw, Pause, Hexagon, Cable, Target, Wrench, ChevronRight, ChevronLeft, Flame, Focus, Radio, GitMerge, Globe } from 'lucide-react';
 import { useGameLoop } from './game/useGameLoop';
 import { TOWER_STATS, TowerType, VIEWPORT_WIDTH, VIEWPORT_HEIGHT, PickOption } from './game/types';
+import { t, getLocale, setLocale, Locale } from './game/i18n';
 
 const TOWER_ICONS: Record<string, React.ReactNode> = {
   blaster:   <Crosshair size={22} />,
@@ -11,6 +12,7 @@ const TOWER_ICONS: Record<string, React.ReactNode> = {
   generator: <Zap size={22} />,
   shield:    <Hexagon size={22} />,
   battery:   <Battery size={22} />,
+  bus:       <GitMerge size={22} />,
   target:    <Target size={22} />,
 };
 
@@ -22,6 +24,7 @@ const SIDEBAR_ICONS: Record<string, React.ReactNode> = {
   generator: <Zap size={16} />,
   shield:    <Hexagon size={16} />,
   battery:   <Battery size={16} />,
+  bus:       <GitMerge size={16} />,
   target:    <Target size={16} />,
 };
 
@@ -49,12 +52,20 @@ export default function App() {
   } = useGameLoop();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [locale, _setLocale] = useState<Locale>(getLocale());
+  const toggleLocale = () => {
+    const next: Locale = locale === 'en' ? 'zh' : 'en';
+    setLocale(next);
+    _setLocale(next);
+  };
+  const i = t();
 
-  const renderTowerButton = (type: TowerType, label: string) => {
+  const renderTowerButton = (type: TowerType) => {
     const isCustom = gameState.gameMode === 'custom';
     const count = gameState.towerInventory[type] ?? 0;
     const hasStock = isCustom || count > 0;
     const isSelected = selectedTower === type;
+    const label = i.towerName[type] ?? type;
 
     return (
       <button
@@ -68,7 +79,7 @@ export default function App() {
               ? 'border-gray-700 bg-gray-800/80 hover:bg-gray-700 hover:border-gray-500'
               : 'border-gray-800 bg-gray-900/50 opacity-40 cursor-not-allowed'
         }`}
-        title={TOWER_STATS[type].description}
+        title={i.towerDesc[type] ?? TOWER_STATS[type].description}
       >
         <div className="text-gray-400 shrink-0">{SIDEBAR_ICONS[type]}</div>
         <div className="flex flex-col items-start min-w-0">
@@ -91,39 +102,47 @@ export default function App() {
         {gameState.gameMode === 'custom' ? (
           <div className="flex items-center gap-1.5 text-orange-400">
             <Wrench size={14} />
-            <span className="text-xs uppercase font-bold">Custom Mode</span>
+            <span className="text-xs uppercase font-bold">{i.customMode}</span>
           </div>
         ) : (
           <div className="flex items-center gap-1.5 text-red-400">
             <Activity size={14} />
-            <span className="text-xs text-gray-500 uppercase font-bold">Wave</span>
+            <span className="text-xs text-gray-500 uppercase font-bold">{i.wave}</span>
             <span className="text-lg font-mono font-bold ml-1">{gameState.wave || '-'}</span>
           </div>
         )}
 
         <div className="flex items-center gap-1.5 text-blue-400">
           <Cable size={14} />
-          <span className="text-xs text-gray-500 uppercase font-bold">Wires</span>
+          <span className="text-xs text-gray-500 uppercase font-bold">{i.wires}</span>
           <span className="text-lg font-mono font-bold ml-1">{gameState.gameMode === 'custom' ? '\u221E' : gameState.wireInventory}</span>
         </div>
 
         <div className="flex items-center gap-1.5 text-white">
-          <span className="text-xs text-gray-500 uppercase font-bold">Score</span>
+          <span className="text-xs text-gray-500 uppercase font-bold">{i.score}</span>
           <span className="text-lg font-mono font-bold ml-1">{gameState.score}</span>
         </div>
 
         {gameState.gameMode !== 'custom' && gameState.status === 'playing' && gameState.enemiesToSpawn === 0 && gameState.enemies.length === 0 && (
           <div className="text-blue-300 text-xs font-medium animate-pulse ml-2">
-            Next wave in {Math.ceil(5 - gameState.waveTimer)}s
+            {i.nextWaveIn(Math.ceil(5 - gameState.waveTimer))}
           </div>
         )}
 
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            onClick={toggleLocale}
+            className="p-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-400 hover:text-white transition-colors text-xs font-bold flex items-center gap-1"
+            title="EN / 中文"
+          >
+            <Globe size={14} />
+            {locale === 'en' ? '中文' : 'EN'}
+          </button>
           {(gameState.status === 'playing' || gameState.status === 'paused') && (
             <button
               onClick={togglePause}
               className="p-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-white transition-colors"
-              title={gameState.status === 'playing' ? "Pause" : "Resume"}
+              title={gameState.status === 'playing' ? i.pause : i.resume}
             >
               {gameState.status === 'playing' ? <Pause size={16} /> : <Play size={16} />}
             </button>
@@ -153,9 +172,9 @@ export default function App() {
             {/* Menu Overlay */}
             {gameState.status === 'menu' && (
               <div className="absolute inset-0 bg-gray-950/80 backdrop-blur-sm flex flex-col items-center justify-center p-8 text-center">
-                <h2 className="text-5xl font-black mb-4 text-white tracking-tight">SYSTEM OFFLINE</h2>
+                <h2 className="text-5xl font-black mb-4 text-white tracking-tight">{i.systemOffline}</h2>
                 <p className="text-gray-400 mb-8 max-w-lg text-sm">
-                  Place and connect machines to defend the Core. After each wave, choose an upgrade to strengthen your defense. If the Core falls, the system dies.
+                  {i.menuDescription}
                 </p>
                 <button
                   onClick={startGame}
@@ -163,7 +182,7 @@ export default function App() {
                 >
                   <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform"></div>
                   <span className="relative flex items-center gap-2">
-                    <Play size={20} /> INITIALIZE CORE
+                    <Play size={20} /> {i.initializeCore}
                   </span>
                 </button>
                 <button
@@ -172,7 +191,7 @@ export default function App() {
                 >
                   <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform"></div>
                   <span className="relative flex items-center gap-2">
-                    <Wrench size={20} /> CUSTOM MODE
+                    <Wrench size={20} /> {i.customMode}
                   </span>
                 </button>
               </div>
@@ -183,13 +202,13 @@ export default function App() {
               <div className="absolute inset-0 bg-gray-950/85 backdrop-blur-sm flex flex-col items-center justify-center p-8 text-center">
                 {gameState.wave > 0 ? (
                   <>
-                    <h2 className="text-3xl font-black mb-1 text-emerald-400 tracking-tight">WAVE {gameState.wave} CLEARED</h2>
+                    <h2 className="text-3xl font-black mb-1 text-emerald-400 tracking-tight">{i.waveCleared(gameState.wave)}</h2>
                     <p className="text-emerald-300/60 text-sm font-mono mb-6">+{gameState.wave * 20} pts</p>
                   </>
                 ) : (
                   <>
-                    <h2 className="text-3xl font-black mb-1 text-blue-400 tracking-tight">SYSTEM UPGRADE</h2>
-                    <p className="text-gray-400 text-sm mb-6">Choose one upgrade for your defense network</p>
+                    <h2 className="text-3xl font-black mb-1 text-blue-400 tracking-tight">{i.systemUpgrade}</h2>
+                    <p className="text-gray-400 text-sm mb-6">{i.pickDescription}</p>
                   </>
                 )}
 
@@ -223,14 +242,14 @@ export default function App() {
             {/* Paused Overlay */}
             {gameState.status === 'paused' && (
               <div className="absolute inset-0 bg-gray-950/50 backdrop-blur-sm flex flex-col items-center justify-center p-8 text-center">
-                <h2 className="text-5xl font-black mb-6 text-white tracking-tight">SYSTEM PAUSED</h2>
+                <h2 className="text-5xl font-black mb-6 text-white tracking-tight">{i.systemPaused}</h2>
                 <button
                   onClick={togglePause}
                   className="group relative px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-all overflow-hidden"
                 >
                   <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform"></div>
                   <span className="relative flex items-center gap-2">
-                    <Play size={20} /> RESUME
+                    <Play size={20} /> {i.resume}
                   </span>
                 </button>
               </div>
@@ -239,20 +258,20 @@ export default function App() {
             {/* Game Over Overlay */}
             {gameState.status === 'gameover' && (
               <div className="absolute inset-0 bg-red-950/90 backdrop-blur-md flex flex-col items-center justify-center p-8 text-center">
-                <h2 className="text-6xl font-black mb-2 text-red-500 tracking-tight">CORE BREACHED</h2>
-                <p className="text-red-300/70 text-xl mb-8 font-mono">SYSTEM FAILURE</p>
+                <h2 className="text-6xl font-black mb-2 text-red-500 tracking-tight">{i.coreBreached}</h2>
+                <p className="text-red-300/70 text-xl mb-8 font-mono">{i.systemFailure}</p>
                 {gameState.gameMode !== 'custom' && (
                   <div className="bg-black/50 rounded-xl p-6 mb-8 min-w-[200px]">
-                    <div className="text-gray-400 text-sm uppercase tracking-wider mb-2">Final Score</div>
+                    <div className="text-gray-400 text-sm uppercase tracking-wider mb-2">{i.finalScore}</div>
                     <div className="text-4xl font-mono font-bold text-white">{gameState.score}</div>
-                    <div className="text-gray-500 text-sm mt-2">Survived {gameState.wave} Waves</div>
+                    <div className="text-gray-500 text-sm mt-2">{i.survivedWaves(gameState.wave)}</div>
                   </div>
                 )}
                 <button
                   onClick={gameState.gameMode === 'custom' ? startCustomGame : startGame}
                   className="px-8 py-4 bg-gray-800 hover:bg-gray-700 border border-gray-600 text-white font-bold rounded-xl transition-all flex items-center gap-2"
                 >
-                  <RotateCcw size={20} /> REBOOT SYSTEM
+                  <RotateCcw size={20} /> {i.rebootSystem}
                 </button>
               </div>
             )}
@@ -265,7 +284,7 @@ export default function App() {
           <button
             onClick={() => setSidebarOpen(v => !v)}
             className="absolute -left-8 top-1/2 -translate-y-1/2 z-10 w-7 h-14 bg-gray-800 hover:bg-gray-700 border border-gray-700 border-r-0 rounded-l-lg flex items-center justify-center text-gray-400 hover:text-white transition-colors"
-            title={sidebarOpen ? 'Hide panel' : 'Show panel'}
+            title={sidebarOpen ? i.hidePanel : i.showPanel}
           >
             {sidebarOpen ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
           </button>
@@ -278,28 +297,29 @@ export default function App() {
           >
             <div className="min-w-[124px]">
               <div className="text-[10px] font-bold uppercase tracking-widest text-gray-500 px-1 py-1">
-                Inventory
+                {i.inventory}
               </div>
-              {renderTowerButton('blaster', 'Blaster')}
-              {renderTowerButton('gatling', 'Gatling')}
-              {renderTowerButton('sniper', 'Sniper')}
-              {renderTowerButton('tesla', 'Tesla')}
-              {renderTowerButton('generator', 'Generator')}
-              {renderTowerButton('shield', 'Shield')}
-              {renderTowerButton('battery', 'Battery')}
-              {gameState.gameMode === 'custom' && renderTowerButton('target', 'Target')}
+              {renderTowerButton('blaster')}
+              {renderTowerButton('gatling')}
+              {renderTowerButton('sniper')}
+              {renderTowerButton('tesla')}
+              {renderTowerButton('generator')}
+              {renderTowerButton('shield')}
+              {renderTowerButton('battery')}
+              {renderTowerButton('bus')}
+              {gameState.gameMode === 'custom' && renderTowerButton('target')}
 
               <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-800 bg-gray-900/50 w-full">
                 <div className="text-blue-400 shrink-0"><Cable size={16} /></div>
                 <div className="flex flex-col items-start min-w-0">
-                  <span className="text-xs font-bold text-gray-200 leading-tight">Wires</span>
+                  <span className="text-xs font-bold text-gray-200 leading-tight">{i.wires}</span>
                   <span className="text-[10px] text-blue-400 font-mono leading-tight">{gameState.gameMode === 'custom' ? '\u221E' : `x${gameState.wireInventory}`}</span>
                 </div>
               </div>
 
               <div className="mt-4 text-[10px] text-gray-600 px-1 py-2 leading-relaxed">
-                <p>Click machine to rotate</p>
-                <p>Drag port to wire</p>
+                <p>{i.clickToRotate}</p>
+                <p>{i.dragToWire}</p>
               </div>
             </div>
           </div>

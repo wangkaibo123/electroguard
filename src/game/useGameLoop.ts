@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  GameState, TowerType, Port, CELL_SIZE, GRID_WIDTH, GRID_HEIGHT,
+  GameState, TowerType, Port, PortDirection, Wire, CELL_SIZE, GRID_WIDTH, GRID_HEIGHT,
   TOWER_STATS, CANVAS_WIDTH, CANVAS_HEIGHT, WIRE_MAX_HP, ChainLightning,
-  Camera, VIEWPORT_WIDTH, VIEWPORT_HEIGHT,
+  Camera, VIEWPORT_WIDTH, VIEWPORT_HEIGHT, HitEffect, ShieldBreakEffect,
 } from './types';
 import {
-  createInitialState, updatePowerGrid, spawnEnemy, createExplosion,
+  createInitialState, updatePowerGrid, spawnEnemy, spawnBoss, createExplosion,
   getPortPos, generatePorts, getPortCell, findWirePath, dispatchPulse,
   snapRotation, applyTowerRotation, canPlace, collidesWithTowers,
   collidesWithWires, repathConnectedWires, genId, rebuildTowerMap,
@@ -24,17 +24,22 @@ const BLASTER_RANGE = 150;
 const BLASTER_DAMAGE = 50;
 const BLASTER_POWER_COST = 2;
 
-const GATLING_COOLDOWN = 200;
 const GATLING_RANGE = 130;
-const GATLING_DAMAGE = 10;
-const GATLING_SPREAD = 0.26; // ~15 degrees
+const GATLING_DAMAGE = 8;
 const GATLING_BULLET_RANGE = 200;
+const GATLING_MIN_INTERVAL = 200;  // ms at max heat (5 shots/sec)
+const GATLING_MAX_INTERVAL = 500;  // ms when cold
+const GATLING_HEAT_PER_SHOT = 0.12;
+const GATLING_HEAT_DECAY = 0.15;   // per second
+const GATLING_MIN_SPREAD = 0.04;   // ~2 degrees when cold
+const GATLING_MAX_SPREAD = 0.35;   // ~20 degrees at max heat
 
-const SNIPER_COOLDOWN = 2500;
+const SNIPER_COOLDOWN = 4000;
 const SNIPER_RANGE = 300;
 const SNIPER_DAMAGE = 200;
 const SNIPER_POWER_COST = 4;
-const SNIPER_SPEED = 600;
+const SNIPER_SPEED = 800;
+const SNIPER_MAX_RANGE = 600; // straight-line max travel
 
 const TESLA_COOLDOWN = 3000;
 const TESLA_RANGE = 180;
@@ -42,6 +47,10 @@ const TESLA_BOUNCE_RANGE = 120;
 const TESLA_DAMAGE_PER_POWER = 25;
 const WAVE_DELAY = 5;
 const ATTACK_RANGE = 10;
+
+const ENEMY_SCORE: Record<string, number> = {
+  scout: 5, grunt: 10, tank: 25, saboteur: 15, overlord: 100,
+};
 
 export const useGameLoop = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -74,6 +83,8 @@ export const useGameLoop = () => {
 
   // Drag cancel state
   const dragOrigPosRef = useRef<{ x: number; y: number } | null>(null);
+  const dragOrigWiresRef = useRef<Wire[] | null>(null);
+  const dragOrigInventoryRef = useRef<number>(0);
 
   const sync = () => setGameState({ ...stateRef.current });
 
@@ -196,12 +207,21 @@ export const useGameLoop = () => {
       }
     }
 
-    // Tower drag check
+    // Tower drag check (core cannot be dragged, but still clickable for selection)
     for (const tower of state.towers) {
       if (wx >= tower.x * CELL_SIZE && wx <= (tower.x + tower.width) * CELL_SIZE &&
           wy >= tower.y * CELL_SIZE && wy <= (tower.y + tower.height) * CELL_SIZE) {
+        if (tower.type === 'core') {
+          // Core: toggle rotation selection on click, no drag
+          updateRotating(rotatingRef.current === tower.id ? null : tower.id);
+          return;
+        }
         dragTowerRef.current = tower.id;
         dragOrigPosRef.current = { x: tower.x, y: tower.y };
+        // Save connected wires for ESC restore
+        const connWires = state.wires.filter(w => w.startTowerId === tower.id || w.endTowerId === tower.id);
+        dragOrigWiresRef.current = connWires.map(w => ({ ...w, path: w.path.map(p => ({ ...p })) }));
+        dragOrigInventoryRef.current = state.wireInventory;
         return;
       }
     }
@@ -221,7 +241,21 @@ export const useGameLoop = () => {
         ];
       } else if (sel === 'generator') {
         ports = generatePorts('output');
-      } else if (sel === 'blaster' || sel === 'gatling' || sel === 'sniper' || sel === 'tesla' || sel === 'shield') {
+      } else if (sel === 'shield') {
+        // Shield: single input port in a random direction
+        const dirs: PortDirection[] = ['top', 'right', 'bottom', 'left'];
+        ports = [{ id: genId(), direction: dirs[(Math.random() * 4) | 0], portType: 'input' }];
+      } else if (sel === 'bus') {
+        // Bus: 3 input ports on left, 3 output ports on right
+        ports = [
+          { id: genId(), direction: 'left',  portType: 'input',  sideOffset: 1 / 6 },
+          { id: genId(), direction: 'left',  portType: 'input',  sideOffset: 3 / 6 },
+          { id: genId(), direction: 'left',  portType: 'input',  sideOffset: 5 / 6 },
+          { id: genId(), direction: 'right', portType: 'output', sideOffset: 1 / 6 },
+          { id: genId(), direction: 'right', portType: 'output', sideOffset: 3 / 6 },
+          { id: genId(), direction: 'right', portType: 'output', sideOffset: 5 / 6 },
+        ];
+      } else if (sel === 'blaster' || sel === 'gatling' || sel === 'sniper' || sel === 'tesla') {
         ports = generatePorts('input');
       } else {
         ports = []; // target
@@ -233,14 +267,19 @@ export const useGameLoop = () => {
         hp: stats.hp, maxHp: stats.hp,
         powered: false, storedPower: 0, maxPower: stats.maxPower, incomingPower: 0,
         shieldHp: stats.maxShieldHp, maxShieldHp: stats.maxShieldHp, shieldRadius: stats.shieldRadius,
-        lastActionTime: 0, ports, rotation: 0, barrelAngle: 0,
+        lastActionTime: 0, ports, rotation: 0, barrelAngle: 0, heat: 0,
       };
       state.towers.push(t);
       state.towerMap.set(t.id, t);
       updatePowerGrid(state);
       sync();
       if (state.gameMode !== 'custom' && (state.towerInventory[sel] ?? 0) <= 0) setSelectedTower(null);
+      return;
     }
+
+    // Left-click on empty space: start pan
+    isPanningRef.current = true;
+    panLastRef.current = { x: sx, y: sy };
   };
 
   const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -350,6 +389,7 @@ export const useGameLoop = () => {
       }
       dragTowerRef.current = null;
       dragOrigPosRef.current = null;
+      dragOrigWiresRef.current = null;
     } else if (!dragWireStartRef.current) {
       let hit = false;
       for (const t of state.towers) {
@@ -410,8 +450,26 @@ export const useGameLoop = () => {
 
   const handleCanvasMouseLeave = () => {
     hoverRef.current = null;
+    // Restore tower + wires if dragging
+    if (dragTowerRef.current && dragOrigPosRef.current) {
+      const state = stateRef.current;
+      const tower = state.towerMap.get(dragTowerRef.current);
+      if (tower) {
+        tower.x = dragOrigPosRef.current.x;
+        tower.y = dragOrigPosRef.current.y;
+        if (dragOrigWiresRef.current) {
+          state.wires = state.wires.filter(w => w.startTowerId !== tower.id && w.endTowerId !== tower.id);
+          state.wires.push(...dragOrigWiresRef.current);
+          state.wireInventory = dragOrigInventoryRef.current;
+          updatePowerGrid(state);
+        }
+        sync();
+      }
+    }
     dragWireStartRef.current = null;
     dragTowerRef.current = null;
+    dragOrigPosRef.current = null;
+    dragOrigWiresRef.current = null;
     dragWirePathRef.current = null;
     isRotKnobRef.current = false;
     isPanningRef.current = false;
@@ -511,6 +569,14 @@ export const useGameLoop = () => {
         changed = true;
       }
 
+      // ── Gatling heat decay ──────────────────────────────────────────
+      for (const t of state.towers) {
+        if (t.type === 'gatling' && t.heat > 0) {
+          t.heat = Math.max(0, t.heat - GATLING_HEAT_DECAY * dt);
+          changed = true;
+        }
+      }
+
       // ── Turret barrel tracking + shooting (blaster, gatling, sniper) ───
       const BARREL_SPEED = 4; // radians per second for smooth tracking
       const TURRET_TYPES = new Set(['blaster', 'gatling', 'sniper']);
@@ -567,47 +633,39 @@ export const useGameLoop = () => {
           }
         }
 
-        // ── Gatling: 4 spread bullets per power, rapid fire ──
+        // ── Gatling: heat-based rapid fire, single bullet ──
         if (t.type === 'gatling') {
-          if (t.storedPower < 1 || now - t.lastActionTime <= GATLING_COOLDOWN) continue;
+          const heat = t.heat;
+          const interval = GATLING_MAX_INTERVAL - (GATLING_MAX_INTERVAL - GATLING_MIN_INTERVAL) * heat;
+          if (t.storedPower < 1 || now - t.lastActionTime <= interval) continue;
           t.storedPower -= 1;
-          const baseAngle = t.barrelAngle;
-          for (let b = 0; b < 4; b++) {
-            const spreadAngle = baseAngle + (Math.random() - 0.5) * GATLING_SPREAD * 2;
-            const targetId = bestEnemy?.id ?? bestTarget?.id ?? '';
-            state.projectiles.push({
-              id: genId(), x: mx, y: my, targetId,
-              speed: 250, damage: GATLING_DAMAGE,
-              isTargetTower: !!bestTarget && !bestEnemy,
-              angle: spreadAngle, traveled: 0, maxRange: GATLING_BULLET_RANGE,
-              color: '#f59e0b', size: 2,
-            });
-          }
+          t.heat = Math.min(1, heat + GATLING_HEAT_PER_SHOT);
+          const spread = GATLING_MIN_SPREAD + (GATLING_MAX_SPREAD - GATLING_MIN_SPREAD) * t.heat;
+          const spreadAngle = t.barrelAngle + (Math.random() - 0.5) * spread * 2;
+          const targetId = bestEnemy?.id ?? bestTarget?.id ?? '';
+          state.projectiles.push({
+            id: genId(), x: mx, y: my, targetId,
+            speed: 280, damage: GATLING_DAMAGE,
+            isTargetTower: !!bestTarget && !bestEnemy,
+            angle: spreadAngle, traveled: 0, maxRange: GATLING_BULLET_RANGE,
+            color: '#f59e0b', size: 2,
+          });
           t.lastActionTime = now; changed = true;
         }
 
-        // ── Sniper: piercing high-damage shot, 4 power ──
+        // ── Sniper: straight-line piercing shot, long CD ──
         if (t.type === 'sniper') {
           if (t.storedPower < SNIPER_POWER_COST || now - t.lastActionTime <= SNIPER_COOLDOWN) continue;
-          if (bestEnemy) {
-            t.storedPower -= SNIPER_POWER_COST;
-            state.projectiles.push({
-              id: genId(), x: mx, y: my, targetId: bestEnemy.id,
-              speed: SNIPER_SPEED, damage: SNIPER_DAMAGE,
-              piercing: true, piercedIds: [],
-              color: '#a78bfa', size: 4,
-            });
-            t.lastActionTime = now; changed = true;
-          } else if (bestTarget) {
-            t.storedPower -= SNIPER_POWER_COST;
-            state.projectiles.push({
-              id: genId(), x: mx, y: my, targetId: bestTarget.id,
-              speed: SNIPER_SPEED, damage: SNIPER_DAMAGE,
-              isTargetTower: true, piercing: true, piercedIds: [],
-              color: '#a78bfa', size: 4,
-            });
-            t.lastActionTime = now; changed = true;
-          }
+          t.storedPower -= SNIPER_POWER_COST;
+          const fireAngle = t.barrelAngle;
+          state.projectiles.push({
+            id: genId(), x: mx, y: my, targetId: bestEnemy?.id ?? bestTarget?.id ?? '',
+            speed: SNIPER_SPEED, damage: SNIPER_DAMAGE,
+            angle: fireAngle, traveled: 0, maxRange: SNIPER_MAX_RANGE,
+            piercing: true, piercedIds: [],
+            color: '#a78bfa', size: 4,
+          });
+          t.lastActionTime = now; changed = true;
         }
       }
 
@@ -639,11 +697,17 @@ export const useGameLoop = () => {
 
         for (let b = 0; b < bounces && curEnemy; b++) {
           clSegments.push({ x1: cx, y1: cy, x2: curEnemy.x, y2: curEnemy.y });
-          curEnemy.hp -= totalDmg / bounces;
+          let dmg = totalDmg / bounces;
+          if (curEnemy.shieldAbsorb > 0) {
+            const absorbed = Math.min(curEnemy.shieldAbsorb, dmg);
+            curEnemy.shieldAbsorb -= absorbed;
+            dmg -= absorbed;
+          }
+          curEnemy.hp -= dmg;
           if (curEnemy.hp <= 0) {
-            createExplosion(state, curEnemy.x, curEnemy.y, '#e879f9', 12);
+            createExplosion(state, curEnemy.x, curEnemy.y, curEnemy.color, 12);
+            state.score += (ENEMY_SCORE[curEnemy.enemyType] ?? 10);
             state.enemies = state.enemies.filter(e => e.id !== curEnemy!.id);
-            state.score += 10;
           }
           hitIds.add(curEnemy.id);
           cx = curEnemy.x; cy = curEnemy.y;
@@ -679,9 +743,11 @@ export const useGameLoop = () => {
             state.waveTimer += dt;
             if (state.waveTimer > WAVE_DELAY) {
               state.wave++;
-              state.enemiesToSpawn = 2 + state.wave;
+              state.enemiesToSpawn = Math.floor(2 + state.wave * 0.8 + Math.sqrt(state.wave) * 0.5);
               state.waveTimer = 0;
               state.needsPick = true; // will trigger pick after this wave clears
+              // Spawn boss every 5 waves
+              if (state.wave % 5 === 0) spawnBoss(state, state.wave);
               changed = true;
             }
           }
@@ -703,17 +769,23 @@ export const useGameLoop = () => {
         let tgtTower: typeof state.towers[0] | null = null;
         let tgtWire: typeof state.wires[0] | null = null;
 
+        // Saboteurs prioritize wires — check wires first with a distance bonus
+        const isSaboteur = enemy.enemyType === 'saboteur';
+
         for (const t of state.towers) {
           if (t.type !== 'core' && !t.powered) continue;
           const tx = Math.max(t.x * CELL_SIZE, Math.min(enemy.x, (t.x + t.width) * CELL_SIZE));
           const ty = Math.max(t.y * CELL_SIZE, Math.min(enemy.y, (t.y + t.height) * CELL_SIZE));
           const d = Math.hypot(tx - enemy.x, ty - enemy.y);
-          if (d < minD) { minD = d; tgtTower = t; tgtWire = null; isShield = false; tgtPos = { x: tx, y: ty }; }
+          // Saboteurs deprioritize towers (1.5x effective distance)
+          const ed = isSaboteur ? d * 1.5 : d;
+          if (ed < minD) { minD = ed; tgtTower = t; tgtWire = null; isShield = false; tgtPos = { x: tx, y: ty }; }
           if (t.shieldHp > 0 && t.shieldRadius > 0) {
             const scx = (t.x + t.width / 2) * CELL_SIZE, scy = (t.y + t.height / 2) * CELL_SIZE;
             const sd = Math.max(0, Math.hypot(scx - enemy.x, scy - enemy.y) - t.shieldRadius);
-            if (sd < minD) {
-              minD = sd; tgtTower = t; tgtWire = null; isShield = true;
+            const esd = isSaboteur ? sd * 1.5 : sd;
+            if (esd < minD) {
+              minD = esd; tgtTower = t; tgtWire = null; isShield = true;
               const a = Math.atan2(enemy.y - scy, enemy.x - scx);
               tgtPos = { x: scx + Math.cos(a) * t.shieldRadius, y: scy + Math.sin(a) * t.shieldRadius };
             }
@@ -723,12 +795,16 @@ export const useGameLoop = () => {
           for (const p of w.path) {
             const wx = p.x * CELL_SIZE + CELL_SIZE / 2, wy = p.y * CELL_SIZE + CELL_SIZE / 2;
             const d = Math.hypot(wx - enemy.x, wy - enemy.y);
-            if (d < minD) { minD = d; tgtTower = null; tgtWire = w; isShield = false; tgtPos = { x: wx, y: wy }; }
+            // Saboteurs get a distance bonus toward wires (0.6x effective distance)
+            const ed = isSaboteur ? d * 0.6 : d;
+            if (ed < minD) { minD = ed; tgtTower = null; tgtWire = w; isShield = false; tgtPos = { x: wx, y: wy }; }
           }
         }
 
         if (!tgtTower && !tgtWire) continue;
-        if (minD > ATTACK_RANGE) {
+        // Use actual distance for movement/attack range (not weighted)
+        const actualDist = Math.hypot(tgtPos.x - enemy.x, tgtPos.y - enemy.y);
+        if (actualDist > ATTACK_RANGE) {
           const a = Math.atan2(tgtPos.y - enemy.y, tgtPos.x - enemy.x);
           enemy.x += Math.cos(a) * enemy.speed * dt;
           enemy.y += Math.sin(a) * enemy.speed * dt;
@@ -736,13 +812,34 @@ export const useGameLoop = () => {
           changed = true;
         } else if (now - enemy.lastAttackTime > enemy.attackCooldown) {
           if (tgtWire) {
-            tgtWire.hp -= enemy.damage;
+            tgtWire.hp -= enemy.damage * enemy.wireDamageMul;
+            // Hit VFX on wire
+            state.hitEffects.push({ x: tgtPos.x, y: tgtPos.y, life: 0, maxLife: 0.3, color: '#ef4444', radius: 12 });
+            createExplosion(state, tgtPos.x, tgtPos.y, '#ef4444', 3);
             if (tgtWire.hp <= 0) { state.wires = state.wires.filter(w => w.id !== tgtWire!.id); updatePowerGrid(state); }
           } else if (tgtTower) {
             if (isShield) {
+              const prevHp = tgtTower.shieldHp;
               tgtTower.shieldHp = Math.max(0, tgtTower.shieldHp - enemy.damage);
+              // Hit VFX on shield
+              state.hitEffects.push({ x: tgtPos.x, y: tgtPos.y, life: 0, maxLife: 0.35, color: '#22d3ee', radius: 18 });
+              createExplosion(state, tgtPos.x, tgtPos.y, '#22d3ee', 4);
+              // Shield break effect
+              if (prevHp > 0 && tgtTower.shieldHp <= 0) {
+                const scx = (tgtTower.x + tgtTower.width / 2) * CELL_SIZE;
+                const scy = (tgtTower.y + tgtTower.height / 2) * CELL_SIZE;
+                const frags: ShieldBreakEffect['fragments'] = [];
+                for (let f = 0; f < 16; f++) {
+                  frags.push({ angle: (f / 16) * Math.PI * 2 + (Math.random() - 0.5) * 0.2, dist: 0, size: 3 + Math.random() * 4, speed: 60 + Math.random() * 80 });
+                }
+                state.shieldBreakEffects.push({ x: scx, y: scy, radius: tgtTower.shieldRadius, life: 0, maxLife: 0.6, fragments: frags });
+                createExplosion(state, scx, scy, '#22d3ee', 20);
+              }
             } else {
               tgtTower.hp -= enemy.damage;
+              // Hit VFX on tower
+              state.hitEffects.push({ x: tgtPos.x, y: tgtPos.y, life: 0, maxLife: 0.3, color: '#ef4444', radius: 14 });
+              createExplosion(state, tgtPos.x, tgtPos.y, '#f87171', 4);
               if (tgtTower.hp <= 0) {
                 if (tgtTower.type === 'core') state.status = 'gameover';
                 state.towers = state.towers.filter(t => t.id !== tgtTower!.id);
@@ -761,7 +858,7 @@ export const useGameLoop = () => {
       for (let i = state.projectiles.length - 1; i >= 0; i--) {
         const p = state.projectiles[i];
 
-        // Non-homing projectiles (gatling spread)
+        // Non-homing projectiles (gatling, sniper line-shot)
         if (p.angle !== undefined) {
           const step = p.speed * dt;
           p.x += Math.cos(p.angle) * step;
@@ -773,10 +870,17 @@ export const useGameLoop = () => {
           let hit = false;
           for (const e of state.enemies) {
             if (p.piercedIds?.includes(e.id)) continue;
-            if (Math.hypot(e.x - p.x, e.y - p.y) < 12) {
-              e.hp -= p.damage;
+            if (Math.hypot(e.x - p.x, e.y - p.y) < e.radius + 4) {
+              // Apply damage through shield absorb first
+              let dmg = p.damage;
+              if (e.shieldAbsorb > 0) {
+                const absorbed = Math.min(e.shieldAbsorb, dmg);
+                e.shieldAbsorb -= absorbed;
+                dmg -= absorbed;
+              }
+              e.hp -= dmg;
               createExplosion(state, e.x, e.y, p.color ?? '#fbbf24', 3);
-              if (e.hp <= 0) { state.enemies = state.enemies.filter(en => en.id !== e.id); state.score += 10; createExplosion(state, e.x, e.y, '#a855f7', 10); }
+              if (e.hp <= 0) { state.enemies = state.enemies.filter(en => en.id !== e.id); state.score += (ENEMY_SCORE[e.enemyType] ?? 10); createExplosion(state, e.x, e.y, e.color, 10); }
               if (!p.piercing) { state.projectiles.splice(i, 1); hit = true; }
               else { p.piercedIds = p.piercedIds ?? []; p.piercedIds.push(e.id); }
               changed = true;
@@ -840,13 +944,20 @@ export const useGameLoop = () => {
             tgtY = tgt.y;
             tgtFound = true;
             const d = Math.hypot(tgtX - p.x, tgtY - p.y);
-            if (d < 10) {
-              tgt.hp -= p.damage;
+            if (d < tgt.radius + 4) {
+              // Apply damage through shield absorb first
+              let dmg = p.damage;
+              if (tgt.shieldAbsorb > 0) {
+                const absorbed = Math.min(tgt.shieldAbsorb, dmg);
+                tgt.shieldAbsorb -= absorbed;
+                dmg -= absorbed;
+              }
+              tgt.hp -= dmg;
               createExplosion(state, tgt.x, tgt.y, p.color ?? '#fbbf24', 5);
               if (tgt.hp <= 0) {
                 state.enemies = state.enemies.filter(e => e.id !== tgt.id);
-                state.score += 10;
-                createExplosion(state, tgt.x, tgt.y, '#a855f7', 15);
+                state.score += (ENEMY_SCORE[tgt.enemyType] ?? 10);
+                createExplosion(state, tgt.x, tgt.y, tgt.color, 15);
               }
               if (p.piercing) {
                 p.piercedIds = p.piercedIds ?? []; p.piercedIds.push(tgt.id);
@@ -893,6 +1004,22 @@ export const useGameLoop = () => {
         changed = true;
       }
 
+      // ── Hit effects ──────────────────────────────────────────────────────
+      for (let i = state.hitEffects.length - 1; i >= 0; i--) {
+        state.hitEffects[i].life += dt;
+        if (state.hitEffects[i].life >= state.hitEffects[i].maxLife) state.hitEffects.splice(i, 1);
+        changed = true;
+      }
+
+      // ── Shield break effects ─────────────────────────────────────────────
+      for (let i = state.shieldBreakEffects.length - 1; i >= 0; i--) {
+        const sb = state.shieldBreakEffects[i];
+        sb.life += dt;
+        for (const f of sb.fragments) f.dist += f.speed * dt;
+        if (sb.life >= sb.maxLife) state.shieldBreakEffects.splice(i, 1);
+        changed = true;
+      }
+
       if (changed) sync();
     }
 
@@ -927,16 +1054,23 @@ export const useGameLoop = () => {
       if (state.status !== 'playing') return;
 
       if (e.key === 'Escape') {
-        // Cancel tower drag — restore original position
+        // Cancel tower drag — restore original position and wires
         if (dragTowerRef.current && dragOrigPosRef.current) {
           const tower = state.towerMap.get(dragTowerRef.current);
           if (tower) {
             tower.x = dragOrigPosRef.current.x;
             tower.y = dragOrigPosRef.current.y;
-            repathConnectedWires(state, tower.id);
+            // Restore saved wires
+            if (dragOrigWiresRef.current) {
+              state.wires = state.wires.filter(w => w.startTowerId !== tower.id && w.endTowerId !== tower.id);
+              state.wires.push(...dragOrigWiresRef.current);
+              state.wireInventory = dragOrigInventoryRef.current;
+              updatePowerGrid(state);
+            }
           }
           dragTowerRef.current = null;
           dragOrigPosRef.current = null;
+          dragOrigWiresRef.current = null;
           sync();
           return;
         }

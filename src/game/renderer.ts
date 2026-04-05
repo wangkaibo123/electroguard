@@ -1,7 +1,8 @@
-import { GameState, Tower, TowerType, CELL_SIZE, HALF_CELL, TOWER_STATS, Camera, CANVAS_WIDTH, CANVAS_HEIGHT, TURRET_RANGE } from './types';
+import { GameState, Tower, TowerType, CELL_SIZE, HALF_CELL, TOWER_STATS, Camera, CANVAS_WIDTH, CANVAS_HEIGHT, TURRET_RANGE, HitEffect, ShieldBreakEffect } from './types';
 import { getPortPos } from './engine';
 
 const TWO_PI = Math.PI * 2;
+const SNIPER_COOLDOWN_MS = 4000; // must match useGameLoop
 
 // ── Blue palette ──────────────────────────────────────────────────────────────
 const BG_DARK   = '#0a0e1a';
@@ -17,12 +18,17 @@ const PORT_IN_USED  = '#93c5fd';
 const HP_BG     = '#1e293b';
 const HP_FG     = '#22c55e';
 const SHIELD_CLR = 'rgba(34,211,238,';
-const ENEMY_CLR = '#c084fc';
 const PROJ_CLR  = '#fbbf24';
 const KNOB_CLR  = '#fbbf24';
 const UNPOWERED = '#4b5563';
 const POWER_ON  = '#34d399';
 const POWER_OFF = '#1e293b';
+
+/** Convert hex color to "r,g,b" string for use in rgba() */
+const hexToRgb = (hex: string): string => {
+  const n = parseInt(hex.slice(1), 16);
+  return `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
+};
 
 /** Interpolate position along a polyline at `dist` pixels from the start. */
 const posOnPath = (path: { x: number; y: number }[], dist: number) => {
@@ -215,18 +221,60 @@ export const renderGame = (
     ctx.fillRect(px + 2, py - 6, (CELL_SIZE - 4) * (wire.hp / wire.maxHp), 3);
   }
 
-  // ── Shields (below towers) ────────────────────────────────────────────────
+  // ── Shields (fade-based visualization) ───────────────────────────────
   for (const t of state.towers) {
     if (t.maxShieldHp <= 0 || t.shieldHp <= 0) continue;
     const cx = (t.x + t.width / 2) * CELL_SIZE, cy = (t.y + t.height / 2) * CELL_SIZE;
-    const op = 0.08 + 0.15 * (t.shieldHp / t.maxShieldHp);
+    const ratio = t.shieldHp / t.maxShieldHp;
+    const r = t.shieldRadius;
+
+    // Outer glow — fades as shield weakens
+    const glowOp = 0.04 + 0.12 * ratio;
+    const sGrad = ctx.createRadialGradient(cx, cy, r * 0.7, cx, cy, r);
+    sGrad.addColorStop(0, `rgba(34,211,238,0)`);
+    sGrad.addColorStop(1, `rgba(34,211,238,${glowOp})`);
+    ctx.fillStyle = sGrad;
     ctx.beginPath();
-    ctx.arc(cx, cy, t.shieldRadius, 0, TWO_PI);
-    ctx.fillStyle = `${SHIELD_CLR}${op})`;
+    ctx.arc(cx, cy, r, 0, TWO_PI);
     ctx.fill();
-    ctx.lineWidth = 1.5;
-    ctx.strokeStyle = `${SHIELD_CLR}${op + 0.3})`;
+
+    // Shield ring — thicker and brighter at full HP, thin and dim at low HP
+    const ringWidth = 1 + 2 * ratio;
+    const ringOp = 0.15 + 0.6 * ratio;
+    ctx.lineWidth = ringWidth;
+    ctx.strokeStyle = `rgba(34,211,238,${ringOp})`;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, TWO_PI);
     ctx.stroke();
+
+    // Hex-pattern segments — fade out as HP decreases
+    const segCount = 12;
+    const segAngle = TWO_PI / segCount;
+    const activeSegs = Math.ceil(segCount * ratio);
+    const shimmer = Math.sin(now / 300) * 0.1;
+    ctx.lineWidth = 1;
+    for (let s = 0; s < activeSegs; s++) {
+      const a = s * segAngle + now / 3000;
+      const segOp = (0.1 + 0.25 * ratio + shimmer) * (s < activeSegs - 1 ? 1 : ratio * segCount - Math.floor(ratio * segCount));
+      if (segOp < 0.01) continue;
+      ctx.strokeStyle = `rgba(34,211,238,${Math.max(0, segOp)})`;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r - 1, a, a + segAngle * 0.7);
+      ctx.stroke();
+    }
+
+    // Inner flicker when low HP
+    if (ratio < 0.4) {
+      const flicker = Math.random() < 0.3 ? 0.15 : 0;
+      if (flicker > 0) {
+        ctx.strokeStyle = `rgba(34,211,238,${flicker})`;
+        ctx.lineWidth = 2;
+        const fa = Math.random() * TWO_PI;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r * (0.8 + Math.random() * 0.2), fa, fa + 0.5);
+        ctx.stroke();
+      }
+    }
   }
 
   // ── Range preview for selected turret placement ───────────────────────────
@@ -324,14 +372,36 @@ export const renderGame = (
 
     ctx.restore();
 
-    // Bars (not rotated)
-    if (tower.maxShieldHp > 0 && tower.shieldHp < tower.maxShieldHp) {
-      ctx.fillStyle = '#164e63'; ctx.fillRect(px, py - 10, tw, 3);
-      ctx.fillStyle = '#22d3ee'; ctx.fillRect(px, py - 10, tw * (tower.shieldHp / tower.maxShieldHp), 3);
-    }
+    // Bars (not rotated) — shield bar removed, shield uses fade visualization
     if (tower.hp < tower.maxHp) {
       ctx.fillStyle = HP_BG; ctx.fillRect(px, py - 5, tw, 3);
       ctx.fillStyle = HP_FG; ctx.fillRect(px, py - 5, tw * (tower.hp / tower.maxHp), 3);
+    }
+    // Sniper cooldown bar
+    if (tower.type === 'sniper') {
+      const elapsed = now - tower.lastActionTime;
+      const cdRatio = tower.lastActionTime > 0 ? Math.min(1, elapsed / SNIPER_COOLDOWN_MS) : 1;
+      if (cdRatio < 1) {
+        const barY = py + th + 2;
+        ctx.fillStyle = HP_BG; ctx.fillRect(px, barY, tw, 3);
+        ctx.fillStyle = '#a78bfa'; ctx.fillRect(px, barY, tw * cdRatio, 3);
+      } else if (tower.storedPower >= 4 && tower.powered) {
+        // Ready indicator glow
+        const pulse = 0.4 + 0.3 * Math.sin(now / 300);
+        ctx.fillStyle = `rgba(167,139,250,${pulse})`;
+        ctx.fillRect(px, py + th + 2, tw, 3);
+      }
+    }
+    // Gatling heat bar
+    if (tower.type === 'gatling' && tower.heat > 0.01) {
+      const barY = py + th + 2;
+      ctx.fillStyle = HP_BG; ctx.fillRect(px, barY, tw, 3);
+      // Gradient from yellow to red based on heat
+      const r = Math.floor(245 + 10 * tower.heat);
+      const g = Math.floor(158 * (1 - tower.heat * 0.7));
+      const b = Math.floor(11 * (1 - tower.heat));
+      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      ctx.fillRect(px, barY, tw * tower.heat, 3);
     }
     if (tower.maxPower > 0 && tower.type !== 'core' && tower.type !== 'battery' && tower.type !== 'blaster' && tower.type !== 'gatling' && tower.type !== 'sniper' && tower.type !== 'tesla') {
       const pr = Math.min(tw, th) / 3;
@@ -401,29 +471,115 @@ export const renderGame = (
     }
   }
 
-  // ── Enemies (rotated triangles facing movement direction) ─────────────────
+  // ── Enemies (type-specific visuals) ─────────────────────────────────────────
   for (const e of state.enemies) {
-    const r = CELL_SIZE / 3;
+    const r = e.radius;
+    const eColor = e.color;
+    const fillAlpha = 'rgba(' + hexToRgb(eColor) + ',0.2)';
+
     ctx.save();
     ctx.translate(e.x, e.y);
-    ctx.rotate(e.heading + Math.PI / 2);
-    ctx.strokeStyle = ENEMY_CLR;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(0, -r);
-    ctx.lineTo(-r * 0.87, r * 0.5);
-    ctx.lineTo(r * 0.87, r * 0.5);
-    ctx.closePath();
-    ctx.fillStyle = 'rgba(192,132,252,0.2)';
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = ENEMY_CLR;
-    ctx.beginPath(); ctx.arc(0, 0, 2, 0, TWO_PI); ctx.fill();
+
+    if (e.enemyType === 'scout') {
+      // Small fast triangle with speed trail
+      ctx.rotate(e.heading + Math.PI / 2);
+      ctx.strokeStyle = eColor; ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(0, -r); ctx.lineTo(-r * 0.7, r * 0.5); ctx.lineTo(r * 0.7, r * 0.5); ctx.closePath();
+      ctx.fillStyle = fillAlpha; ctx.fill(); ctx.stroke();
+      // Speed trail
+      ctx.globalAlpha = 0.15;
+      ctx.strokeStyle = eColor; ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.4, r * 0.5); ctx.lineTo(-r * 0.2, r * 1.5);
+      ctx.moveTo(r * 0.4, r * 0.5); ctx.lineTo(r * 0.2, r * 1.5);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    } else if (e.enemyType === 'grunt') {
+      // Standard triangle (like the old enemy)
+      ctx.rotate(e.heading + Math.PI / 2);
+      ctx.strokeStyle = eColor; ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, -r); ctx.lineTo(-r * 0.87, r * 0.5); ctx.lineTo(r * 0.87, r * 0.5); ctx.closePath();
+      ctx.fillStyle = fillAlpha; ctx.fill(); ctx.stroke();
+      ctx.fillStyle = eColor;
+      ctx.beginPath(); ctx.arc(0, 0, 2, 0, TWO_PI); ctx.fill();
+    } else if (e.enemyType === 'tank') {
+      // Large circle with armor ring
+      ctx.strokeStyle = eColor; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, TWO_PI); ctx.stroke();
+      ctx.fillStyle = fillAlpha; ctx.beginPath(); ctx.arc(0, 0, r, 0, TWO_PI); ctx.fill();
+      // Inner armor ring
+      ctx.strokeStyle = eColor; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(0, 0, r * 0.6, 0, TWO_PI); ctx.stroke();
+      ctx.fillStyle = eColor;
+      ctx.beginPath(); ctx.arc(0, 0, 3, 0, TWO_PI); ctx.fill();
+    } else if (e.enemyType === 'saboteur') {
+      // Diamond shape with spark effect
+      ctx.rotate(e.heading);
+      ctx.strokeStyle = eColor; ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(0, -r); ctx.lineTo(r * 0.6, 0); ctx.lineTo(0, r); ctx.lineTo(-r * 0.6, 0); ctx.closePath();
+      ctx.fillStyle = fillAlpha; ctx.fill(); ctx.stroke();
+      // Sparks
+      const sparkT = now / 150;
+      ctx.lineWidth = 1;
+      for (let s = 0; s < 3; s++) {
+        const sa = (s / 3) * TWO_PI + sparkT;
+        const sd = r * 0.8 + Math.sin(sparkT + s * 2) * 2;
+        const spOp = 0.3 + 0.3 * Math.sin(sparkT * 2 + s);
+        if (spOp < 0.1) continue;
+        ctx.strokeStyle = `rgba(${hexToRgb(eColor)},${spOp})`;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(sa) * sd - 1, Math.sin(sa) * sd - 1);
+        ctx.lineTo(Math.cos(sa) * sd + 1, Math.sin(sa) * sd + 1);
+        ctx.stroke();
+      }
+    } else if (e.enemyType === 'overlord') {
+      // Large circle with pulsing red aura
+      const pulse = 0.1 + 0.08 * Math.sin(now / 200);
+      const auraR = r * 1.4;
+      const grd = ctx.createRadialGradient(0, 0, r * 0.5, 0, 0, auraR);
+      grd.addColorStop(0, `rgba(239,68,68,0)`);
+      grd.addColorStop(1, `rgba(239,68,68,${pulse})`);
+      ctx.fillStyle = grd;
+      ctx.beginPath(); ctx.arc(0, 0, auraR, 0, TWO_PI); ctx.fill();
+
+      // Main body
+      ctx.strokeStyle = eColor; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, TWO_PI); ctx.stroke();
+      ctx.fillStyle = 'rgba(239,68,68,0.25)';
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, TWO_PI); ctx.fill();
+
+      // Inner cross pattern
+      ctx.strokeStyle = eColor; ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.5, 0); ctx.lineTo(r * 0.5, 0);
+      ctx.moveTo(0, -r * 0.5); ctx.lineTo(0, r * 0.5);
+      ctx.stroke();
+
+      // Shield ring if active
+      if (e.shieldAbsorb > 0) {
+        const shieldRatio = e.shieldAbsorb / e.maxShieldAbsorb;
+        ctx.strokeStyle = `rgba(255,255,255,${0.3 + 0.4 * shieldRatio})`;
+        ctx.lineWidth = 2 * shieldRatio + 0.5;
+        ctx.beginPath(); ctx.arc(0, 0, r + 3, 0, TWO_PI * shieldRatio); ctx.stroke();
+      }
+    }
+
     ctx.restore();
 
+    // HP bar
     if (e.hp < e.maxHp) {
-      ctx.fillStyle = HP_BG; ctx.fillRect(e.x - 10, e.y - r - 6, 20, 3);
-      ctx.fillStyle = HP_FG; ctx.fillRect(e.x - 10, e.y - r - 6, 20 * (e.hp / e.maxHp), 3);
+      const barW = Math.max(20, r * 2.5);
+      ctx.fillStyle = HP_BG; ctx.fillRect(e.x - barW / 2, e.y - r - 7, barW, 3);
+      ctx.fillStyle = HP_FG; ctx.fillRect(e.x - barW / 2, e.y - r - 7, barW * (e.hp / e.maxHp), 3);
+    }
+    // Shield bar for overlord
+    if (e.shieldAbsorb > 0 && e.maxShieldAbsorb > 0) {
+      const barW = Math.max(20, r * 2.5);
+      ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fillRect(e.x - barW / 2, e.y - r - 11, barW, 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.fillRect(e.x - barW / 2, e.y - r - 11, barW * (e.shieldAbsorb / e.maxShieldAbsorb), 2);
     }
   }
 
@@ -476,6 +632,47 @@ export const renderGame = (
     ctx.globalAlpha = 1 - p.life / p.maxLife;
     ctx.fillStyle = p.color;
     ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, TWO_PI); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // ── Hit effects (expanding ring flash) ──────────────────────────────────
+  for (const h of state.hitEffects) {
+    const t = h.life / h.maxLife;
+    const alpha = 1 - t;
+    const r = h.radius * (0.5 + t * 1.5);
+    // Outer ring
+    ctx.strokeStyle = h.color;
+    ctx.lineWidth = 2 * (1 - t);
+    ctx.globalAlpha = alpha * 0.8;
+    ctx.beginPath(); ctx.arc(h.x, h.y, r, 0, TWO_PI); ctx.stroke();
+    // Inner flash
+    ctx.fillStyle = h.color;
+    ctx.globalAlpha = alpha * 0.3;
+    ctx.beginPath(); ctx.arc(h.x, h.y, r * 0.4, 0, TWO_PI); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // ── Shield break effects ──────────────────────────────────────────────
+  for (const sb of state.shieldBreakEffects) {
+    const t = sb.life / sb.maxLife;
+    const alpha = (1 - t) * 0.9;
+    // Expanding shatter ring
+    ctx.strokeStyle = `rgba(34,211,238,${alpha * 0.5})`;
+    ctx.lineWidth = 3 * (1 - t);
+    ctx.beginPath(); ctx.arc(sb.x, sb.y, sb.radius + sb.life * 100, 0, TWO_PI); ctx.stroke();
+    // Flying fragments
+    for (const f of sb.fragments) {
+      const fx = sb.x + Math.cos(f.angle) * (sb.radius + f.dist);
+      const fy = sb.y + Math.sin(f.angle) * (sb.radius + f.dist);
+      ctx.fillStyle = `rgba(34,211,238,${alpha})`;
+      ctx.beginPath(); ctx.arc(fx, fy, f.size * (1 - t * 0.5), 0, TWO_PI); ctx.fill();
+    }
+    // Flash at center
+    if (t < 0.2) {
+      const flashOp = (1 - t / 0.2) * 0.2;
+      ctx.fillStyle = `rgba(34,211,238,${flashOp})`;
+      ctx.beginPath(); ctx.arc(sb.x, sb.y, sb.radius * (1 + t * 2), 0, TWO_PI); ctx.fill();
+    }
   }
   ctx.globalAlpha = 1;
 
@@ -537,6 +734,17 @@ function drawTowerDetails(
     }
     const localAngle = t.barrelAngle - t.rotation;
     const barrelLen = Math.min(tw, th) / 2 - inset + 4;
+    // Heat glow on barrels
+    const heat = t.heat;
+    if (heat > 0.1) {
+      const glowR = r * 1.3;
+      const heatOp = heat * 0.15;
+      const hGrd = ctx.createRadialGradient(cx, cy, r * 0.3, cx, cy, glowR);
+      hGrd.addColorStop(0, `rgba(255,${Math.floor(100 * (1 - heat))},0,${heatOp})`);
+      hGrd.addColorStop(1, 'rgba(255,100,0,0)');
+      ctx.fillStyle = hGrd;
+      ctx.beginPath(); ctx.arc(cx, cy, glowR, 0, TWO_PI); ctx.fill();
+    }
     for (let b = -1; b <= 1; b++) {
       const offset = b * 3;
       const perpX = -Math.sin(localAngle) * offset;
@@ -545,7 +753,12 @@ function drawTowerDetails(
       const sy = cy + perpY + Math.sin(localAngle) * r * 0.3;
       const ex = cx + perpX + Math.cos(localAngle) * barrelLen;
       const ey = cy + perpY + Math.sin(localAngle) * barrelLen;
-      ctx.strokeStyle = tColor; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+      // Barrel color shifts toward red with heat
+      const bColorR = Math.floor(245 + 10 * heat);
+      const bColorG = Math.floor(158 * (1 - heat * 0.6));
+      const bColorB = Math.floor(11 * (1 - heat));
+      const barrelColor = heat > 0.1 ? `rgb(${bColorR},${bColorG},${bColorB})` : tColor;
+      ctx.strokeStyle = barrelColor; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
       ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
     }
   } else if (t.type === 'sniper') {
@@ -600,12 +813,59 @@ function drawTowerDetails(
     ctx.fillStyle = tColor;
     ctx.beginPath(); ctx.arc(cx, cy, 2.5, 0, TWO_PI); ctx.fill();
   } else if (t.type === 'generator') {
-    ctx.strokeStyle = tColor; ctx.lineWidth = 1.5;
+    const now = performance.now();
     const s = Math.min(tw, th) * 0.25;
+
+    // Rotating energy arcs
+    ctx.lineWidth = 1.5;
+    const arcCount = 3;
+    for (let i = 0; i < arcCount; i++) {
+      const baseAngle = (i / arcCount) * TWO_PI + now / 800;
+      const arcR = s * 1.2 + Math.sin(now / 400 + i * 2) * 2;
+      const arcOp = t.powered ? (0.2 + 0.25 * Math.sin(now / 300 + i * 1.5)) : 0.08;
+      ctx.strokeStyle = `rgba(251,191,36,${arcOp})`;
+      ctx.beginPath();
+      ctx.arc(cx, cy, arcR, baseAngle, baseAngle + Math.PI * 0.5);
+      ctx.stroke();
+    }
+
+    // Pulsing center glow
+    if (t.powered) {
+      const pulse = 0.08 + 0.07 * Math.sin(now / 250);
+      const glowR = s * 1.5;
+      const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, glowR);
+      grd.addColorStop(0, `rgba(251,191,36,${pulse})`);
+      grd.addColorStop(1, 'rgba(251,191,36,0)');
+      ctx.fillStyle = grd;
+      ctx.beginPath(); ctx.arc(cx, cy, glowR, 0, TWO_PI); ctx.fill();
+    }
+
+    // Lightning bolt icon
+    ctx.strokeStyle = tColor; ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(cx + s * 0.1, cy - s); ctx.lineTo(cx - s * 0.4, cy + s * 0.1);
     ctx.lineTo(cx + s * 0.1, cy + s * 0.1); ctx.lineTo(cx - s * 0.1, cy + s);
     ctx.stroke();
+
+    // Small electric sparks flying outward when powered
+    if (t.powered) {
+      ctx.lineWidth = 1;
+      for (let sp = 0; sp < 4; sp++) {
+        const spAngle = (sp / 4) * TWO_PI + now / 600;
+        const spDist = s * (0.6 + 0.6 * ((now / 500 + sp * 0.25) % 1));
+        const spOp = 0.6 * (1 - ((now / 500 + sp * 0.25) % 1));
+        if (spOp < 0.05) continue;
+        const spx = cx + Math.cos(spAngle) * spDist;
+        const spy = cy + Math.sin(spAngle) * spDist;
+        ctx.strokeStyle = `rgba(251,191,36,${spOp})`;
+        ctx.beginPath();
+        const jx = (Math.sin(now / 100 + sp) * 2);
+        const jy = (Math.cos(now / 100 + sp) * 2);
+        ctx.moveTo(spx - 2 + jx, spy - 2 + jy);
+        ctx.lineTo(spx + 2 - jx, spy + 2 - jy);
+        ctx.stroke();
+      }
+    }
   } else if (t.type === 'battery') {
     const cc = 4, cg = 2, bw = (tw - inset * 2 - 2 - (cc - 1) * cg) / cc, bh = th - inset * 2 - 4;
     for (let i = 0; i < cc; i++) {
@@ -631,5 +891,46 @@ function drawTowerDetails(
     const r = Math.min(tw, th) / 3;
     ctx.beginPath(); ctx.arc(cx, cy, r, -Math.PI * 0.8, Math.PI * 0.8); ctx.stroke();
     ctx.beginPath(); ctx.arc(cx, cy, r * 0.5, 0, TWO_PI); ctx.stroke();
+  } else if (t.type === 'bus') {
+    // Bus: 1x3 merger/splitter
+    ctx.strokeStyle = tColor; ctx.lineWidth = 1.5;
+    // Center line
+    ctx.beginPath();
+    ctx.moveTo(px + inset + 2, cy);
+    ctx.lineTo(px + tw - inset - 2, cy);
+    ctx.stroke();
+    // Input arrows (left side)
+    const segH = th / 3;
+    for (let i = 0; i < 3; i++) {
+      const sy = py + segH * i + segH / 2;
+      ctx.strokeStyle = '#60a5fa'; ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(px + inset, sy);
+      ctx.lineTo(px + tw / 2, cy);
+      ctx.stroke();
+      // Small arrow tip
+      ctx.fillStyle = '#60a5fa';
+      ctx.beginPath();
+      ctx.arc(px + inset + 2, sy, 2, 0, TWO_PI);
+      ctx.fill();
+    }
+    // Output arrows (right side)
+    for (let i = 0; i < 3; i++) {
+      const sy = py + segH * i + segH / 2;
+      ctx.strokeStyle = '#fbbf24'; ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(px + tw / 2, cy);
+      ctx.lineTo(px + tw - inset, sy);
+      ctx.stroke();
+      // Small arrow tip
+      ctx.fillStyle = '#fbbf24';
+      ctx.beginPath();
+      const tipX = px + tw - inset - 2;
+      ctx.moveTo(tipX, sy - 3); ctx.lineTo(tipX + 4, sy); ctx.lineTo(tipX, sy + 3); ctx.closePath();
+      ctx.fill();
+    }
+    // Center node
+    ctx.fillStyle = tColor;
+    ctx.beginPath(); ctx.arc(cx, cy, 3, 0, TWO_PI); ctx.fill();
   }
 }
