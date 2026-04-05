@@ -24,6 +24,7 @@ export interface I18nStrings {
 
   // Paused
   systemPaused: string;
+  exitToMenu: string;
 
   // Game over
   coreBreached: string;
@@ -69,6 +70,7 @@ const en: I18nStrings = {
   pickDescription: 'Choose one upgrade for your defense network',
 
   systemPaused: 'SYSTEM PAUSED',
+  exitToMenu: 'EXIT TO MENU',
 
   coreBreached: 'CORE BREACHED',
   systemFailure: 'SYSTEM FAILURE',
@@ -155,6 +157,7 @@ const zh: I18nStrings = {
   pickDescription: '为你的防御网络选择一项升级',
 
   systemPaused: '系统暂停',
+  exitToMenu: '退出到主界面',
 
   coreBreached: '核心失守',
   systemFailure: '系统崩溃',

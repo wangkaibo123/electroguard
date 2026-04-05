@@ -177,6 +177,14 @@ export const useGameLoop = () => {
     sync();
   };
 
+  const returnToMenu = () => {
+    const s = createInitialState();
+    s.status = 'menu';
+    stateRef.current = s;
+    setSelectedTower(null);
+    sync();
+  };
+
   const handlePick = (optionId: string) => {
     const state = stateRef.current;
     const option = state.pickOptions.find(o => o.id === optionId);
@@ -336,7 +344,9 @@ export const useGameLoop = () => {
       return;
     }
 
-    // Left-click on empty space: start pan
+    // Left-click on empty space: deselect tower & start pan
+    setSelectedTower(null);
+    updateRotating(null);
     isPanningRef.current = true;
     panLastRef.current = { x: sx, y: sy };
   };
@@ -1088,7 +1098,7 @@ export const useGameLoop = () => {
   }, []);
 
   return {
-    canvasRef, gameState, startGame, startCustomGame, togglePause, handlePick,
+    canvasRef, gameState, startGame, startCustomGame, togglePause, returnToMenu, handlePick,
     selectedTower, setSelectedTower,
     handleCanvasMouseDown, handleCanvasMouseMove, handleCanvasMouseUp, handleCanvasMouseLeave,
     handleCanvasWheel, handleCanvasContextMenu,

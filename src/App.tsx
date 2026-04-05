@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Battery, Zap, Crosshair, Activity, Play, RotateCcw, Pause, Hexagon, Cable, Target, Wrench, ChevronRight, ChevronLeft, Flame, Focus, Radio, GitMerge, Globe } from 'lucide-react';
+import { Battery, Zap, Crosshair, Activity, Play, RotateCcw, Pause, Hexagon, Cable, Target, Wrench, ChevronRight, ChevronLeft, Flame, Focus, Radio, GitMerge, Globe, LogOut } from 'lucide-react';
 import { useGameLoop } from './game/useGameLoop';
 import { TOWER_STATS, TowerType, VIEWPORT_WIDTH, VIEWPORT_HEIGHT, PickOption } from './game/types';
 import { t, getLocale, setLocale, Locale } from './game/i18n';
@@ -25,6 +25,7 @@ export default function App() {
     startGame,
     startCustomGame,
     togglePause,
+    returnToMenu,
     handlePick,
     selectedTower,
     setSelectedTower,
@@ -57,7 +58,7 @@ export default function App() {
         key={type}
         onClick={() => setSelectedTower(isSelected ? null : type)}
         disabled={!hasStock || gameState.status !== 'playing'}
-        className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all w-full ${
+        className={`flex items-center gap-2.5 px-4 py-3 rounded-lg border transition-all w-full ${
           isSelected
             ? 'border-blue-500 bg-blue-500/15 shadow-[0_0_10px_rgba(59,130,246,0.3)]'
             : hasStock
@@ -66,10 +67,10 @@ export default function App() {
         }`}
         title={i.towerDesc[type] ?? TOWER_STATS[type].description}
       >
-        <div className="text-gray-400 shrink-0"><TowerIcon type={type} size={16} /></div>
+        <div className="text-gray-400 shrink-0"><TowerIcon type={type} size={20} /></div>
         <div className="flex flex-col items-start min-w-0">
-          <span className="text-xs font-bold text-gray-200 leading-tight">{label}</span>
-          <span className="text-[10px] text-emerald-400 font-mono leading-tight">{isCustom ? '\u221E' : `x${count}`}</span>
+          <span className="text-sm font-bold text-gray-200 leading-tight">{label}</span>
+          <span className="text-xs text-emerald-400 font-mono leading-tight">{isCustom ? '\u221E' : `x${count}`}</span>
         </div>
       </button>
     );
@@ -163,19 +164,19 @@ export default function App() {
                 </p>
                 <button
                   onClick={startGame}
-                  className="group relative px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-all overflow-hidden"
+                  className="group relative w-64 px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-all overflow-hidden"
                 >
                   <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform"></div>
-                  <span className="relative flex items-center gap-2">
+                  <span className="relative flex items-center justify-center gap-2">
                     <Play size={20} /> {i.initializeCore}
                   </span>
                 </button>
                 <button
                   onClick={startCustomGame}
-                  className="group relative px-8 py-4 bg-gray-700 hover:bg-gray-600 text-white font-bold rounded-xl transition-all overflow-hidden mt-3 border border-gray-600"
+                  className="group relative w-64 px-8 py-4 bg-gray-700 hover:bg-gray-600 text-white font-bold rounded-xl transition-all overflow-hidden mt-3 border border-gray-600"
                 >
                   <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform"></div>
-                  <span className="relative flex items-center gap-2">
+                  <span className="relative flex items-center justify-center gap-2">
                     <Wrench size={20} /> {i.customMode}
                   </span>
                 </button>
@@ -237,6 +238,15 @@ export default function App() {
                     <Play size={20} /> {i.resume}
                   </span>
                 </button>
+                <button
+                  onClick={returnToMenu}
+                  className="group relative px-8 py-4 bg-gray-700 hover:bg-gray-600 text-white font-bold rounded-xl transition-all overflow-hidden mt-3 border border-gray-600"
+                >
+                  <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform"></div>
+                  <span className="relative flex items-center gap-2">
+                    <LogOut size={20} /> {i.exitToMenu}
+                  </span>
+                </button>
               </div>
             )}
 
@@ -276,12 +286,12 @@ export default function App() {
 
           {/* Right Build Panel — Inventory based */}
           <div
-            className={`bg-gray-900/80 border-l border-gray-800 p-2 flex flex-col gap-1.5 overflow-y-auto overflow-x-hidden transition-all duration-300 ease-in-out ${
-              sidebarOpen ? 'w-[140px] opacity-100' : 'w-0 opacity-0 p-0 border-l-0'
+            className={`bg-gray-900/80 border-l border-gray-800 p-3 flex flex-col gap-2 overflow-y-auto overflow-x-hidden transition-all duration-300 ease-in-out ${
+              sidebarOpen ? 'w-[180px] opacity-100' : 'w-0 opacity-0 p-0 border-l-0'
             }`}
           >
-            <div className="min-w-[124px]">
-              <div className="text-[10px] font-bold uppercase tracking-widest text-gray-500 px-1 py-1">
+            <div className="min-w-[160px]">
+              <div className="text-xs font-bold uppercase tracking-widest text-gray-500 px-1 py-1.5">
                 {i.inventory}
               </div>
               {renderTowerButton('blaster')}
@@ -294,15 +304,15 @@ export default function App() {
               {renderTowerButton('bus')}
               {gameState.gameMode === 'custom' && renderTowerButton('target')}
 
-              <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-800 bg-gray-900/50 w-full">
-                <div className="text-blue-400 shrink-0"><Cable size={16} /></div>
+              <div className="flex items-center gap-2.5 px-4 py-3 rounded-lg border border-gray-800 bg-gray-900/50 w-full">
+                <div className="text-blue-400 shrink-0"><Cable size={20} /></div>
                 <div className="flex flex-col items-start min-w-0">
-                  <span className="text-xs font-bold text-gray-200 leading-tight">{i.wires}</span>
-                  <span className="text-[10px] text-blue-400 font-mono leading-tight">{gameState.gameMode === 'custom' ? '\u221E' : `x${gameState.wireInventory}`}</span>
+                  <span className="text-sm font-bold text-gray-200 leading-tight">{i.wires}</span>
+                  <span className="text-xs text-blue-400 font-mono leading-tight">{gameState.gameMode === 'custom' ? '\u221E' : `x${gameState.wireInventory}`}</span>
                 </div>
               </div>
 
-              <div className="mt-4 text-[10px] text-gray-600 px-1 py-2 leading-relaxed">
+              <div className="mt-4 text-xs text-gray-600 px-1 py-2 leading-relaxed">
                 <p>{i.clickToRotate}</p>
                 <p>{i.dragToWire}</p>
               </div>
