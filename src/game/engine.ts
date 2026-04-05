@@ -185,11 +185,12 @@ export const rebuildTowerMap = (state: GameState) => {
 // ── Roguelike pick system ────────────────────────────────────────────────────
 
 const PICK_POOL: Omit<PickOption, 'id'>[] = [
-  { kind: 'tower', towerType: 'blaster',   count: 1, label: 'Blaster',     description: 'Auto-fires at enemies (50 dmg)' },
-  { kind: 'tower', towerType: 'blaster',   count: 2, label: 'Blaster x2',  description: 'Two auto-firing turrets' },
+  { kind: 'tower', towerType: 'blaster',   count: 1, label: 'Blaster',     description: 'Fires a bullet per 2 power' },
+  { kind: 'tower', towerType: 'blaster',   count: 2, label: 'Blaster x2',  description: 'Two standard turrets' },
+  { kind: 'tower', towerType: 'gatling',   count: 1, label: 'Gatling',     description: 'Rapid spread fire, 4 bullets/power' },
+  { kind: 'tower', towerType: 'sniper',    count: 1, label: 'Sniper',      description: 'High-damage piercing shot' },
+  { kind: 'tower', towerType: 'tesla',     count: 1, label: 'Tesla',       description: 'Chain lightning between enemies' },
   { kind: 'tower', towerType: 'generator', count: 1, label: 'Generator',   description: 'Power source for the network' },
-  { kind: 'tower', towerType: 'wall',      count: 3, label: 'Wall x3',     description: 'High-durability enemy blockers' },
-  { kind: 'tower', towerType: 'wall',      count: 5, label: 'Wall x5',     description: 'Fortify your defense perimeter' },
   { kind: 'tower', towerType: 'shield',    count: 1, label: 'Shield',      description: 'Projects a protective bubble' },
   { kind: 'tower', towerType: 'battery',   count: 1, label: 'Battery',     description: 'Stores power, discharges rapidly' },
   { kind: 'wire',                          count: 3, label: 'Wire x3',     description: 'Power line connectors' },
@@ -215,6 +216,7 @@ export const createInitialState = (): GameState => {
     lastActionTime: 0,
     ports: PORT_DIRS.map(d => ({ id: genId(), direction: d, portType: 'output' as PortType })),
     rotation: 0,
+    barrelAngle: 0,
   };
   const towerMap = new Map<string, Tower>([[core.id, core]]);
   return {
@@ -223,10 +225,10 @@ export const createInitialState = (): GameState => {
     wave: 0,
     powerTimer: 0,
     wireInventory: 5,
-    towerInventory: { blaster: 1, generator: 1, wall: 0, shield: 0, battery: 0 },
+    towerInventory: { blaster: 1, gatling: 0, sniper: 0, tesla: 0, generator: 1, shield: 0, battery: 0 },
     pickOptions: [],
     needsPick: true,
-    towers: [core], wires: [], pulses: [], enemies: [], projectiles: [], particles: [],
+    towers: [core], wires: [], pulses: [], enemies: [], projectiles: [], chainLightnings: [], particles: [],
     waveTimer: 0, enemiesToSpawn: 0, spawnTimer: 0, score: 0, towerMap,
   };
 };

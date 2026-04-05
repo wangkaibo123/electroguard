@@ -1,11 +1,14 @@
-import { Battery, Zap, Crosshair, Shield, Activity, Play, RotateCcw, Pause, Hexagon, Cable, Target, Wrench } from 'lucide-react';
+import { useState } from 'react';
+import { Battery, Zap, Crosshair, Activity, Play, RotateCcw, Pause, Hexagon, Cable, Target, Wrench, ChevronRight, ChevronLeft, Flame, Focus, Radio } from 'lucide-react';
 import { useGameLoop } from './game/useGameLoop';
-import { TOWER_STATS, TowerType, CANVAS_WIDTH, CANVAS_HEIGHT, PickOption } from './game/types';
+import { TOWER_STATS, TowerType, VIEWPORT_WIDTH, VIEWPORT_HEIGHT, PickOption } from './game/types';
 
 const TOWER_ICONS: Record<string, React.ReactNode> = {
   blaster:   <Crosshair size={22} />,
+  gatling:   <Flame size={22} />,
+  sniper:    <Focus size={22} />,
+  tesla:     <Radio size={22} />,
   generator: <Zap size={22} />,
-  wall:      <Shield size={22} />,
   shield:    <Hexagon size={22} />,
   battery:   <Battery size={22} />,
   target:    <Target size={22} />,
@@ -13,8 +16,10 @@ const TOWER_ICONS: Record<string, React.ReactNode> = {
 
 const SIDEBAR_ICONS: Record<string, React.ReactNode> = {
   blaster:   <Crosshair size={16} />,
+  gatling:   <Flame size={16} />,
+  sniper:    <Focus size={16} />,
+  tesla:     <Radio size={16} />,
   generator: <Zap size={16} />,
-  wall:      <Shield size={16} />,
   shield:    <Hexagon size={16} />,
   battery:   <Battery size={16} />,
   target:    <Target size={16} />,
@@ -39,7 +44,11 @@ export default function App() {
     handleCanvasMouseMove,
     handleCanvasMouseUp,
     handleCanvasMouseLeave,
+    handleCanvasWheel,
+    handleCanvasContextMenu,
   } = useGameLoop();
+
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const renderTowerButton = (type: TowerType, label: string) => {
     const isCustom = gameState.gameMode === 'custom';
@@ -130,12 +139,14 @@ export default function App() {
           <div className="relative rounded-xl overflow-hidden shadow-[0_0_30px_rgba(0,0,0,0.6)] border-2 border-gray-800 bg-gray-900 shrink-0">
             <canvas
               ref={canvasRef}
-              width={CANVAS_WIDTH}
-              height={CANVAS_HEIGHT}
+              width={VIEWPORT_WIDTH}
+              height={VIEWPORT_HEIGHT}
               onMouseDown={handleCanvasMouseDown}
               onMouseMove={handleCanvasMouseMove}
               onMouseUp={handleCanvasMouseUp}
               onMouseLeave={handleCanvasMouseLeave}
+              onWheel={handleCanvasWheel}
+              onContextMenu={handleCanvasContextMenu}
               className={`block ${gameState.status === 'playing' ? (selectedTower ? 'cursor-crosshair' : 'cursor-grab active:cursor-grabbing') : ''}`}
             />
 
@@ -248,29 +259,49 @@ export default function App() {
           </div>
         </div>
 
-        {/* Right Build Panel — Inventory based */}
-        <div className="shrink-0 w-[140px] bg-gray-900/80 border-l border-gray-800 p-2 flex flex-col gap-1.5 overflow-y-auto">
-          <div className="text-[10px] font-bold uppercase tracking-widest text-gray-500 px-1 py-1">
-            Inventory
-          </div>
-          {renderTowerButton('blaster', 'Blaster')}
-          {renderTowerButton('generator', 'Generator')}
-          {renderTowerButton('wall', 'Wall')}
-          {renderTowerButton('shield', 'Shield')}
-          {renderTowerButton('battery', 'Battery')}
-          {gameState.gameMode === 'custom' && renderTowerButton('target', 'Target')}
+        {/* Sidebar toggle + panel */}
+        <div className="relative shrink-0 flex">
+          {/* Toggle button */}
+          <button
+            onClick={() => setSidebarOpen(v => !v)}
+            className="absolute -left-8 top-1/2 -translate-y-1/2 z-10 w-7 h-14 bg-gray-800 hover:bg-gray-700 border border-gray-700 border-r-0 rounded-l-lg flex items-center justify-center text-gray-400 hover:text-white transition-colors"
+            title={sidebarOpen ? 'Hide panel' : 'Show panel'}
+          >
+            {sidebarOpen ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+          </button>
 
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-800 bg-gray-900/50 w-full">
-            <div className="text-blue-400 shrink-0"><Cable size={16} /></div>
-            <div className="flex flex-col items-start min-w-0">
-              <span className="text-xs font-bold text-gray-200 leading-tight">Wires</span>
-              <span className="text-[10px] text-blue-400 font-mono leading-tight">{gameState.gameMode === 'custom' ? '\u221E' : `x${gameState.wireInventory}`}</span>
+          {/* Right Build Panel — Inventory based */}
+          <div
+            className={`bg-gray-900/80 border-l border-gray-800 p-2 flex flex-col gap-1.5 overflow-y-auto overflow-x-hidden transition-all duration-300 ease-in-out ${
+              sidebarOpen ? 'w-[140px] opacity-100' : 'w-0 opacity-0 p-0 border-l-0'
+            }`}
+          >
+            <div className="min-w-[124px]">
+              <div className="text-[10px] font-bold uppercase tracking-widest text-gray-500 px-1 py-1">
+                Inventory
+              </div>
+              {renderTowerButton('blaster', 'Blaster')}
+              {renderTowerButton('gatling', 'Gatling')}
+              {renderTowerButton('sniper', 'Sniper')}
+              {renderTowerButton('tesla', 'Tesla')}
+              {renderTowerButton('generator', 'Generator')}
+              {renderTowerButton('shield', 'Shield')}
+              {renderTowerButton('battery', 'Battery')}
+              {gameState.gameMode === 'custom' && renderTowerButton('target', 'Target')}
+
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-800 bg-gray-900/50 w-full">
+                <div className="text-blue-400 shrink-0"><Cable size={16} /></div>
+                <div className="flex flex-col items-start min-w-0">
+                  <span className="text-xs font-bold text-gray-200 leading-tight">Wires</span>
+                  <span className="text-[10px] text-blue-400 font-mono leading-tight">{gameState.gameMode === 'custom' ? '\u221E' : `x${gameState.wireInventory}`}</span>
+                </div>
+              </div>
+
+              <div className="mt-4 text-[10px] text-gray-600 px-1 py-2 leading-relaxed">
+                <p>Click machine to rotate</p>
+                <p>Drag port to wire</p>
+              </div>
             </div>
-          </div>
-
-          <div className="mt-auto text-[10px] text-gray-600 px-1 py-2 leading-relaxed">
-            <p>Click machine to rotate</p>
-            <p>Drag port to wire</p>
           </div>
         </div>
       </div>

@@ -1,5 +1,5 @@
 export type Position = { x: number; y: number };
-export type TowerType = 'core' | 'blaster' | 'generator' | 'wall' | 'shield' | 'battery' | 'target';
+export type TowerType = 'core' | 'blaster' | 'gatling' | 'sniper' | 'tesla' | 'generator' | 'shield' | 'battery' | 'target';
 export type GameMode = 'normal' | 'custom';
 export type PortDirection = 'top' | 'right' | 'bottom' | 'left';
 export type PortType = 'input' | 'output';
@@ -48,6 +48,7 @@ export interface Tower {
   lastActionTime: number;
   ports: Port[];
   rotation: number;
+  barrelAngle: number;
 }
 
 export interface Enemy {
@@ -72,6 +73,19 @@ export interface Projectile {
   speed: number;
   damage: number;
   isTargetTower?: boolean;
+  angle?: number;          // fixed direction for non-homing (gatling)
+  traveled?: number;       // distance traveled so far
+  maxRange?: number;       // max range before despawn
+  piercing?: boolean;      // passes through enemies (sniper)
+  piercedIds?: string[];   // enemies already hit by piercing
+  color?: string;          // custom projectile color
+  size?: number;           // custom projectile size
+}
+
+export interface ChainLightning {
+  segments: { x1: number; y1: number; x2: number; y2: number }[];
+  life: number;
+  maxLife: number;
 }
 
 export interface Particle {
@@ -108,6 +122,7 @@ export interface GameState {
   pulses: Pulse[];
   enemies: Enemy[];
   projectiles: Projectile[];
+  chainLightnings: ChainLightning[];
   particles: Particle[];
   waveTimer: number;
   enemiesToSpawn: number;
@@ -128,19 +143,37 @@ export interface TowerStats {
 }
 
 export const TOWER_STATS: Record<TowerType, TowerStats> = {
-  core:      { hp: 1000, description: 'The heart of your defense. Generates power.',             color: '#93c5fd', width: 3, height: 3, maxPower: 9, maxShieldHp: 500, shieldRadius: 100 },
-  blaster:   { hp: 100,  description: 'Auto-fires at nearby enemies. 50 dmg, needs 4 power.',   color: '#f87171', width: 2, height: 2, maxPower: 4, maxShieldHp: 0,   shieldRadius: 0 },
+  core:      { hp: 1000, description: 'The heart of your defense. Generates power.',             color: '#93c5fd', width: 3, height: 3, maxPower: 9, maxShieldHp: 500, shieldRadius: 160 },
+  blaster:   { hp: 100,  description: 'Fires a bullet per 2 power. Reliable turret.',           color: '#f87171', width: 2, height: 2, maxPower: 2, maxShieldHp: 0,   shieldRadius: 0 },
+  gatling:   { hp: 100,  description: 'Rapid fire. Each power = 4 spread bullets.',              color: '#f59e0b', width: 2, height: 2, maxPower: 2, maxShieldHp: 0,   shieldRadius: 0 },
+  sniper:    { hp: 80,   description: 'High-damage piercing shot. Costs 4 power.',              color: '#a78bfa', width: 2, height: 2, maxPower: 4, maxShieldHp: 0,   shieldRadius: 0 },
+  tesla:     { hp: 100,  description: 'Chain lightning bounces between enemies.',                color: '#e879f9', width: 2, height: 2, maxPower: 9, maxShieldHp: 0,   shieldRadius: 0 },
   generator: { hp: 100,  description: 'Power source for the network. Dispatches energy.',        color: '#fbbf24', width: 2, height: 2, maxPower: 0, maxShieldHp: 0,   shieldRadius: 0 },
-  wall:      { hp: 500,  description: 'High durability. Blocks enemies.',                        color: '#6b7280', width: 1, height: 1, maxPower: 0, maxShieldHp: 0,   shieldRadius: 0 },
+
   shield:    { hp: 100,  description: 'Projects a protective shield. Consumes power to recharge.', color: '#22d3ee', width: 1, height: 1, maxPower: 4, maxShieldHp: 300, shieldRadius: 60 },
   battery:   { hp: 150,  description: 'Stores 4 units of power and discharges quickly.',         color: '#34d399', width: 2, height: 1, maxPower: 4, maxShieldHp: 0,   shieldRadius: 0 },
   target:    { hp: 200,  description: 'Practice target. Treated as an enemy by turrets.',       color: '#fb923c', width: 1, height: 1, maxPower: 0, maxShieldHp: 0,   shieldRadius: 0 },
 };
 
 export const WIRE_MAX_HP = 50;
-export const GRID_WIDTH = 60;
-export const GRID_HEIGHT = 34;
+export const GRID_WIDTH = 90;
+export const GRID_HEIGHT = 51;
 export const CELL_SIZE = 20;
-export const CANVAS_WIDTH = GRID_WIDTH * CELL_SIZE;
-export const CANVAS_HEIGHT = GRID_HEIGHT * CELL_SIZE;
+export const CANVAS_WIDTH = GRID_WIDTH * CELL_SIZE;   // world width in pixels (1800)
+export const CANVAS_HEIGHT = GRID_HEIGHT * CELL_SIZE;  // world height in pixels (1020)
 export const HALF_CELL = CELL_SIZE / 2;
+export const VIEWPORT_WIDTH = 1200;
+export const VIEWPORT_HEIGHT = 680;
+
+export interface Camera {
+  x: number;    // world X of viewport top-left
+  y: number;    // world Y of viewport top-left
+  zoom: number;
+}
+
+export const TURRET_RANGE: Partial<Record<TowerType, number>> = {
+  blaster: 150,
+  gatling: 130,
+  sniper: 300,
+  tesla: 180,
+};

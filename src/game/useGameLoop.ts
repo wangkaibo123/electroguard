@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   GameState, TowerType, Port, CELL_SIZE, GRID_WIDTH, GRID_HEIGHT,
-  TOWER_STATS, CANVAS_WIDTH, CANVAS_HEIGHT, WIRE_MAX_HP,
+  TOWER_STATS, CANVAS_WIDTH, CANVAS_HEIGHT, WIRE_MAX_HP, ChainLightning,
+  Camera, VIEWPORT_WIDTH, VIEWPORT_HEIGHT,
 } from './types';
 import {
   createInitialState, updatePowerGrid, spawnEnemy, createExplosion,
@@ -13,13 +14,32 @@ import {
 import { renderGame } from './renderer';
 
 // ── Constants ────────────────────────────────────────────────────────────────
+const TWO_PI = Math.PI * 2;
 const PULSE_SPEED = 400;
 const POWER_INTERVAL = 2;
 const SHIELD_COOLDOWN = 500;
 const BATTERY_INTERVAL = 100;
 const BLASTER_COOLDOWN = 1000;
 const BLASTER_RANGE = 150;
-const BLASTER_DAMAGE = 50; // doubled from original 25
+const BLASTER_DAMAGE = 50;
+const BLASTER_POWER_COST = 2;
+
+const GATLING_COOLDOWN = 200;
+const GATLING_RANGE = 130;
+const GATLING_DAMAGE = 10;
+const GATLING_SPREAD = 0.26; // ~15 degrees
+const GATLING_BULLET_RANGE = 200;
+
+const SNIPER_COOLDOWN = 2500;
+const SNIPER_RANGE = 300;
+const SNIPER_DAMAGE = 200;
+const SNIPER_POWER_COST = 4;
+const SNIPER_SPEED = 600;
+
+const TESLA_COOLDOWN = 3000;
+const TESLA_RANGE = 180;
+const TESLA_BOUNCE_RANGE = 120;
+const TESLA_DAMAGE_PER_POWER = 25;
 const WAVE_DELAY = 5;
 const ATTACK_RANGE = 10;
 
@@ -42,6 +62,18 @@ export const useGameLoop = () => {
   const mouseDownPosRef = useRef<{ x: number; y: number } | null>(null);
   const rotStartAngleRef = useRef(0);
   const lastTimeRef = useRef(0);
+
+  // Camera
+  const MIN_ZOOM = Math.min(VIEWPORT_WIDTH / CANVAS_WIDTH, VIEWPORT_HEIGHT / CANVAS_HEIGHT);
+  const MAX_ZOOM = 2.0;
+  const cameraRef = useRef<Camera>({ x: 0, y: 0, zoom: MIN_ZOOM });
+
+  // Pan state
+  const isPanningRef = useRef(false);
+  const panLastRef = useRef<{ x: number; y: number } | null>(null);
+
+  // Drag cancel state
+  const dragOrigPosRef = useRef<{ x: number; y: number } | null>(null);
 
   const sync = () => setGameState({ ...stateRef.current });
 
@@ -94,18 +126,39 @@ export const useGameLoop = () => {
   };
 
   // ── Canvas mouse helpers ────────────────────────────────────────────────
-  const canvasXY = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const canvasScreenXY = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const r = canvasRef.current?.getBoundingClientRect();
-    return r ? { px: e.clientX - r.left, py: e.clientY - r.top } : null;
+    return r ? { sx: e.clientX - r.left, sy: e.clientY - r.top } : null;
+  };
+
+  const toWorld = (sx: number, sy: number) => {
+    const cam = cameraRef.current;
+    return { wx: sx / cam.zoom + cam.x, wy: sy / cam.zoom + cam.y };
+  };
+
+  const clampCamera = (cam: Camera) => {
+    const viewW = VIEWPORT_WIDTH / cam.zoom;
+    const viewH = VIEWPORT_HEIGHT / cam.zoom;
+    cam.x = Math.max(0, Math.min(cam.x, CANVAS_WIDTH - viewW));
+    cam.y = Math.max(0, Math.min(cam.y, CANVAS_HEIGHT - viewH));
   };
 
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const pos = canvasXY(e);
-    if (!pos) return;
-    const { px, py } = pos;
+    const spos = canvasScreenXY(e);
+    if (!spos) return;
+    const { sx, sy } = spos;
     const state = stateRef.current;
+
+    // Right-click: start pan
+    if (e.button === 2) {
+      isPanningRef.current = true;
+      panLastRef.current = { x: sx, y: sy };
+      return;
+    }
+
     if (state.status !== 'playing') return;
-    mouseDownPosRef.current = { x: px, y: py };
+    const { wx, wy } = toWorld(sx, sy);
+    mouseDownPosRef.current = { x: wx, y: wy };
 
     // Rotation knob check
     if (rotatingRef.current) {
@@ -116,7 +169,7 @@ export const useGameLoop = () => {
         const kd = Math.max(tower.width, tower.height) * CELL_SIZE / 2 + 20;
         const kx = cx + Math.cos(tower.rotation - Math.PI / 2) * kd;
         const ky = cy + Math.sin(tower.rotation - Math.PI / 2) * kd;
-        if (Math.hypot(px - kx, py - ky) < 14) {
+        if (Math.hypot(wx - kx, wy - ky) < 14) {
           rotStartAngleRef.current = 0;
           isRotKnobRef.current = true;
           return;
@@ -128,7 +181,7 @@ export const useGameLoop = () => {
     for (const tower of state.towers) {
       for (const port of tower.ports) {
         const pp = getPortPos(tower, port);
-        if (Math.hypot(pp.x - px, pp.y - py) >= 7) continue;
+        if (Math.hypot(pp.x - wx, pp.y - wy) >= 7) continue;
         const existIdx = state.wires.findIndex(w => w.startPortId === port.id || w.endPortId === port.id);
         if (existIdx !== -1) {
           state.wires.splice(existIdx, 1);
@@ -145,15 +198,16 @@ export const useGameLoop = () => {
 
     // Tower drag check
     for (const tower of state.towers) {
-      if (px >= tower.x * CELL_SIZE && px <= (tower.x + tower.width) * CELL_SIZE &&
-          py >= tower.y * CELL_SIZE && py <= (tower.y + tower.height) * CELL_SIZE) {
+      if (wx >= tower.x * CELL_SIZE && wx <= (tower.x + tower.width) * CELL_SIZE &&
+          wy >= tower.y * CELL_SIZE && wy <= (tower.y + tower.height) * CELL_SIZE) {
         dragTowerRef.current = tower.id;
+        dragOrigPosRef.current = { x: tower.x, y: tower.y };
         return;
       }
     }
 
     // Place tower from inventory
-    const gx = (px / CELL_SIZE) | 0, gy = (py / CELL_SIZE) | 0;
+    const gx = (wx / CELL_SIZE) | 0, gy = (wy / CELL_SIZE) | 0;
     const sel = selectedTowerRef.current;
     if (sel && canPlace(gx, gy, sel, state)) {
       const stats = TOWER_STATS[sel];
@@ -167,10 +221,10 @@ export const useGameLoop = () => {
         ];
       } else if (sel === 'generator') {
         ports = generatePorts('output');
-      } else if (sel === 'blaster' || sel === 'shield') {
+      } else if (sel === 'blaster' || sel === 'gatling' || sel === 'sniper' || sel === 'tesla' || sel === 'shield') {
         ports = generatePorts('input');
       } else {
-        ports = []; // wall, target
+        ports = []; // target
       }
 
       const t = {
@@ -179,7 +233,7 @@ export const useGameLoop = () => {
         hp: stats.hp, maxHp: stats.hp,
         powered: false, storedPower: 0, maxPower: stats.maxPower, incomingPower: 0,
         shieldHp: stats.maxShieldHp, maxShieldHp: stats.maxShieldHp, shieldRadius: stats.shieldRadius,
-        lastActionTime: 0, ports, rotation: 0,
+        lastActionTime: 0, ports, rotation: 0, barrelAngle: 0,
       };
       state.towers.push(t);
       state.towerMap.set(t.id, t);
@@ -190,25 +244,37 @@ export const useGameLoop = () => {
   };
 
   const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const pos = canvasXY(e);
-    if (!pos) return;
-    const { px, py } = pos;
+    const spos = canvasScreenXY(e);
+    if (!spos) return;
+    const { sx, sy } = spos;
+
+    // Panning
+    if (isPanningRef.current && panLastRef.current) {
+      const cam = cameraRef.current;
+      cam.x -= (sx - panLastRef.current.x) / cam.zoom;
+      cam.y -= (sy - panLastRef.current.y) / cam.zoom;
+      clampCamera(cam);
+      panLastRef.current = { x: sx, y: sy };
+      return;
+    }
+
     const state = stateRef.current;
     if (state.status !== 'playing') return;
-    mousePxRef.current = { x: px, y: py };
+    const { wx, wy } = toWorld(sx, sy);
+    mousePxRef.current = { x: wx, y: wy };
 
     if (isRotKnobRef.current && rotatingRef.current) {
       const tower = state.towerMap.get(rotatingRef.current);
       if (tower) {
         const cx = (tower.x + tower.width / 2) * CELL_SIZE;
         const cy = (tower.y + tower.height / 2) * CELL_SIZE;
-        tower.rotation = Math.atan2(py - cy, px - cx) + Math.PI / 2;
+        tower.rotation = Math.atan2(wy - cy, wx - cx) + Math.PI / 2;
         sync();
       }
       return;
     }
 
-    const gx = (px / CELL_SIZE) | 0, gy = (py / CELL_SIZE) | 0;
+    const gx = (wx / CELL_SIZE) | 0, gy = (wy / CELL_SIZE) | 0;
     hoverRef.current = (gx >= 0 && gx < GRID_WIDTH && gy >= 0 && gy < GRID_HEIGHT)
       ? { x: gx, y: gy } : null;
 
@@ -222,7 +288,7 @@ export const useGameLoop = () => {
         for (const tower of state.towers) {
           for (const port of tower.ports) {
             const pp = getPortPos(tower, port);
-            if (Math.hypot(pp.x - px, pp.y - py) < 15 && tower.id !== st.id) {
+            if (Math.hypot(pp.x - wx, pp.y - wy) < 15 && tower.id !== st.id) {
               endCell = getPortCell(tower, port);
               break;
             }
@@ -235,8 +301,8 @@ export const useGameLoop = () => {
     if (dragTowerRef.current) {
       const tower = state.towerMap.get(dragTowerRef.current);
       if (!tower) return;
-      const nx = (px / CELL_SIZE | 0) - (tower.width >> 1);
-      const ny = (py / CELL_SIZE | 0) - (tower.height >> 1);
+      const nx = (wx / CELL_SIZE | 0) - (tower.width >> 1);
+      const ny = (wy / CELL_SIZE | 0) - (tower.height >> 1);
       if (nx < 0 || ny < 0 || nx + tower.width > GRID_WIDTH || ny + tower.height > GRID_HEIGHT) return;
       if (collidesWithTowers(nx, ny, tower.width, tower.height, state.towers, tower.id)) return;
       if (collidesWithWires(nx, ny, tower.width, tower.height, state.wires, tower.id)) return;
@@ -250,8 +316,16 @@ export const useGameLoop = () => {
   };
 
   const handleCanvasMouseUp = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const pos = canvasXY(e);
-    const px = pos?.px ?? 0, py = pos?.py ?? 0;
+    // End pan
+    if (isPanningRef.current) {
+      isPanningRef.current = false;
+      panLastRef.current = null;
+      return;
+    }
+
+    const spos = canvasScreenXY(e);
+    if (!spos) return;
+    const { wx, wy } = toWorld(spos.sx, spos.sy);
     const state = stateRef.current;
 
     if (isRotKnobRef.current) {
@@ -271,15 +345,16 @@ export const useGameLoop = () => {
 
     if (dragTowerRef.current) {
       const dp = mouseDownPosRef.current;
-      if (dp && Math.hypot(px - dp.x, py - dp.y) < 5) {
+      if (dp && Math.hypot(wx - dp.x, wy - dp.y) < 5) {
         updateRotating(rotatingRef.current === dragTowerRef.current ? null : dragTowerRef.current);
       }
       dragTowerRef.current = null;
+      dragOrigPosRef.current = null;
     } else if (!dragWireStartRef.current) {
       let hit = false;
       for (const t of state.towers) {
-        if (px >= t.x * CELL_SIZE && px <= (t.x + t.width) * CELL_SIZE &&
-            py >= t.y * CELL_SIZE && py <= (t.y + t.height) * CELL_SIZE) { hit = true; break; }
+        if (wx >= t.x * CELL_SIZE && wx <= (t.x + t.width) * CELL_SIZE &&
+            wy >= t.y * CELL_SIZE && wy <= (t.y + t.height) * CELL_SIZE) { hit = true; break; }
       }
       if (!hit) updateRotating(null);
     }
@@ -339,6 +414,33 @@ export const useGameLoop = () => {
     dragTowerRef.current = null;
     dragWirePathRef.current = null;
     isRotKnobRef.current = false;
+    isPanningRef.current = false;
+    panLastRef.current = null;
+  };
+
+  const handleCanvasWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    const spos = canvasScreenXY(e as unknown as React.MouseEvent<HTMLCanvasElement>);
+    if (!spos) return;
+    const { sx, sy } = spos;
+    const cam = cameraRef.current;
+
+    // World point under cursor before zoom
+    const wx = sx / cam.zoom + cam.x;
+    const wy = sy / cam.zoom + cam.y;
+
+    // Adjust zoom
+    const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+    cam.zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, cam.zoom * factor));
+
+    // Keep world point under cursor after zoom
+    cam.x = wx - sx / cam.zoom;
+    cam.y = wy - sy / cam.zoom;
+    clampCamera(cam);
+  };
+
+  const handleCanvasContextMenu = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
   };
 
   // ── Game loop ──────────────────────────────────────────────────────────
@@ -409,37 +511,158 @@ export const useGameLoop = () => {
         changed = true;
       }
 
-      // ── Blaster shooting (damage = 50) — also targets 'target' towers ───
+      // ── Turret barrel tracking + shooting (blaster, gatling, sniper) ───
+      const BARREL_SPEED = 4; // radians per second for smooth tracking
+      const TURRET_TYPES = new Set(['blaster', 'gatling', 'sniper']);
       for (const t of state.towers) {
-        if (t.type !== 'blaster' || !t.powered || t.storedPower < 4 || now - t.lastActionTime <= BLASTER_COOLDOWN) continue;
+        if (!TURRET_TYPES.has(t.type)) continue;
         const bx = (t.x + t.width / 2) * CELL_SIZE, by = (t.y + t.height / 2) * CELL_SIZE;
-        let bestEnemy: typeof state.enemies[0] | null = null, bestD = BLASTER_RANGE;
+        const range = t.type === 'sniper' ? SNIPER_RANGE : t.type === 'gatling' ? GATLING_RANGE : BLASTER_RANGE;
+
+        // Find nearest target for barrel aiming
+        let bestD = range;
+        let tgtX = 0, tgtY = 0, hasTarget = false;
+        let bestEnemy: typeof state.enemies[0] | null = null;
         let bestTarget: typeof state.towers[0] | null = null;
 
-        // Check real enemies first
         for (const e of state.enemies) {
           const d = Math.hypot(e.x - bx, e.y - by);
-          if (d < bestD) { bestD = d; bestEnemy = e; bestTarget = null; }
+          if (d < bestD) { bestD = d; tgtX = e.x; tgtY = e.y; hasTarget = true; bestEnemy = e; bestTarget = null; }
         }
-        // Check target towers
         for (const tgt of state.towers) {
           if (tgt.type !== 'target') continue;
           const tx = (tgt.x + tgt.width / 2) * CELL_SIZE, ty = (tgt.y + tgt.height / 2) * CELL_SIZE;
           const d = Math.hypot(tx - bx, ty - by);
-          if (d < bestD) { bestD = d; bestTarget = tgt; bestEnemy = null; }
+          if (d < bestD) { bestD = d; tgtX = tx; tgtY = ty; hasTarget = true; bestTarget = tgt; bestEnemy = null; }
         }
 
-        if (bestEnemy) {
-          t.storedPower -= 4;
-          state.projectiles.push({ id: genId(), x: bx, y: by, targetId: bestEnemy.id, speed: 300, damage: BLASTER_DAMAGE });
-          t.lastActionTime = now;
-          changed = true;
-        } else if (bestTarget) {
-          t.storedPower -= 4;
-          state.projectiles.push({ id: genId(), x: bx, y: by, targetId: bestTarget.id, speed: 300, damage: BLASTER_DAMAGE, isTargetTower: true });
-          t.lastActionTime = now;
+        // Smooth barrel rotation toward target
+        if (hasTarget) {
+          const desired = Math.atan2(tgtY - by, tgtX - bx);
+          let diff = desired - t.barrelAngle;
+          while (diff > Math.PI) diff -= TWO_PI;
+          while (diff < -Math.PI) diff += TWO_PI;
+          const maxRot = BARREL_SPEED * dt;
+          t.barrelAngle += Math.abs(diff) < maxRot ? diff : Math.sign(diff) * maxRot;
           changed = true;
         }
+
+        if (!t.powered || !hasTarget) continue;
+
+        const barrelLen = Math.min(t.width, t.height) * CELL_SIZE / 2 - 4 + 6;
+        const mx = bx + Math.cos(t.barrelAngle) * barrelLen;
+        const my = by + Math.sin(t.barrelAngle) * barrelLen;
+
+        // ── Blaster: 1 bullet per 2 power ──
+        if (t.type === 'blaster') {
+          if (t.storedPower < BLASTER_POWER_COST || now - t.lastActionTime <= BLASTER_COOLDOWN) continue;
+          if (bestEnemy) {
+            t.storedPower -= BLASTER_POWER_COST;
+            state.projectiles.push({ id: genId(), x: mx, y: my, targetId: bestEnemy.id, speed: 300, damage: BLASTER_DAMAGE });
+            t.lastActionTime = now; changed = true;
+          } else if (bestTarget) {
+            t.storedPower -= BLASTER_POWER_COST;
+            state.projectiles.push({ id: genId(), x: mx, y: my, targetId: bestTarget.id, speed: 300, damage: BLASTER_DAMAGE, isTargetTower: true });
+            t.lastActionTime = now; changed = true;
+          }
+        }
+
+        // ── Gatling: 4 spread bullets per power, rapid fire ──
+        if (t.type === 'gatling') {
+          if (t.storedPower < 1 || now - t.lastActionTime <= GATLING_COOLDOWN) continue;
+          t.storedPower -= 1;
+          const baseAngle = t.barrelAngle;
+          for (let b = 0; b < 4; b++) {
+            const spreadAngle = baseAngle + (Math.random() - 0.5) * GATLING_SPREAD * 2;
+            const targetId = bestEnemy?.id ?? bestTarget?.id ?? '';
+            state.projectiles.push({
+              id: genId(), x: mx, y: my, targetId,
+              speed: 250, damage: GATLING_DAMAGE,
+              isTargetTower: !!bestTarget && !bestEnemy,
+              angle: spreadAngle, traveled: 0, maxRange: GATLING_BULLET_RANGE,
+              color: '#f59e0b', size: 2,
+            });
+          }
+          t.lastActionTime = now; changed = true;
+        }
+
+        // ── Sniper: piercing high-damage shot, 4 power ──
+        if (t.type === 'sniper') {
+          if (t.storedPower < SNIPER_POWER_COST || now - t.lastActionTime <= SNIPER_COOLDOWN) continue;
+          if (bestEnemy) {
+            t.storedPower -= SNIPER_POWER_COST;
+            state.projectiles.push({
+              id: genId(), x: mx, y: my, targetId: bestEnemy.id,
+              speed: SNIPER_SPEED, damage: SNIPER_DAMAGE,
+              piercing: true, piercedIds: [],
+              color: '#a78bfa', size: 4,
+            });
+            t.lastActionTime = now; changed = true;
+          } else if (bestTarget) {
+            t.storedPower -= SNIPER_POWER_COST;
+            state.projectiles.push({
+              id: genId(), x: mx, y: my, targetId: bestTarget.id,
+              speed: SNIPER_SPEED, damage: SNIPER_DAMAGE,
+              isTargetTower: true, piercing: true, piercedIds: [],
+              color: '#a78bfa', size: 4,
+            });
+            t.lastActionTime = now; changed = true;
+          }
+        }
+      }
+
+      // ── Tesla: chain lightning ───────────────────────────────────────
+      for (const t of state.towers) {
+        if (t.type !== 'tesla' || !t.powered || t.storedPower <= 0) continue;
+        if (now - t.lastActionTime <= TESLA_COOLDOWN) continue;
+        const bx = (t.x + t.width / 2) * CELL_SIZE, by = (t.y + t.height / 2) * CELL_SIZE;
+
+        // Find first enemy in range
+        let firstEnemy: typeof state.enemies[0] | null = null;
+        let firstD = TESLA_RANGE;
+        for (const e of state.enemies) {
+          const d = Math.hypot(e.x - bx, e.y - by);
+          if (d < firstD) { firstD = d; firstEnemy = e; }
+        }
+        if (!firstEnemy) continue;
+
+        const power = t.storedPower;
+        t.storedPower = 0;
+        const totalDmg = power * TESLA_DAMAGE_PER_POWER;
+        const bounces = power;
+
+        // Chain lightning: hit first, then bounce
+        const clSegments: { x1: number; y1: number; x2: number; y2: number }[] = [];
+        const hitIds = new Set<string>();
+        let cx = bx, cy = by;
+        let curEnemy: typeof state.enemies[0] | null = firstEnemy;
+
+        for (let b = 0; b < bounces && curEnemy; b++) {
+          clSegments.push({ x1: cx, y1: cy, x2: curEnemy.x, y2: curEnemy.y });
+          curEnemy.hp -= totalDmg / bounces;
+          if (curEnemy.hp <= 0) {
+            createExplosion(state, curEnemy.x, curEnemy.y, '#e879f9', 12);
+            state.enemies = state.enemies.filter(e => e.id !== curEnemy!.id);
+            state.score += 10;
+          }
+          hitIds.add(curEnemy.id);
+          cx = curEnemy.x; cy = curEnemy.y;
+
+          // Find next bounce target
+          let nextEnemy: typeof state.enemies[0] | null = null;
+          let nextD = TESLA_BOUNCE_RANGE;
+          for (const e of state.enemies) {
+            if (hitIds.has(e.id)) continue;
+            const d = Math.hypot(e.x - cx, e.y - cy);
+            if (d < nextD) { nextD = d; nextEnemy = e; }
+          }
+          curEnemy = nextEnemy;
+        }
+
+        if (clSegments.length > 0) {
+          state.chainLightnings.push({ segments: clSegments, life: 0, maxLife: 0.4 });
+        }
+        t.lastActionTime = now; changed = true;
       }
 
       // ── Wave management with roguelike pick (skipped in custom mode) ────
@@ -538,7 +761,34 @@ export const useGameLoop = () => {
       for (let i = state.projectiles.length - 1; i >= 0; i--) {
         const p = state.projectiles[i];
 
-        // Find target — either an enemy or a target tower
+        // Non-homing projectiles (gatling spread)
+        if (p.angle !== undefined) {
+          const step = p.speed * dt;
+          p.x += Math.cos(p.angle) * step;
+          p.y += Math.sin(p.angle) * step;
+          p.traveled = (p.traveled ?? 0) + step;
+          if (p.maxRange && p.traveled > p.maxRange) { state.projectiles.splice(i, 1); changed = true; continue; }
+
+          // Check collision with all enemies
+          let hit = false;
+          for (const e of state.enemies) {
+            if (p.piercedIds?.includes(e.id)) continue;
+            if (Math.hypot(e.x - p.x, e.y - p.y) < 12) {
+              e.hp -= p.damage;
+              createExplosion(state, e.x, e.y, p.color ?? '#fbbf24', 3);
+              if (e.hp <= 0) { state.enemies = state.enemies.filter(en => en.id !== e.id); state.score += 10; createExplosion(state, e.x, e.y, '#a855f7', 10); }
+              if (!p.piercing) { state.projectiles.splice(i, 1); hit = true; }
+              else { p.piercedIds = p.piercedIds ?? []; p.piercedIds.push(e.id); }
+              changed = true;
+              break;
+            }
+          }
+          if (hit) continue;
+          changed = true;
+          continue;
+        }
+
+        // Homing projectiles (blaster, sniper)
         let tgtX: number, tgtY: number;
         let tgtFound = false;
 
@@ -551,8 +801,14 @@ export const useGameLoop = () => {
           const d = Math.hypot(tgtX - p.x, tgtY - p.y);
           if (d < 10) {
             tgt.hp -= p.damage;
-            createExplosion(state, tgtX, tgtY, '#fbbf24', 5);
-            state.projectiles.splice(i, 1);
+            createExplosion(state, tgtX, tgtY, p.color ?? '#fbbf24', 5);
+            if (p.piercing) {
+              p.piercedIds = p.piercedIds ?? []; p.piercedIds.push(p.targetId);
+              // Find next target tower (unlikely but handle it)
+              state.projectiles.splice(i, 1);
+            } else {
+              state.projectiles.splice(i, 1);
+            }
             if (tgt.hp <= 0) {
               state.towers = state.towers.filter(t => t.id !== tgt.id);
               state.wires = state.wires.filter(w => w.startTowerId !== tgt.id && w.endTowerId !== tgt.id);
@@ -564,31 +820,68 @@ export const useGameLoop = () => {
           }
         } else {
           const tgt = state.enemies.find(e => e.id === p.targetId);
-          if (!tgt) { state.projectiles.splice(i, 1); changed = true; continue; }
-          tgtX = tgt.x;
-          tgtY = tgt.y;
-          tgtFound = true;
-          const d = Math.hypot(tgtX - p.x, tgtY - p.y);
-          if (d < 10) {
-            tgt.hp -= p.damage;
-            createExplosion(state, tgt.x, tgt.y, '#fbbf24', 5);
-            state.projectiles.splice(i, 1);
-            if (tgt.hp <= 0) {
-              state.enemies = state.enemies.filter(e => e.id !== tgt.id);
-              state.score += 10;
-              createExplosion(state, tgt.x, tgt.y, '#a855f7', 15);
+          if (!tgt) {
+            // For piercing, find next enemy instead of removing
+            if (p.piercing) {
+              let bestD = 300, bestE: typeof state.enemies[0] | null = null;
+              for (const e of state.enemies) {
+                if (p.piercedIds?.includes(e.id)) continue;
+                const d = Math.hypot(e.x - p.x, e.y - p.y);
+                if (d < bestD) { bestD = d; bestE = e; }
+              }
+              if (bestE) { p.targetId = bestE.id; } else { state.projectiles.splice(i, 1); changed = true; continue; }
+              const et = state.enemies.find(e => e.id === p.targetId)!;
+              tgtX = et.x; tgtY = et.y; tgtFound = true;
+            } else {
+              state.projectiles.splice(i, 1); changed = true; continue;
             }
-            changed = true;
-            continue;
+          } else {
+            tgtX = tgt.x;
+            tgtY = tgt.y;
+            tgtFound = true;
+            const d = Math.hypot(tgtX - p.x, tgtY - p.y);
+            if (d < 10) {
+              tgt.hp -= p.damage;
+              createExplosion(state, tgt.x, tgt.y, p.color ?? '#fbbf24', 5);
+              if (tgt.hp <= 0) {
+                state.enemies = state.enemies.filter(e => e.id !== tgt.id);
+                state.score += 10;
+                createExplosion(state, tgt.x, tgt.y, '#a855f7', 15);
+              }
+              if (p.piercing) {
+                p.piercedIds = p.piercedIds ?? []; p.piercedIds.push(tgt.id);
+                // Re-target next enemy
+                let bestD = 300, bestE: typeof state.enemies[0] | null = null;
+                for (const e of state.enemies) {
+                  if (p.piercedIds.includes(e.id)) continue;
+                  const d2 = Math.hypot(e.x - p.x, e.y - p.y);
+                  if (d2 < bestD) { bestD = d2; bestE = e; }
+                }
+                if (bestE) { p.targetId = bestE.id; } else { state.projectiles.splice(i, 1); changed = true; continue; }
+              } else {
+                state.projectiles.splice(i, 1);
+              }
+              changed = true;
+              continue;
+            }
           }
         }
 
         if (tgtFound) {
-          const a = Math.atan2(tgtY - p.y, tgtX - p.x);
+          const a = Math.atan2(tgtY! - p.y, tgtX! - p.x);
           p.x += Math.cos(a) * p.speed * dt;
           p.y += Math.sin(a) * p.speed * dt;
           changed = true;
         }
+      }
+
+      // ── Chain lightning update ─────────────────────────────────────────
+      for (let i = state.chainLightnings.length - 1; i >= 0; i--) {
+        state.chainLightnings[i].life += dt;
+        if (state.chainLightnings[i].life >= state.chainLightnings[i].maxLife) {
+          state.chainLightnings.splice(i, 1);
+        }
+        changed = true;
       }
 
       // ── Particles ───────────────────────────────────────────────────────
@@ -609,7 +902,7 @@ export const useGameLoop = () => {
       const hover = hoverRef.current;
       const sel = selectedTowerRef.current;
       renderGame(
-        ctx, state, CANVAS_WIDTH, CANVAS_HEIGHT,
+        ctx, state, VIEWPORT_WIDTH, VIEWPORT_HEIGHT, cameraRef.current,
         hover, sel,
         hover && sel ? canPlace(hover.x, hover.y, sel, state) : false,
         dragWireStartRef.current,
@@ -627,9 +920,76 @@ export const useGameLoop = () => {
     return () => cancelAnimationFrame(id);
   }, [gameLoop]);
 
+  // ── Keyboard shortcuts ──────────────────────────────────────────────
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const state = stateRef.current;
+      if (state.status !== 'playing') return;
+
+      if (e.key === 'Escape') {
+        // Cancel tower drag — restore original position
+        if (dragTowerRef.current && dragOrigPosRef.current) {
+          const tower = state.towerMap.get(dragTowerRef.current);
+          if (tower) {
+            tower.x = dragOrigPosRef.current.x;
+            tower.y = dragOrigPosRef.current.y;
+            repathConnectedWires(state, tower.id);
+          }
+          dragTowerRef.current = null;
+          dragOrigPosRef.current = null;
+          sync();
+          return;
+        }
+        // Cancel wire drag
+        if (dragWireStartRef.current) {
+          dragWireStartRef.current = null;
+          dragWirePathRef.current = null;
+          return;
+        }
+        // Cancel rotation knob
+        if (isRotKnobRef.current) {
+          isRotKnobRef.current = false;
+          if (rotatingRef.current) {
+            const tower = state.towerMap.get(rotatingRef.current);
+            if (tower) tower.rotation = 0;
+          }
+          sync();
+          return;
+        }
+        // Deselect tower placement
+        if (selectedTowerRef.current) {
+          setSelectedTower(null);
+          return;
+        }
+        // Deselect rotating tower
+        if (rotatingRef.current) {
+          updateRotating(null);
+          return;
+        }
+      }
+
+      if (e.key === 'q' || e.key === 'Q') {
+        // Quick rotate the currently selected (rotating) tower 90° right
+        if (rotatingRef.current) {
+          const tower = state.towerMap.get(rotatingRef.current);
+          if (tower) {
+            const newAngle = snapRotation(tower.rotation) + Math.PI / 2;
+            if (!applyTowerRotation(tower, snapRotation(newAngle), snapRotation(tower.rotation), state)) {
+              // Rotation failed (collision), do nothing
+            }
+            sync();
+          }
+        }
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
   return {
     canvasRef, gameState, startGame, startCustomGame, togglePause, handlePick,
     selectedTower, setSelectedTower,
     handleCanvasMouseDown, handleCanvasMouseMove, handleCanvasMouseUp, handleCanvasMouseLeave,
+    handleCanvasWheel, handleCanvasContextMenu,
   };
 };
