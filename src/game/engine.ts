@@ -78,12 +78,12 @@ export const collidesWithWires = (
   return false;
 };
 
-/** Placement validity check — uses towerInventory instead of resources */
+/** Placement validity check — uses towerInventory (unlimited in custom mode) */
 export const canPlace = (
   x: number, y: number, type: TowerType, state: GameState
 ): boolean => {
   const s = TOWER_STATS[type];
-  if ((state.towerInventory[type] ?? 0) <= 0) return false;
+  if (state.gameMode !== 'custom' && (state.towerInventory[type] ?? 0) <= 0) return false;
   if (x < 0 || y < 0 || x + s.width > GRID_WIDTH || y + s.height > GRID_HEIGHT) return false;
   return !collidesWithTowers(x, y, s.width, s.height, state.towers)
       && !collidesWithWires(x, y, s.width, s.height, state.wires);
@@ -116,7 +116,9 @@ export const findWirePath = (
 
   const gScore = new Map<number, number>([[sk, 0]]);
   const parent = new Map<number, number>();
+  const parentDir = new Map<number, number>(); // track incoming direction index
   const h = (x: number, y: number) => Math.abs(x - end.x) + Math.abs(y - end.y);
+  const TURN_COST = 0.001; // small penalty for direction changes → prefers straight paths
 
   const open: { k: number; x: number; y: number; f: number }[] =
     [{ k: sk, x: start.x, y: start.y, f: h(start.x, start.y) }];
@@ -142,15 +144,19 @@ export const findWirePath = (
     }
 
     const curG = gScore.get(cur.k)!;
-    for (const [dx, dy] of NEIGHBOR_OFFSETS) {
+    const curDir = parentDir.get(cur.k);
+    for (let di = 0; di < 4; di++) {
+      const [dx, dy] = NEIGHBOR_OFFSETS[di];
       const nx = cur.x + dx, ny = cur.y + dy;
       if (nx < 0 || nx >= GRID_WIDTH || ny < 0 || ny >= GRID_HEIGHT) continue;
       const nk = key(nx, ny);
       if (blocked.has(nk)) continue;
-      const ng = curG + 1;
+      const turn = (curDir !== undefined && curDir !== di) ? TURN_COST : 0;
+      const ng = curG + 1 + turn;
       if (ng < (gScore.get(nk) ?? Infinity)) {
         gScore.set(nk, ng);
         parent.set(nk, cur.k);
+        parentDir.set(nk, di);
         open.push({ k: nk, x: nx, y: ny, f: ng + h(nx, ny) });
       }
     }
@@ -213,6 +219,7 @@ export const createInitialState = (): GameState => {
   const towerMap = new Map<string, Tower>([[core.id, core]]);
   return {
     status: 'menu',
+    gameMode: 'normal',
     wave: 0,
     powerTimer: 0,
     wireInventory: 5,
@@ -362,7 +369,7 @@ export const spawnEnemy = (state: GameState, wave: number) => {
     id: genId(), x, y,
     hp: 20 * hpMul, maxHp: 20 * hpMul,
     speed: 30 + Math.random() * 20, damage: 5 + wave,
-    attackCooldown: 1000, lastAttackTime: 0, targetId: null,
+    attackCooldown: 1000, lastAttackTime: 0, targetId: null, heading: 0,
   });
 };
 

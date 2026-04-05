@@ -1,4 +1,4 @@
-import { Battery, Zap, Crosshair, Shield, Activity, Play, RotateCcw, Pause, Hexagon, Cable } from 'lucide-react';
+import { Battery, Zap, Crosshair, Shield, Activity, Play, RotateCcw, Pause, Hexagon, Cable, Target, Wrench } from 'lucide-react';
 import { useGameLoop } from './game/useGameLoop';
 import { TOWER_STATS, TowerType, CANVAS_WIDTH, CANVAS_HEIGHT, PickOption } from './game/types';
 
@@ -8,6 +8,7 @@ const TOWER_ICONS: Record<string, React.ReactNode> = {
   wall:      <Shield size={22} />,
   shield:    <Hexagon size={22} />,
   battery:   <Battery size={22} />,
+  target:    <Target size={22} />,
 };
 
 const SIDEBAR_ICONS: Record<string, React.ReactNode> = {
@@ -16,10 +17,11 @@ const SIDEBAR_ICONS: Record<string, React.ReactNode> = {
   wall:      <Shield size={16} />,
   shield:    <Hexagon size={16} />,
   battery:   <Battery size={16} />,
+  target:    <Target size={16} />,
 };
 
 const getPickColor = (opt: PickOption) => {
-  if (opt.kind === 'wire') return '#3b82f6';
+  if (opt.kind === 'wire') return '#60a5fa';
   return TOWER_STATS[opt.towerType!]?.color ?? '#6b7280';
 };
 
@@ -28,6 +30,7 @@ export default function App() {
     canvasRef,
     gameState,
     startGame,
+    startCustomGame,
     togglePause,
     handlePick,
     selectedTower,
@@ -39,8 +42,9 @@ export default function App() {
   } = useGameLoop();
 
   const renderTowerButton = (type: TowerType, label: string) => {
+    const isCustom = gameState.gameMode === 'custom';
     const count = gameState.towerInventory[type] ?? 0;
-    const hasStock = count > 0;
+    const hasStock = isCustom || count > 0;
     const isSelected = selectedTower === type;
 
     return (
@@ -50,17 +54,17 @@ export default function App() {
         disabled={!hasStock || gameState.status !== 'playing'}
         className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all w-full ${
           isSelected
-            ? 'border-blue-500 bg-blue-500/20 shadow-[0_0_10px_rgba(59,130,246,0.4)]'
+            ? 'border-blue-500 bg-blue-500/15 shadow-[0_0_10px_rgba(59,130,246,0.3)]'
             : hasStock
               ? 'border-gray-700 bg-gray-800/80 hover:bg-gray-700 hover:border-gray-500'
               : 'border-gray-800 bg-gray-900/50 opacity-40 cursor-not-allowed'
         }`}
         title={TOWER_STATS[type].description}
       >
-        <div className="text-gray-300 shrink-0">{SIDEBAR_ICONS[type]}</div>
+        <div className="text-gray-400 shrink-0">{SIDEBAR_ICONS[type]}</div>
         <div className="flex flex-col items-start min-w-0">
           <span className="text-xs font-bold text-gray-200 leading-tight">{label}</span>
-          <span className="text-[10px] text-emerald-400 font-mono leading-tight">x{count}</span>
+          <span className="text-[10px] text-emerald-400 font-mono leading-tight">{isCustom ? '\u221E' : `x${count}`}</span>
         </div>
       </button>
     );
@@ -75,16 +79,23 @@ export default function App() {
           ELECTROGUARD
         </h1>
 
-        <div className="flex items-center gap-1.5 text-red-400">
-          <Activity size={14} />
-          <span className="text-xs text-gray-500 uppercase font-bold">Wave</span>
-          <span className="text-lg font-mono font-bold ml-1">{gameState.wave || '-'}</span>
-        </div>
+        {gameState.gameMode === 'custom' ? (
+          <div className="flex items-center gap-1.5 text-orange-400">
+            <Wrench size={14} />
+            <span className="text-xs uppercase font-bold">Custom Mode</span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 text-red-400">
+            <Activity size={14} />
+            <span className="text-xs text-gray-500 uppercase font-bold">Wave</span>
+            <span className="text-lg font-mono font-bold ml-1">{gameState.wave || '-'}</span>
+          </div>
+        )}
 
         <div className="flex items-center gap-1.5 text-blue-400">
           <Cable size={14} />
           <span className="text-xs text-gray-500 uppercase font-bold">Wires</span>
-          <span className="text-lg font-mono font-bold ml-1">{gameState.wireInventory}</span>
+          <span className="text-lg font-mono font-bold ml-1">{gameState.gameMode === 'custom' ? '\u221E' : gameState.wireInventory}</span>
         </div>
 
         <div className="flex items-center gap-1.5 text-white">
@@ -92,7 +103,7 @@ export default function App() {
           <span className="text-lg font-mono font-bold ml-1">{gameState.score}</span>
         </div>
 
-        {gameState.status === 'playing' && gameState.enemiesToSpawn === 0 && gameState.enemies.length === 0 && (
+        {gameState.gameMode !== 'custom' && gameState.status === 'playing' && gameState.enemiesToSpawn === 0 && gameState.enemies.length === 0 && (
           <div className="text-blue-300 text-xs font-medium animate-pulse ml-2">
             Next wave in {Math.ceil(5 - gameState.waveTimer)}s
           </div>
@@ -144,6 +155,15 @@ export default function App() {
                     <Play size={20} /> INITIALIZE CORE
                   </span>
                 </button>
+                <button
+                  onClick={startCustomGame}
+                  className="group relative px-8 py-4 bg-gray-700 hover:bg-gray-600 text-white font-bold rounded-xl transition-all overflow-hidden mt-3 border border-gray-600"
+                >
+                  <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform"></div>
+                  <span className="relative flex items-center gap-2">
+                    <Wrench size={20} /> CUSTOM MODE
+                  </span>
+                </button>
               </div>
             )}
 
@@ -176,7 +196,7 @@ export default function App() {
                       >
                         <div
                           className="w-12 h-12 rounded-lg flex items-center justify-center text-white"
-                          style={{ backgroundColor: color + '33', color }}
+                          style={{ backgroundColor: color + '22', color }}
                         >
                           {opt.kind === 'wire' ? <Cable size={22} /> : TOWER_ICONS[opt.towerType!]}
                         </div>
@@ -210,13 +230,15 @@ export default function App() {
               <div className="absolute inset-0 bg-red-950/90 backdrop-blur-md flex flex-col items-center justify-center p-8 text-center">
                 <h2 className="text-6xl font-black mb-2 text-red-500 tracking-tight">CORE BREACHED</h2>
                 <p className="text-red-300/70 text-xl mb-8 font-mono">SYSTEM FAILURE</p>
-                <div className="bg-black/50 rounded-xl p-6 mb-8 min-w-[200px]">
-                  <div className="text-gray-400 text-sm uppercase tracking-wider mb-2">Final Score</div>
-                  <div className="text-4xl font-mono font-bold text-white">{gameState.score}</div>
-                  <div className="text-gray-500 text-sm mt-2">Survived {gameState.wave} Waves</div>
-                </div>
+                {gameState.gameMode !== 'custom' && (
+                  <div className="bg-black/50 rounded-xl p-6 mb-8 min-w-[200px]">
+                    <div className="text-gray-400 text-sm uppercase tracking-wider mb-2">Final Score</div>
+                    <div className="text-4xl font-mono font-bold text-white">{gameState.score}</div>
+                    <div className="text-gray-500 text-sm mt-2">Survived {gameState.wave} Waves</div>
+                  </div>
+                )}
                 <button
-                  onClick={startGame}
+                  onClick={gameState.gameMode === 'custom' ? startCustomGame : startGame}
                   className="px-8 py-4 bg-gray-800 hover:bg-gray-700 border border-gray-600 text-white font-bold rounded-xl transition-all flex items-center gap-2"
                 >
                   <RotateCcw size={20} /> REBOOT SYSTEM
@@ -236,12 +258,13 @@ export default function App() {
           {renderTowerButton('wall', 'Wall')}
           {renderTowerButton('shield', 'Shield')}
           {renderTowerButton('battery', 'Battery')}
+          {gameState.gameMode === 'custom' && renderTowerButton('target', 'Target')}
 
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-800 bg-gray-900/50 w-full">
             <div className="text-blue-400 shrink-0"><Cable size={16} /></div>
             <div className="flex flex-col items-start min-w-0">
               <span className="text-xs font-bold text-gray-200 leading-tight">Wires</span>
-              <span className="text-[10px] text-blue-400 font-mono leading-tight">x{gameState.wireInventory}</span>
+              <span className="text-[10px] text-blue-400 font-mono leading-tight">{gameState.gameMode === 'custom' ? '\u221E' : `x${gameState.wireInventory}`}</span>
             </div>
           </div>
 

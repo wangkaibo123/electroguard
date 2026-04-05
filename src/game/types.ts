@@ -1,5 +1,6 @@
 export type Position = { x: number; y: number };
-export type TowerType = 'core' | 'blaster' | 'generator' | 'wall' | 'shield' | 'battery';
+export type TowerType = 'core' | 'blaster' | 'generator' | 'wall' | 'shield' | 'battery' | 'target';
+export type GameMode = 'normal' | 'custom';
 export type PortDirection = 'top' | 'right' | 'bottom' | 'left';
 export type PortType = 'input' | 'output';
 export type GameStatus = 'menu' | 'playing' | 'paused' | 'pick' | 'gameover';
@@ -60,6 +61,7 @@ export interface Enemy {
   attackCooldown: number;
   lastAttackTime: number;
   targetId: string | null;
+  heading: number;
 }
 
 export interface Projectile {
@@ -69,6 +71,7 @@ export interface Projectile {
   targetId: string;
   speed: number;
   damage: number;
+  isTargetTower?: boolean;
 }
 
 export interface Particle {
@@ -93,6 +96,7 @@ export interface PickOption {
 
 export interface GameState {
   status: GameStatus;
+  gameMode: GameMode;
   wave: number;
   powerTimer: number;
   wireInventory: number;
@@ -124,12 +128,13 @@ export interface TowerStats {
 }
 
 export const TOWER_STATS: Record<TowerType, TowerStats> = {
-  core:      { hp: 1000, description: 'The heart of your defense. Generates power.',             color: '#3b82f6', width: 3, height: 3, maxPower: 9, maxShieldHp: 500, shieldRadius: 100 },
-  blaster:   { hp: 100,  description: 'Auto-fires at nearby enemies. 50 dmg, needs 4 power.',   color: '#ef4444', width: 2, height: 2, maxPower: 4, maxShieldHp: 0,   shieldRadius: 0 },
-  generator: { hp: 100,  description: 'Power source for the network. Dispatches energy.',        color: '#eab308', width: 2, height: 2, maxPower: 0, maxShieldHp: 0,   shieldRadius: 0 },
-  wall:      { hp: 500,  description: 'High durability. Blocks enemies.',                        color: '#4b5563', width: 1, height: 1, maxPower: 0, maxShieldHp: 0,   shieldRadius: 0 },
-  shield:    { hp: 100,  description: 'Projects a protective shield. Consumes power to recharge.', color: '#06b6d4', width: 1, height: 1, maxPower: 4, maxShieldHp: 300, shieldRadius: 60 },
-  battery:   { hp: 150,  description: 'Stores 4 units of power and discharges quickly.',         color: '#10b981', width: 2, height: 1, maxPower: 4, maxShieldHp: 0,   shieldRadius: 0 },
+  core:      { hp: 1000, description: 'The heart of your defense. Generates power.',             color: '#93c5fd', width: 3, height: 3, maxPower: 9, maxShieldHp: 500, shieldRadius: 100 },
+  blaster:   { hp: 100,  description: 'Auto-fires at nearby enemies. 50 dmg, needs 4 power.',   color: '#f87171', width: 2, height: 2, maxPower: 4, maxShieldHp: 0,   shieldRadius: 0 },
+  generator: { hp: 100,  description: 'Power source for the network. Dispatches energy.',        color: '#fbbf24', width: 2, height: 2, maxPower: 0, maxShieldHp: 0,   shieldRadius: 0 },
+  wall:      { hp: 500,  description: 'High durability. Blocks enemies.',                        color: '#6b7280', width: 1, height: 1, maxPower: 0, maxShieldHp: 0,   shieldRadius: 0 },
+  shield:    { hp: 100,  description: 'Projects a protective shield. Consumes power to recharge.', color: '#22d3ee', width: 1, height: 1, maxPower: 4, maxShieldHp: 300, shieldRadius: 60 },
+  battery:   { hp: 150,  description: 'Stores 4 units of power and discharges quickly.',         color: '#34d399', width: 2, height: 1, maxPower: 4, maxShieldHp: 0,   shieldRadius: 0 },
+  target:    { hp: 200,  description: 'Practice target. Treated as an enemy by turrets.',       color: '#fb923c', width: 1, height: 1, maxPower: 0, maxShieldHp: 0,   shieldRadius: 0 },
 };
 
 export const WIRE_MAX_HP = 50;
