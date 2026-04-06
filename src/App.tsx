@@ -272,7 +272,12 @@ export default function App() {
             {/* Pick Overlay (Roguelike 3-choice) */}
             {gameState.status === 'pick' && (
               <div className="absolute inset-0 bg-gray-950/85 backdrop-blur-sm flex flex-col items-center justify-center p-8 text-center">
-                {gameState.wave > 0 ? (
+                {gameState.pickUiPhase === 'boss_bonus' ? (
+                  <>
+                    <h2 className="text-3xl font-black mb-1 text-amber-400 tracking-tight">{i.bossBonusPickTitle}</h2>
+                    <p className="text-gray-400 text-sm mb-6 max-w-md leading-relaxed">{i.bossBonusPickDescription}</p>
+                  </>
+                ) : gameState.wave > 0 ? (
                   <>
                     <h2 className="text-3xl font-black mb-1 text-emerald-400 tracking-tight">{i.waveCleared(gameState.wave)}</h2>
                     <p className="text-emerald-300/60 text-sm font-mono mb-6">+{gameState.wave * GLOBAL_CONFIG.waveClearScoreMul} pts</p>

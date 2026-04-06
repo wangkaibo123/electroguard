@@ -9,7 +9,7 @@ import {
   getPortPos, generatePorts, getPortCell, findWirePath, dispatchPulse,
   snapRotation, applyTowerRotation, canPlace, collidesWithTowers,
   collidesWithWires, repathConnectedWires, genId, rebuildTowerMap,
-  generatePickOptions,
+  generatePickOptions, generateBossBonusPickOptions,
 } from './engine';
 import { renderGame } from './renderer';
 import { GLOBAL_CONFIG, WEAPON_CONFIG, SHIELD_CONFIG, SCORE_CONFIG, ENEMY_SCALING, ENEMY_AI_CONFIG } from './config';
@@ -193,9 +193,19 @@ export const useGameLoop = () => {
       state.wireInventory += option.count;
     }
 
+    if (state.bossBonusPickQueued) {
+      state.bossBonusPickQueued = false;
+      state.pickOptions = generateBossBonusPickOptions();
+      state.pickUiPhase = 'boss_bonus';
+      state.status = 'pick';
+      sync();
+      return;
+    }
+
     state.pickOptions = [];
     state.needsPick = false;
     state.status = 'playing';
+    state.pickUiPhase = 'standard';
     state.waveTimer = 0;
     sync();
   };
@@ -811,6 +821,9 @@ export const useGameLoop = () => {
           if (state.needsPick) {
             // Wave cleared — enter pick phase
             if (state.wave > 0) state.score += state.wave * WAVE_CLEAR_SCORE_MUL;
+            const isBossWave = state.wave > 0 && state.wave % BOSS_WAVE_INTERVAL === 0;
+            state.bossBonusPickQueued = isBossWave;
+            state.pickUiPhase = 'standard';
             state.pickOptions = generatePickOptions();
             state.status = 'pick';
             changed = true;

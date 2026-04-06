@@ -22,6 +22,9 @@ export interface I18nStrings {
   waveCleared: (wave: number) => string;
   systemUpgrade: string;
   pickDescription: string;
+  /** Extra fixed pick after boss wave (wire / generator / shield) */
+  bossBonusPickTitle: string;
+  bossBonusPickDescription: string;
 
   // Paused
   systemPaused: string;
@@ -93,6 +96,8 @@ const en: I18nStrings = {
   waveCleared: (w) => `WAVE ${w} CLEARED`,
   systemUpgrade: 'SYSTEM UPGRADE',
   pickDescription: 'Choose one upgrade for your defense network',
+  bossBonusPickTitle: 'BOSS SUPPLY DROP',
+  bossBonusPickDescription: 'Boss defeated — choose one: wires, generator, or shield.',
 
   systemPaused: 'SYSTEM PAUSED',
   exitToMenu: 'EXIT TO MENU',
@@ -233,6 +238,8 @@ const zh: I18nStrings = {
   waveCleared: (w) => `第 ${w} 波 已清除`,
   systemUpgrade: '系统升级',
   pickDescription: '为你的防御网络选择一项升级',
+  bossBonusPickTitle: 'Boss 额外补给',
+  bossBonusPickDescription: '击败 Boss 后的定向三选一：线缆、发电机、护盾塔各一项，请选其一。',
 
   systemPaused: '系统暂停',
   exitToMenu: '退出到主界面',
@@ -272,22 +279,22 @@ const zh: I18nStrings = {
     tipHoverIcon: '鼠标停在机器图标上可以阅读其简介。',
     tipRotateTower: '点击已放置的设备可以旋转，也可以按 Q 键快速旋转。',
     tipWireConnect: '在端口之间拖拽来创建线缆——设备需要通电才能运作！',
-    tipShieldReboot: '护盾被摧毁后需要 3 格电才能重启，记得保持发电机连接！',
+    tipShieldReboot: '护盾塔护罩被击破后需要 3 格电才能重启，记得保持发电机连接！',
     tipGeneratorExpand: '发电机可以扩展电网——放在核心和远处炮塔之间中转电力。',
-    tipBusMultiplex: '并联器能将 3 条输入线合并为 3 条输出，简化复杂布局。',
-    tipSniperPierce: '狙击手的子弹可以穿透一条线上的所有敌人——排列好角度！',
-    tipTeslaChain: '特斯拉闪电会在临近敌人之间弹射——对付大群敌人效果拔群。',
+    tipBusMultiplex: '插线板能将 3 条输入线合并为 3 条输出，简化复杂布局。',
+    tipSniperPierce: '狙击塔的子弹可以穿透一条线上的所有敌人——排列好角度！',
+    tipTeslaChain: '电磁炮的闪电会在临近敌人之间弹射——对付大群敌人效果拔群。',
   },
 
   towerName: {
-    blaster: '冲击炮',
+    blaster: '加农炮',
     gatling: '加特林',
-    sniper: '狙击手',
-    tesla: '特斯拉',
+    sniper: '狙击塔',
+    tesla: '电磁炮',
     generator: '发电机',
-    shield: '护盾',
+    shield: '护盾塔',
     battery: '蓄电池',
-    bus: '并联器',
+    bus: '插线板',
     target: '靶标',
     core: '核心',
   },
@@ -308,35 +315,35 @@ const zh: I18nStrings = {
   codexButton: '图鉴',
   towerCodex: {
     blaster:
-      '定位：稳定单体输出，性价比高。\n\n每次开火消耗 2 格电力。能量沿线缆从核心或发电机传来，必须连通电网且正在受电才能射击。\n\n用法建议：放在能俯视刷怪方向的位置；放置后点击旋转炮口。电力稳定时适合作为主力炮塔。',
+      '定位：加农炮——稳定单体输出，性价比高。\n\n每次开火消耗 2 格电力。能量沿线缆从核心或发电机传来，必须连通电网且正在受电才能射击。\n\n用法建议：放在能俯视刷怪方向的位置；放置后点击旋转炮口。电力稳定时适合作为主力炮塔。',
     gatling:
       '定位：持续火力，越久射得越快。\n\n通电连射时会“升温”加速，射速提高后耗电也会增加，注意与发电机、蓄电池搭配。\n\n用法建议：适合应对密集波次；务必保证线缆可靠，避免打一半断供。',
     sniper:
-      '定位：直线高爆发、穿透杀伤。\n\n每发消耗 4 格电，冷却较长，但一发可穿透路径上所有敌人。\n\n用法建议：把敌人走位收成一条线时收益最大，适合隘口；放置后旋转找好穿透角度。',
+      '定位：狙击塔——直线高爆发、穿透杀伤。\n\n每发消耗 4 格电，冷却较长，但一发可穿透路径上所有敌人。\n\n用法建议：把敌人走位收成一条线时收益最大，适合隘口；放置后旋转找好穿透角度。',
     tesla:
-      '定位：连锁闪电，克制聚堆敌人。\n\n电弧在临近敌人之间跳跃，对成群目标特别有效。储电上限较高，布线时预留容量。\n\n用法建议：引诱或迫使敌人聚拢；若路线过于分散，可多座配合覆盖。',
+      '定位：电磁炮——连锁闪电，克制聚堆敌人。\n\n电弧在临近敌人之间跳跃，对成群目标特别有效。储电上限较高，布线时预留容量。\n\n用法建议：引诱或迫使敌人聚拢；若路线过于分散，可多座配合覆盖。',
     generator:
       '定位：扩展电网，远程供电。\n\n与核心类似，按周期向网络派发能量脉冲。当前方炮塔离核心太远或单线负载不足时使用。\n\n用法建议：放在核心与前线之间作“中继”；输入接上游，输出指向下游炮塔。',
     shield:
-      '定位：范围护盾，吸收伤害保护圈内建筑。\n\n护盾会消耗电力充能；被击破后需要积累一定电力（例如 3 格）才能重启，请保持连接。\n\n用法建议：罩住核心或关键炮塔群；不要长时间断电否则极易被集火打穿。',
+      '定位：护盾塔——展开范围护罩，吸收伤害保护圈内建筑。\n\n护罩会消耗电力充能；被击破后需要积累一定电力（例如 3 格）才能重启，请保持连接。\n\n用法建议：罩住核心或关键炮塔群；不要长时间断电否则极易被集火打穿。',
     battery:
-      '定位：缓冲池，平滑用电尖峰。\n\n最多存 4 格电并快速放出，适合多炮塔同时开火的瞬间。\n\n用法建议：放在主供电路径与耗电大户（加特林、狙击、特斯拉等）之间；输入接发电机/核心，输出通往前线。',
+      '定位：缓冲池，平滑用电尖峰。\n\n最多存 4 格电并快速放出，适合多炮塔同时开火的瞬间。\n\n用法建议：放在主供电路径与耗电大户（加特林、狙击塔、电磁炮等）之间；输入接发电机/核心，输出通往前线。',
     bus:
-      '定位：汇流与分线，整理复杂布线。\n\n最多合并 3 条输入线，并分出最多 3 条输出，用于十字路口式走线。\n\n用法建议：线缆容易交叉纠缠时用并联器收束；它本身不产生能量，上游仍需核心或发电机供能。',
+      '定位：汇流与分线，整理复杂布线。\n\n最多合并 3 条输入线，并分出最多 3 条输出，用于十字路口式走线。\n\n用法建议：线缆容易交叉纠缠时用插线板收束；它本身不产生能量，上游仍需核心或发电机供能。',
     target:
       '定位：自定义模式下的练习靶。\n\n炮塔会把它当作敌人攻击，可在没有波次时测试射程、旋转与伤害。\n\n用法建议：空地放置靶标，接好测试炮塔的线缆，观察开火行为；随时可挪位重测。',
   },
 
   pickLabel: {
-    'blaster_1': '冲击炮',
-    'blaster_2': '冲击炮 x2',
+    'blaster_1': '加农炮',
+    'blaster_2': '加农炮 x2',
     'gatling_1': '加特林',
-    'sniper_1': '狙击手',
-    'tesla_1': '特斯拉',
+    'sniper_1': '狙击塔',
+    'tesla_1': '电磁炮',
     'generator_1': '发电机',
-    'shield_1': '护盾',
+    'shield_1': '护盾塔',
     'battery_1': '蓄电池',
-    'bus_1': '并联器',
+    'bus_1': '插线板',
     'wire_3': '线缆 x3',
     'wire_5': '线缆 x5',
   },

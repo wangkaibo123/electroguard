@@ -1,5 +1,6 @@
 import {
   GameState, Tower, TowerType, Position, Port, PortDirection, PortType, Wire, PickOption, EnemyType,
+  PickUiPhase,
   GRID_WIDTH, GRID_HEIGHT, CELL_SIZE, HALF_CELL, TOWER_STATS, CANVAS_WIDTH, CANVAS_HEIGHT, WIRE_MAX_HP,
 } from './types';
 import { t, pickKey } from './i18n';
@@ -228,6 +229,27 @@ export const generatePickOptions = (): PickOption[] => {
   });
 };
 
+/** Fixed bonus 3-choice after clearing a boss wave: wire → generator → shield (display order). */
+export const generateBossBonusPickOptions = (): PickOption[] => {
+  const loc = t();
+  const defs: { kind: 'tower' | 'wire'; towerType?: TowerType; count: number }[] = [
+    { kind: 'wire', count: 5 },
+    { kind: 'tower', towerType: 'generator', count: 1 },
+    { kind: 'tower', towerType: 'shield', count: 1 },
+  ];
+  return defs.map(o => {
+    const k = pickKey(o.kind, o.towerType, o.count);
+    return {
+      kind: o.kind,
+      towerType: o.towerType,
+      count: o.count,
+      id: genId(),
+      label: loc.pickLabel[k] ?? k,
+      description: loc.pickDesc[k] ?? '',
+    };
+  });
+};
+
 // ── Initial state ────────────────────────────────────────────────────────────
 
 export const createInitialState = (): GameState => {
@@ -257,6 +279,8 @@ export const createInitialState = (): GameState => {
     wireInventory: STARTING_INVENTORY.wires,
     towerInventory: { ...STARTING_INVENTORY.towers },
     pickOptions: [],
+    bossBonusPickQueued: false,
+    pickUiPhase: 'standard' satisfies PickUiPhase,
     needsPick: true,
     towers: [core], wires: [], pulses: [], enemies: [], projectiles: [], chainLightnings: [], particles: [], hitEffects: [], shieldBreakEffects: [],
     waveTimer: 0, enemiesToSpawn: 0, spawnTimer: 0, score: 0, towerMap,
