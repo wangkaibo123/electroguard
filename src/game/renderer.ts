@@ -26,6 +26,16 @@ const UNPOWERED = '#4b5563';
 const POWER_ON  = '#34d399';
 const POWER_OFF = '#1e293b';
 
+const PORT_OUTWARD = 4;
+const portOutward = (dir: string): { x: number; y: number } => {
+  switch (dir) {
+    case 'top':    return { x: 0, y: -PORT_OUTWARD };
+    case 'bottom': return { x: 0, y: PORT_OUTWARD };
+    case 'left':   return { x: -PORT_OUTWARD, y: 0 };
+    default:       return { x: PORT_OUTWARD, y: 0 };
+  }
+};
+
 /** Convert hex color to "r,g,b" string for use in rgba() */
 const hexToRgb = (hex: string): string => {
   const n = parseInt(hex.slice(1), 16);
@@ -182,10 +192,12 @@ export const renderGame = (
     if (powered) { ctx.shadowColor = WIRE_ON; ctx.shadowBlur = 9; }
     ctx.beginPath();
     const sp = getPortPos(t1, p1);
-    ctx.moveTo(sp.x, sp.y);
+    const so = portOutward(p1.direction);
+    ctx.moveTo(sp.x + so.x, sp.y + so.y);
     for (const pt of wire.path) ctx.lineTo(pt.x * CELL_SIZE + HALF_CELL, pt.y * CELL_SIZE + HALF_CELL);
     const ep = getPortPos(t2, p2);
-    ctx.lineTo(ep.x, ep.y);
+    const eo = portOutward(p2.direction);
+    ctx.lineTo(ep.x + eo.x, ep.y + eo.y);
     ctx.stroke();
     ctx.shadowBlur = 0;
   }
@@ -196,11 +208,12 @@ export const renderGame = (
     const p1 = t1?.ports.find(p => p.id === draggedWireStart.portId);
     if (t1 && p1) {
       const sp = getPortPos(t1, p1);
+      const spo = portOutward(p1.direction);
       ctx.strokeStyle = draggedWirePath ? 'rgba(96,165,250,0.8)' : 'rgba(239,68,68,0.8)';
       ctx.lineWidth = WIRE_LINE_WIDTH;
       ctx.setLineDash([5, 5]);
       ctx.beginPath();
-      ctx.moveTo(sp.x, sp.y);
+      ctx.moveTo(sp.x + spo.x, sp.y + spo.y);
       if (draggedWirePath) {
         for (const pt of draggedWirePath) ctx.lineTo(pt.x * CELL_SIZE + HALF_CELL, pt.y * CELL_SIZE + HALF_CELL);
       }
@@ -313,6 +326,67 @@ export const renderGame = (
     }
   }
 
+  // ── Ports (drawn under tower bodies) ─────────────────────────────────────
+  const OUT_TRI = 7.5;
+  const IN_HALF = 6;
+  const portStrokeW = 1.35;
+  for (const tower of state.towers) {
+    const ppx = tower.x * CELL_SIZE, ppy = tower.y * CELL_SIZE;
+    const ptw = tower.width * CELL_SIZE, pth = tower.height * CELL_SIZE;
+    const pcx = ppx + ptw / 2, pcy = ppy + pth / 2;
+
+    ctx.save();
+    ctx.translate(pcx, pcy);
+    ctx.rotate(tower.rotation);
+    ctx.translate(-pcx, -pcy);
+
+    for (const port of tower.ports) {
+      const pos = getPortPos(tower, port);
+      const off = portOutward(port.direction);
+      const drawX = pos.x + off.x, drawY = pos.y + off.y;
+      const used = state.wires.some(w => w.startPortId === port.id || w.endPortId === port.id);
+      const portColor = port.portType === 'output'
+        ? (used ? PORT_OUT_USED : PORT_OUT)
+        : (used ? PORT_IN_USED : PORT_IN);
+
+      ctx.strokeStyle = portColor;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(pos.x, pos.y);
+      ctx.lineTo(drawX, drawY);
+      ctx.stroke();
+
+      if (port.portType === 'output') {
+        ctx.fillStyle = portColor;
+        const s = OUT_TRI;
+        ctx.beginPath();
+        switch (port.direction) {
+          case 'top':    ctx.moveTo(drawX - s, drawY + s / 2); ctx.lineTo(drawX + s, drawY + s / 2); ctx.lineTo(drawX, drawY - s); break;
+          case 'bottom': ctx.moveTo(drawX - s, drawY - s / 2); ctx.lineTo(drawX + s, drawY - s / 2); ctx.lineTo(drawX, drawY + s); break;
+          case 'left':   ctx.moveTo(drawX + s / 2, drawY - s); ctx.lineTo(drawX + s / 2, drawY + s); ctx.lineTo(drawX - s, drawY); break;
+          case 'right':  ctx.moveTo(drawX - s / 2, drawY - s); ctx.lineTo(drawX - s / 2, drawY + s); ctx.lineTo(drawX + s, drawY); break;
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = BG_DARK;
+        ctx.lineWidth = portStrokeW;
+        ctx.stroke();
+      } else {
+        ctx.fillStyle = portColor;
+        const h = IN_HALF;
+        const r = 2.25;
+        ctx.beginPath();
+        ctx.roundRect(drawX - h, drawY - h, h * 2, h * 2, r);
+        ctx.fill();
+        ctx.strokeStyle = BG_DARK;
+        ctx.lineWidth = portStrokeW;
+        ctx.stroke();
+      }
+    }
+
+    ctx.restore();
+  }
+
   // ── Towers ────────────────────────────────────────────────────────────────
   const INSET = 6;
   for (const tower of state.towers) {
@@ -336,43 +410,6 @@ export const renderGame = (
     ctx.strokeRect(px + inset, py + inset, tw - inset * 2, th - inset * 2);
 
     drawTowerDetails(ctx, tower, px, py, tw, th, cx, cy, tColor, inset);
-
-    // ── Ports (drawn inside rotation transform) ───────────────────────────
-    const OUT_TRI = 7.5;
-    const IN_HALF = 6;
-    const portStrokeW = 1.35;
-    for (const port of tower.ports) {
-      const pos = getPortPos(tower, port);
-      const used = state.wires.some(w => w.startPortId === port.id || w.endPortId === port.id);
-
-      if (port.portType === 'output') {
-        ctx.fillStyle = used ? PORT_OUT_USED : PORT_OUT;
-        const s = OUT_TRI;
-        ctx.beginPath();
-        switch (port.direction) {
-          case 'top':    ctx.moveTo(pos.x - s, pos.y + s / 2); ctx.lineTo(pos.x + s, pos.y + s / 2); ctx.lineTo(pos.x, pos.y - s); break;
-          case 'bottom': ctx.moveTo(pos.x - s, pos.y - s / 2); ctx.lineTo(pos.x + s, pos.y - s / 2); ctx.lineTo(pos.x, pos.y + s); break;
-          case 'left':   ctx.moveTo(pos.x + s / 2, pos.y - s); ctx.lineTo(pos.x + s / 2, pos.y + s); ctx.lineTo(pos.x - s, pos.y); break;
-          case 'right':  ctx.moveTo(pos.x - s / 2, pos.y - s); ctx.lineTo(pos.x - s / 2, pos.y + s); ctx.lineTo(pos.x + s, pos.y); break;
-        }
-        ctx.closePath();
-        ctx.fill();
-        ctx.strokeStyle = BG_DARK;
-        ctx.lineWidth = portStrokeW;
-        ctx.stroke();
-      } else {
-        ctx.fillStyle = used ? PORT_IN_USED : PORT_IN;
-        const h = IN_HALF;
-        const r = 2.25;
-        const x0 = pos.x - h, y0 = pos.y - h, side = h * 2;
-        ctx.beginPath();
-        ctx.roundRect(x0, y0, side, side, r);
-        ctx.fill();
-        ctx.strokeStyle = BG_DARK;
-        ctx.lineWidth = portStrokeW;
-        ctx.stroke();
-      }
-    }
 
     ctx.restore();
 

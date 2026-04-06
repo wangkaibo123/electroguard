@@ -63,7 +63,7 @@ export const TOWER_CONFIG: Record<TowerType, {
   shieldRadius: number;
 }> = {
   /* 核心：玩家基地，被摧毁即失败 */
-  core:      { hp: 1000, description: 'The heart of your defense. Generates power.',                color: '#93c5fd', width: 5, height: 5, maxPower: 9, maxShieldHp: 500, shieldRadius: 180 },
+  core:      { hp: 1000, description: 'The heart of your defense. Generates power.',                color: '#93c5fd', width: 5, height: 5, maxPower: 9, maxShieldHp: 500, shieldRadius: 240 },
   /* 爆破炮：每次消耗 2 电力发射追踪弹 */
   blaster:   { hp: 100,  description: 'Fires a bullet per 2 power. Reliable turret.',              color: '#f87171', width: 3, height: 3, maxPower: 2, maxShieldHp: 0,   shieldRadius: 0 },
   /* 加特林：热量驱动的连射炮塔，越打越快 */
@@ -75,7 +75,7 @@ export const TOWER_CONFIG: Record<TowerType, {
   /* 发电机：电网的能量来源 */
   generator: { hp: 100,  description: 'Power source for the network. Dispatches energy.',           color: '#fbbf24', width: 3, height: 3, maxPower: 0, maxShieldHp: 0,   shieldRadius: 0 },
   /* 护盾塔：消耗电力投射防护盾 */
-  shield:    { hp: 100,  description: 'Projects a protective shield. Consumes power to recharge.', color: '#22d3ee', width: 1, height: 1, maxPower: 4, maxShieldHp: 300, shieldRadius: 60 },
+  shield:    { hp: 100,  description: 'Projects a protective shield. Consumes power to recharge.', color: '#22d3ee', width: 1, height: 1, maxPower: 4, maxShieldHp: 300, shieldRadius: 120 },
   /* 电池：储存电力并快速放电 */
   battery:   { hp: 150,  description: 'Stores 4 units of power and discharges quickly.',            color: '#34d399', width: 3, height: 2, maxPower: 4, maxShieldHp: 0,   shieldRadius: 0 },
   /* 汇流器：将 3 条输入线合并为 3 条输出线 */
