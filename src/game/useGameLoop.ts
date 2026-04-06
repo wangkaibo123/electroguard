@@ -46,7 +46,7 @@ const TESLA_RANGE = 180;
 const TESLA_BOUNCE_RANGE = 120;
 const TESLA_DAMAGE_PER_POWER = 25;
 const WAVE_DELAY = 5;
-const ATTACK_RANGE = 10;
+const ATTACK_RANGE = 14;
 
 const ENEMY_SCORE: Record<string, number> = {
   scout: 5, grunt: 10, tank: 25, saboteur: 15, overlord: 100,
@@ -259,7 +259,7 @@ export const useGameLoop = () => {
     for (const tower of state.towers) {
       for (const port of tower.ports) {
         const pp = getPortPos(tower, port);
-        if (Math.hypot(pp.x - wx, pp.y - wy) >= 7) continue;
+        if (Math.hypot(pp.x - wx, pp.y - wy) >= 11) continue;
         const existIdx = state.wires.findIndex(w => w.startPortId === port.id || w.endPortId === port.id);
         if (existIdx !== -1) {
           state.wires.splice(existIdx, 1);
@@ -313,14 +313,14 @@ export const useGameLoop = () => {
         const dirs: PortDirection[] = ['top', 'right', 'bottom', 'left'];
         ports = [{ id: genId(), direction: dirs[(Math.random() * 4) | 0], portType: 'input' }];
       } else if (sel === 'bus') {
-        // Bus: 3 input ports on left, 3 output ports on right
+        // Bus 3×2: long edge = width 3 — inputs on top, outputs on bottom (sideOffset along width)
         ports = [
-          { id: genId(), direction: 'left',  portType: 'input',  sideOffset: 1 / 6 },
-          { id: genId(), direction: 'left',  portType: 'input',  sideOffset: 3 / 6 },
-          { id: genId(), direction: 'left',  portType: 'input',  sideOffset: 5 / 6 },
-          { id: genId(), direction: 'right', portType: 'output', sideOffset: 1 / 6 },
-          { id: genId(), direction: 'right', portType: 'output', sideOffset: 3 / 6 },
-          { id: genId(), direction: 'right', portType: 'output', sideOffset: 5 / 6 },
+          { id: genId(), direction: 'top',    portType: 'input',  sideOffset: 1 / 6 },
+          { id: genId(), direction: 'top',    portType: 'input',  sideOffset: 3 / 6 },
+          { id: genId(), direction: 'top',    portType: 'input',  sideOffset: 5 / 6 },
+          { id: genId(), direction: 'bottom', portType: 'output', sideOffset: 1 / 6 },
+          { id: genId(), direction: 'bottom', portType: 'output', sideOffset: 3 / 6 },
+          { id: genId(), direction: 'bottom', portType: 'output', sideOffset: 5 / 6 },
         ];
       } else if (sel === 'blaster' || sel === 'gatling' || sel === 'sniper' || sel === 'tesla') {
         ports = generatePorts('input');

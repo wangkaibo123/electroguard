@@ -154,7 +154,8 @@ export const renderGame = (
   ctx.stroke();
 
   // ── Wires ─────────────────────────────────────────────────────────────────
-  ctx.lineWidth = 3;
+  const WIRE_LINE_WIDTH = 5.5;
+  ctx.lineWidth = WIRE_LINE_WIDTH;
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
   for (const wire of state.wires) {
@@ -167,7 +168,7 @@ export const renderGame = (
 
     const powered = t1.powered || t2.powered;
     ctx.strokeStyle = powered ? WIRE_ON : WIRE_OFF;
-    if (powered) { ctx.shadowColor = WIRE_ON; ctx.shadowBlur = 6; }
+    if (powered) { ctx.shadowColor = WIRE_ON; ctx.shadowBlur = 9; }
     ctx.beginPath();
     const sp = getPortPos(t1, p1);
     ctx.moveTo(sp.x, sp.y);
@@ -185,7 +186,7 @@ export const renderGame = (
     if (t1 && p1) {
       const sp = getPortPos(t1, p1);
       ctx.strokeStyle = draggedWirePath ? 'rgba(96,165,250,0.8)' : 'rgba(239,68,68,0.8)';
-      ctx.lineWidth = 3;
+      ctx.lineWidth = WIRE_LINE_WIDTH;
       ctx.setLineDash([5, 5]);
       ctx.beginPath();
       ctx.moveTo(sp.x, sp.y);
@@ -205,7 +206,7 @@ export const renderGame = (
   for (const p of state.pulses) {
     const pos = posOnPath(p.path, p.progress);
     ctx.beginPath();
-    ctx.arc(pos.x, pos.y, 5, 0, TWO_PI);
+    ctx.arc(pos.x, pos.y, 6.5, 0, TWO_PI);
     ctx.fill();
   }
   ctx.shadowBlur = 0;
@@ -302,12 +303,12 @@ export const renderGame = (
   }
 
   // ── Towers ────────────────────────────────────────────────────────────────
-  const INSET = 4;
+  const INSET = 6;
   for (const tower of state.towers) {
     const px = tower.x * CELL_SIZE, py = tower.y * CELL_SIZE;
     const tw = tower.width * CELL_SIZE, th = tower.height * CELL_SIZE;
     const cx = px + tw / 2, cy = py + th / 2;
-    const inset = (tower.width === 1 && tower.height === 1) ? 3 : INSET;
+    const inset = (tower.width === 1 && tower.height === 1) ? 5 : INSET;
 
     ctx.save();
     ctx.translate(cx, cy);
@@ -320,20 +321,22 @@ export const renderGame = (
     ctx.fillStyle = 'rgba(10,14,26,0.85)';
     ctx.fillRect(px + inset, py + inset, tw - inset * 2, th - inset * 2);
     ctx.strokeStyle = tColor;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 1.75;
     ctx.strokeRect(px + inset, py + inset, tw - inset * 2, th - inset * 2);
 
     drawTowerDetails(ctx, tower, px, py, tw, th, cx, cy, tColor, inset);
 
     // ── Ports (drawn inside rotation transform) ───────────────────────────
-    ctx.lineWidth = 1;
+    const OUT_TRI = 7.5;
+    const IN_HALF = 6;
+    const portStrokeW = 1.35;
     for (const port of tower.ports) {
       const pos = getPortPos(tower, port);
       const used = state.wires.some(w => w.startPortId === port.id || w.endPortId === port.id);
 
       if (port.portType === 'output') {
         ctx.fillStyle = used ? PORT_OUT_USED : PORT_OUT;
-        const s = 5;
+        const s = OUT_TRI;
         ctx.beginPath();
         switch (port.direction) {
           case 'top':    ctx.moveTo(pos.x - s, pos.y + s / 2); ctx.lineTo(pos.x + s, pos.y + s / 2); ctx.lineTo(pos.x, pos.y - s); break;
@@ -344,13 +347,19 @@ export const renderGame = (
         ctx.closePath();
         ctx.fill();
         ctx.strokeStyle = BG_DARK;
+        ctx.lineWidth = portStrokeW;
         ctx.stroke();
       } else {
         ctx.fillStyle = used ? PORT_IN_USED : PORT_IN;
-        const s = 4;
-        ctx.fillRect(pos.x - s, pos.y - s, s * 2, s * 2);
+        const h = IN_HALF;
+        const r = 2.25;
+        const x0 = pos.x - h, y0 = pos.y - h, side = h * 2;
+        ctx.beginPath();
+        ctx.roundRect(x0, y0, side, side, r);
+        ctx.fill();
         ctx.strokeStyle = BG_DARK;
-        ctx.strokeRect(pos.x - s, pos.y - s, s * 2, s * 2);
+        ctx.lineWidth = portStrokeW;
+        ctx.stroke();
       }
     }
 
@@ -408,14 +417,15 @@ export const renderGame = (
   // ── Placement preview ─────────────────────────────────────────────────────
   if (hoverPos && selectedTower && state.status === 'playing') {
     const stats = TOWER_STATS[selectedTower];
+    const pi = INSET;
     ctx.strokeStyle = canPlaceFlag ? stats.color : '#ef4444';
     ctx.lineWidth = 2;
     ctx.globalAlpha = 0.6;
-    ctx.strokeRect(hoverPos.x * CELL_SIZE + 2, hoverPos.y * CELL_SIZE + 2, stats.width * CELL_SIZE - 4, stats.height * CELL_SIZE - 4);
+    ctx.strokeRect(hoverPos.x * CELL_SIZE + pi, hoverPos.y * CELL_SIZE + pi, stats.width * CELL_SIZE - pi * 2, stats.height * CELL_SIZE - pi * 2);
     if (canPlaceFlag) {
       ctx.fillStyle = stats.color;
       ctx.globalAlpha = 0.15;
-      ctx.fillRect(hoverPos.x * CELL_SIZE + 2, hoverPos.y * CELL_SIZE + 2, stats.width * CELL_SIZE - 4, stats.height * CELL_SIZE - 4);
+      ctx.fillRect(hoverPos.x * CELL_SIZE + pi, hoverPos.y * CELL_SIZE + pi, stats.width * CELL_SIZE - pi * 2, stats.height * CELL_SIZE - pi * 2);
     }
     ctx.globalAlpha = 1;
   }
@@ -709,17 +719,29 @@ function drawTowerDetails(
   tColor: string, inset: number,
 ) {
   if (t.type === 'core') {
+    const R = Math.min(tw, th);
     ctx.strokeStyle = tColor; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.arc(cx, cy, Math.min(tw, th) / 3 - 2, 0, TWO_PI); ctx.stroke();
-    ctx.beginPath(); ctx.arc(cx, cy, Math.min(tw, th) / 5, 0, TWO_PI); ctx.stroke();
-    const gs = 3, cw = 8, ch = 8, gap = 2;
-    const totW = gs * cw + (gs - 1) * gap, totH = gs * ch + (gs - 1) * gap;
-    const sx = cx - totW / 2, sy = cy - totH / 2;
-    for (let r = 0; r < gs; r++) for (let c = 0; c < gs; c++) {
-      const idx = r * gs + c;
-      if (idx < t.storedPower) { ctx.fillStyle = POWER_ON; ctx.shadowColor = POWER_ON; ctx.shadowBlur = 4; }
-      else { ctx.fillStyle = POWER_OFF; ctx.shadowBlur = 0; }
-      ctx.fillRect(sx + c * (cw + gap), sy + r * (ch + gap), cw, ch);
+    ctx.beginPath(); ctx.arc(cx, cy, R / 3 - 2, 0, TWO_PI); ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, R / 5, 0, TWO_PI); ctx.stroke();
+
+    const gs = 3;
+    const margin = Math.max(15, R * 0.125);
+    const inner = R - inset * 2 - margin * 2;
+    const gap = Math.max(2.5, inner * 0.065);
+    const cell = (inner - gap * (gs - 1)) / gs;
+    const tot = gs * cell + (gs - 1) * gap;
+    const sx = cx - tot / 2, sy = cy - tot / 2;
+
+    for (let row = 0; row < gs; row++) for (let col = 0; col < gs; col++) {
+      const idx = row * gs + col;
+      const x = sx + col * (cell + gap);
+      const y = sy + row * (cell + gap);
+      if (idx < t.storedPower) {
+        ctx.fillStyle = POWER_ON; ctx.shadowColor = POWER_ON; ctx.shadowBlur = 4;
+      } else {
+        ctx.fillStyle = POWER_OFF; ctx.shadowBlur = 0;
+      }
+      ctx.fillRect(x, y, cell, cell);
       ctx.shadowBlur = 0;
     }
   } else if (t.type === 'blaster') {
@@ -851,16 +873,21 @@ function drawTowerDetails(
       }
     }
   } else if (t.type === 'battery') {
-    const cc = 4, cg = 2, bw = (tw - inset * 2 - 2 - (cc - 1) * cg) / cc, bh = th - inset * 2 - 4;
+    const cc = t.maxPower;
+    const cg = 2;
+    const bw = (tw - inset * 2 - 2 - (cc - 1) * cg) / cc;
+    const bh = th - inset * 2 - 4;
     for (let i = 0; i < cc; i++) {
+      const bx = px + inset + 1 + i * (bw + cg);
+      const by = py + inset + 2;
       if (i < t.storedPower) {
         ctx.fillStyle = POWER_ON; ctx.shadowColor = POWER_ON; ctx.shadowBlur = 3;
         ctx.globalAlpha = 0.6;
-        ctx.fillRect(px + inset + 1 + i * (bw + cg), py + inset + 2, bw, bh);
+        ctx.fillRect(bx, by, bw, bh);
         ctx.globalAlpha = 1;
       }
       ctx.strokeStyle = tColor; ctx.lineWidth = 1;
-      ctx.strokeRect(px + inset + 1 + i * (bw + cg), py + inset + 2, bw, bh);
+      ctx.strokeRect(bx, by, bw, bh);
       ctx.shadowBlur = 0;
     }
   } else if (t.type === 'target') {
@@ -876,44 +903,37 @@ function drawTowerDetails(
     ctx.beginPath(); ctx.arc(cx, cy, r, -Math.PI * 0.8, Math.PI * 0.8); ctx.stroke();
     ctx.beginPath(); ctx.arc(cx, cy, r * 0.5, 0, TWO_PI); ctx.stroke();
   } else if (t.type === 'bus') {
-    // Bus: 1x3 merger/splitter
+    // Bus 3×2: 3 inputs on top long edge, 3 outputs on bottom long edge
     ctx.strokeStyle = tColor; ctx.lineWidth = 1.5;
-    // Center line
     ctx.beginPath();
-    ctx.moveTo(px + inset + 2, cy);
-    ctx.lineTo(px + tw - inset - 2, cy);
+    ctx.moveTo(cx, py + inset + 2);
+    ctx.lineTo(cx, py + th - inset - 2);
     ctx.stroke();
-    // Input arrows (left side)
-    const segH = th / 3;
     for (let i = 0; i < 3; i++) {
-      const sy = py + segH * i + segH / 2;
+      const sx = px + tw * ((i * 2 + 1) / 6);
       ctx.strokeStyle = '#60a5fa'; ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(px + inset, sy);
-      ctx.lineTo(px + tw / 2, cy);
+      ctx.moveTo(sx, py + inset);
+      ctx.lineTo(cx, cy);
       ctx.stroke();
-      // Small arrow tip
       ctx.fillStyle = '#60a5fa';
       ctx.beginPath();
-      ctx.arc(px + inset + 2, sy, 2, 0, TWO_PI);
+      ctx.arc(sx, py + inset + 2, 2, 0, TWO_PI);
       ctx.fill();
     }
-    // Output arrows (right side)
     for (let i = 0; i < 3; i++) {
-      const sy = py + segH * i + segH / 2;
+      const sx = px + tw * ((i * 2 + 1) / 6);
       ctx.strokeStyle = '#fbbf24'; ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(px + tw / 2, cy);
-      ctx.lineTo(px + tw - inset, sy);
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(sx, py + th - inset);
       ctx.stroke();
-      // Small arrow tip
       ctx.fillStyle = '#fbbf24';
+      const tipY = py + th - inset - 2;
       ctx.beginPath();
-      const tipX = px + tw - inset - 2;
-      ctx.moveTo(tipX, sy - 3); ctx.lineTo(tipX + 4, sy); ctx.lineTo(tipX, sy + 3); ctx.closePath();
+      ctx.moveTo(sx, tipY + 4); ctx.lineTo(sx - 3, tipY); ctx.lineTo(sx + 3, tipY); ctx.closePath();
       ctx.fill();
     }
-    // Center node
     ctx.fillStyle = tColor;
     ctx.beginPath(); ctx.arc(cx, cy, 3, 0, TWO_PI); ctx.fill();
   }

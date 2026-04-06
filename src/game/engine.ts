@@ -218,10 +218,13 @@ export const generatePickOptions = (): PickOption[] => {
 // ── Initial state ────────────────────────────────────────────────────────────
 
 export const createInitialState = (): GameState => {
+  const cw = TOWER_STATS.core.width;
+  const ch = TOWER_STATS.core.height;
   const core: Tower = {
     id: genId(), type: 'core',
-    x: (GRID_WIDTH >> 1) - 1, y: (GRID_HEIGHT >> 1) - 1,
-    width: 3, height: 3,
+    x: (GRID_WIDTH >> 1) - Math.floor(cw / 2),
+    y: (GRID_HEIGHT >> 1) - Math.floor(ch / 2),
+    width: cw, height: ch,
     hp: TOWER_STATS.core.hp, maxHp: TOWER_STATS.core.hp,
     powered: true, storedPower: 0, maxPower: TOWER_STATS.core.maxPower, incomingPower: 0,
     shieldHp: TOWER_STATS.core.maxShieldHp, maxShieldHp: TOWER_STATS.core.maxShieldHp,
@@ -389,11 +392,11 @@ const ENEMY_DEFS: Record<EnemyType, {
   cooldown: number; radius: number; color: string; wireDamageMul: number;
   baseShield: number;
 }> = {
-  scout:    { baseHp: 12,  speedMin: 50, speedMax: 65, baseDamage: 3,  cooldown: 800,  radius: 6,  color: '#4ade80', wireDamageMul: 1, baseShield: 0 },
-  grunt:    { baseHp: 25,  speedMin: 28, speedMax: 40, baseDamage: 6,  cooldown: 1000, radius: 8,  color: '#f87171', wireDamageMul: 1, baseShield: 0 },
-  tank:     { baseHp: 60,  speedMin: 15, speedMax: 22, baseDamage: 10, cooldown: 1200, radius: 12, color: '#a78bfa', wireDamageMul: 1, baseShield: 0 },
-  saboteur: { baseHp: 18,  speedMin: 35, speedMax: 45, baseDamage: 4,  cooldown: 600,  radius: 7,  color: '#fbbf24', wireDamageMul: 2, baseShield: 0 },
-  overlord: { baseHp: 200, speedMin: 12, speedMax: 16, baseDamage: 20, cooldown: 1500, radius: 18, color: '#ef4444', wireDamageMul: 1, baseShield: 50 },
+  scout:    { baseHp: 12,  speedMin: 50, speedMax: 65, baseDamage: 3,  cooldown: 800,  radius: 9,  color: '#4ade80', wireDamageMul: 1, baseShield: 0 },
+  grunt:    { baseHp: 25,  speedMin: 28, speedMax: 40, baseDamage: 6,  cooldown: 1000, radius: 12, color: '#f87171', wireDamageMul: 1, baseShield: 0 },
+  tank:     { baseHp: 60,  speedMin: 15, speedMax: 22, baseDamage: 10, cooldown: 1200, radius: 17, color: '#a78bfa', wireDamageMul: 1, baseShield: 0 },
+  saboteur: { baseHp: 18,  speedMin: 35, speedMax: 45, baseDamage: 4,  cooldown: 600,  radius: 10, color: '#fbbf24', wireDamageMul: 2, baseShield: 0 },
+  overlord: { baseHp: 200, speedMin: 12, speedMax: 16, baseDamage: 20, cooldown: 1500, radius: 26, color: '#ef4444', wireDamageMul: 1, baseShield: 50 },
 };
 
 /** Pick a random enemy type valid for the given wave */
