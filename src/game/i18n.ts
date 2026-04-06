@@ -41,6 +41,12 @@ export interface I18nStrings {
   clickToRotate: string;
   dragToWire: string;
 
+  // Wave
+  startNextWave: string;
+
+  // Toast
+  noWires: string;
+
   // Tutorial
   tutorialSkip: string;
   tutorialNext: string;
@@ -50,6 +56,9 @@ export interface I18nStrings {
     text: string;
     action?: string;
   }[];
+
+  // Sidebar tips
+  gameTips: Record<string, string>;
 
   // Tower names
   towerName: Record<string, string>;
@@ -96,6 +105,9 @@ const en: I18nStrings = {
   clickToRotate: 'Click machine to rotate',
   dragToWire: 'Drag port to wire',
 
+  startNextWave: 'Start Next Wave',
+  noWires: 'No wires available!',
+
   tutorialSkip: 'Skip',
   tutorialNext: 'Next',
   tutorialDone: 'Start Playing!',
@@ -109,6 +121,19 @@ const en: I18nStrings = {
     { title: 'Power System', text: 'Energy pulses travel from the Core through wires. Connected towers glow when powered. Use Generators to extend your network!' },
     { title: 'Ready for Battle!', text: 'Enemies attack from the edges. Powered turrets fire automatically. Click towers to rotate them, press Q for quick rotation. After each wave, pick a new upgrade. Good luck!' },
   ],
+
+  gameTips: {
+    tipMoveTurret: 'Move turrets closer to where enemies appear for better coverage.',
+    tipBalanceEnergy: 'Balance energy generation and consumption to keep all turrets powered.',
+    tipHoverIcon: 'Hover over a machine icon to read its description.',
+    tipRotateTower: 'Click a placed tower to rotate it, or press Q for quick rotation.',
+    tipWireConnect: 'Drag between ports to create wires — towers need power to fire!',
+    tipShieldReboot: 'A destroyed shield needs 3 power to reboot. Keep generators connected!',
+    tipGeneratorExpand: 'Generators extend your power network — place them between the Core and distant turrets.',
+    tipBusMultiplex: 'A Bus merges 3 input wires into 3 outputs, simplifying complex layouts.',
+    tipSniperPierce: 'Sniper shots pierce through all enemies in a line — line them up!',
+    tipTeslaChain: 'Tesla lightning bounces between nearby enemies — great vs. swarms.',
+  },
 
   towerName: {
     blaster: 'Blaster',
@@ -198,6 +223,9 @@ const zh: I18nStrings = {
   clickToRotate: '点击机器旋转',
   dragToWire: '拖拽端口连线',
 
+  startNextWave: '提前开始下一波',
+  noWires: '没有可用的线缆！',
+
   tutorialSkip: '跳过',
   tutorialNext: '下一步',
   tutorialDone: '开始游戏！',
@@ -211,6 +239,19 @@ const zh: I18nStrings = {
     { title: '电力系统', text: '能量脉冲从核心通过线缆传输。已连接的设备会发光表示通电，才能正常运作。使用发电机来扩展电网！' },
     { title: '准备战斗！', text: '敌人会从边缘进攻。通电的炮塔会自动开火。点击设备可以旋转，按 Q 键快速旋转。每波结束后选择新升级。祝你好运！' },
   ],
+
+  gameTips: {
+    tipMoveTurret: '可以移动炮塔到有敌人的位置射击，覆盖更多区域。',
+    tipBalanceEnergy: '注意平衡能源的生成与消耗，确保所有炮塔持续供电。',
+    tipHoverIcon: '鼠标停在机器图标上可以阅读其简介。',
+    tipRotateTower: '点击已放置的设备可以旋转，也可以按 Q 键快速旋转。',
+    tipWireConnect: '在端口之间拖拽来创建线缆——设备需要通电才能运作！',
+    tipShieldReboot: '护盾被摧毁后需要 3 格电才能重启，记得保持发电机连接！',
+    tipGeneratorExpand: '发电机可以扩展电网——放在核心和远处炮塔之间中转电力。',
+    tipBusMultiplex: '并联器能将 3 条输入线合并为 3 条输出，简化复杂布局。',
+    tipSniperPierce: '狙击手的子弹可以穿透一条线上的所有敌人——排列好角度！',
+    tipTeslaChain: '特斯拉闪电会在临近敌人之间弹射——对付大群敌人效果拔群。',
+  },
 
   towerName: {
     blaster: '冲击炮',

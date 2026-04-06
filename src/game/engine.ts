@@ -189,14 +189,28 @@ export const rebuildTowerMap = (state: GameState) => {
 
 export const generatePickOptions = (): PickOption[] => {
   const loc = t();
-  const shuffled = [...PICK_POOL_CONFIG.pool].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, PICK_POOL_CONFIG.pickCount).map(o => {
-    const key = pickKey(o.kind, o.towerType, o.count);
+  const remaining = PICK_POOL_CONFIG.pool.map((o, i) => ({ ...o, idx: i }));
+  const picked: typeof remaining = [];
+
+  for (let n = 0; n < PICK_POOL_CONFIG.pickCount && remaining.length > 0; n++) {
+    const totalWeight = remaining.reduce((s, o) => s + o.weight, 0);
+    let roll = Math.random() * totalWeight;
+    let chosenIdx = 0;
+    for (let i = 0; i < remaining.length; i++) {
+      roll -= remaining[i].weight;
+      if (roll <= 0) { chosenIdx = i; break; }
+    }
+    picked.push(remaining[chosenIdx]);
+    remaining.splice(chosenIdx, 1);
+  }
+
+  return picked.map(o => {
+    const k = pickKey(o.kind, o.towerType, o.count);
     return {
-      ...o,
+      kind: o.kind, towerType: o.towerType, count: o.count,
       id: genId(),
-      label: loc.pickLabel[key] ?? key,
-      description: loc.pickDesc[key] ?? '',
+      label: loc.pickLabel[k] ?? k,
+      description: loc.pickDesc[k] ?? '',
     };
   });
 };

@@ -36,7 +36,7 @@ export const GLOBAL_CONFIG = {
   maxZoom: 2.0,
 
   /** 清波后到下一波开始的休整时间（秒） */
-  waveDelay: 5,
+  waveDelay: 30,
   /** 同一波内，两个敌人之间的刷出间隔（秒） */
   spawnInterval: 1,
   /** 每隔几波出一个 Boss（Overlord） */
@@ -75,7 +75,7 @@ export const TOWER_CONFIG: Record<TowerType, {
   /* 发电机：电网的能量来源 */
   generator: { hp: 100,  description: 'Power source for the network. Dispatches energy.',           color: '#fbbf24', width: 3, height: 3, maxPower: 0, maxShieldHp: 0,   shieldRadius: 0 },
   /* 护盾塔：消耗电力投射防护盾 */
-  shield:    { hp: 100,  description: 'Projects a protective shield. Consumes power to recharge.', color: '#22d3ee', width: 1, height: 1, maxPower: 4, maxShieldHp: 300, shieldRadius: 120 },
+  shield:    { hp: 100,  description: 'Projects a protective shield. Consumes power to recharge.', color: '#22d3ee', width: 2, height: 2, maxPower: 4, maxShieldHp: 300, shieldRadius: 120 },
   /* 电池：储存电力并快速放电 */
   battery:   { hp: 150,  description: 'Stores 4 units of power and discharges quickly.',            color: '#34d399', width: 3, height: 2, maxPower: 4, maxShieldHp: 0,   shieldRadius: 0 },
   /* 汇流器：将 3 条输入线合并为 3 条输出线 */
@@ -92,7 +92,7 @@ export const WEAPON_CONFIG = {
     /** 开火冷却（ms） */
     cooldown: 1000,
     /** 索敌射程（px） */
-    range: 150,
+    range: 200,
     /** 单发伤害 */
     damage: 50,
     /** 每次开火消耗电力 */
@@ -103,11 +103,11 @@ export const WEAPON_CONFIG = {
   /** 加特林 */
   gatling: {
     /** 索敌射程（px） */
-    range: 130,
+    range: 175,
     /** 单发伤害 */
     damage: 8,
     /** 子弹最大飞行距离（px），超出后消失 */
-    bulletRange: 200,
+    bulletRange: 270,
     /** 最大热量时的射击间隔（ms），即最快射速 */
     minInterval: 200,
     /** 冷却状态的射击间隔（ms），即最慢射速 */
@@ -130,7 +130,7 @@ export const WEAPON_CONFIG = {
     /** 开火冷却（ms） */
     cooldown: 4000,
     /** 索敌射程（px） */
-    range: 300,
+    range: 400,
     /** 单发伤害 */
     damage: 200,
     /** 每次开火消耗电力 */
@@ -138,16 +138,16 @@ export const WEAPON_CONFIG = {
     /** 子弹飞行速度（px/s） */
     bulletSpeed: 800,
     /** 子弹最大直线飞行距离（px），穿透后仍沿直线前进 */
-    maxRange: 600,
+    maxRange: 800,
   },
   /** 特斯拉 */
   tesla: {
     /** 开火冷却（ms） */
     cooldown: 3000,
     /** 首次索敌射程（px） */
-    range: 180,
+    range: 240,
     /** 闪电弹跳搜索范围（px） */
-    bounceRange: 120,
+    bounceRange: 160,
     /** 每点储电的伤害量，总伤害 = storedPower × damagePerPower */
     damagePerPower: 25,
   },
@@ -250,23 +250,45 @@ export const STARTING_INVENTORY = {
 export const PICK_POOL_CONFIG = {
   /** 每次展示给玩家的选项数量 */
   pickCount: 3,
-  /** 奖励池：kind=类型  towerType=建筑类型  count=获得数量 */
+  /** 奖励池：kind=类型  towerType=建筑类型  count=获得数量  weight=出现权重（越大越容易被抽中） */
   pool: [
-    { kind: 'tower' as const, towerType: 'blaster'   as TowerType, count: 1 },
-    { kind: 'tower' as const, towerType: 'blaster'   as TowerType, count: 2 },
-    { kind: 'tower' as const, towerType: 'gatling'   as TowerType, count: 1 },
-    { kind: 'tower' as const, towerType: 'sniper'    as TowerType, count: 1 },
-    { kind: 'tower' as const, towerType: 'tesla'     as TowerType, count: 1 },
-    { kind: 'tower' as const, towerType: 'generator' as TowerType, count: 1 },
-    { kind: 'tower' as const, towerType: 'shield'    as TowerType, count: 1 },
-    { kind: 'tower' as const, towerType: 'battery'   as TowerType, count: 1 },
-    { kind: 'tower' as const, towerType: 'bus'       as TowerType, count: 1 },
-    { kind: 'wire'  as const,                                       count: 3 },
-    { kind: 'wire'  as const,                                       count: 5 },
+    { kind: 'tower' as const, towerType: 'blaster'   as TowerType, count: 1, weight: 10 },
+    { kind: 'tower' as const, towerType: 'blaster'   as TowerType, count: 2, weight: 5 },
+    { kind: 'tower' as const, towerType: 'gatling'   as TowerType, count: 1, weight: 8 },
+    { kind: 'tower' as const, towerType: 'sniper'    as TowerType, count: 1, weight: 6 },
+    { kind: 'tower' as const, towerType: 'tesla'     as TowerType, count: 1, weight: 5 },
+    { kind: 'tower' as const, towerType: 'generator' as TowerType, count: 1, weight: 8 },
+    { kind: 'tower' as const, towerType: 'shield'    as TowerType, count: 1, weight: 6 },
+    { kind: 'tower' as const, towerType: 'battery'   as TowerType, count: 1, weight: 6 },
+    { kind: 'tower' as const, towerType: 'bus'       as TowerType, count: 1, weight: 4 },
+    { kind: 'wire'  as const,                                       count: 3, weight: 10 },
+    { kind: 'wire'  as const,                                       count: 5, weight: 6 },
   ],
 };
 
 // ── 9. 敌人 AI 参数 ─────────────────────────────────────────────────────────
+
+// ── 10. 侧边栏提示轮播 ──────────────────────────────────────────────────────
+//  tips: 提示词 key 列表，对应 i18n 中的翻译
+//  intervalMs: 每条提示停留时间（毫秒）
+
+export const TIPS_CONFIG = {
+  intervalMs: 8000,
+  tips: [
+    'tipMoveTurret',
+    'tipBalanceEnergy',
+    'tipHoverIcon',
+    'tipRotateTower',
+    'tipWireConnect',
+    'tipShieldReboot',
+    'tipGeneratorExpand',
+    'tipBusMultiplex',
+    'tipSniperPierce',
+    'tipTeslaChain',
+  ],
+} as const;
+
+// ── 11. 敌人 AI 参数 ─────────────────────────────────────────────────────────
 
 export const ENEMY_AI_CONFIG = {
   /** 破坏者寻找塔时的距离加权倍率（>1 表示降低优先级） */

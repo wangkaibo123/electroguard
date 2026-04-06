@@ -13,6 +13,7 @@ import {
 } from './engine';
 import { renderGame } from './renderer';
 import { GLOBAL_CONFIG, WEAPON_CONFIG, SHIELD_CONFIG, SCORE_CONFIG, ENEMY_SCALING, ENEMY_AI_CONFIG } from './config';
+import { t } from './i18n';
 
 // ── Constants (derived from config) ──────────────────────────────────────────
 const TWO_PI = Math.PI * 2;
@@ -104,6 +105,14 @@ export const useGameLoop = () => {
   const dragOrigWiresRef = useRef<Wire[] | null>(null);
   const dragOrigInventoryRef = useRef<number>(0);
 
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showToast = (msg: string, durationMs = 2000) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToastMessage(msg);
+    toastTimerRef.current = setTimeout(() => setToastMessage(null), durationMs);
+  };
+
   const sync = () => setGameState({ ...stateRef.current });
 
   const getMinZoom = () => {
@@ -189,6 +198,15 @@ export const useGameLoop = () => {
     sync();
   };
 
+  const skipToNextWave = () => {
+    const state = stateRef.current;
+    if (state.status !== 'playing' || state.gameMode === 'custom') return;
+    if (state.enemies.length > 0 || state.enemiesToSpawn > 0) return;
+    if (state.needsPick) return;
+    state.waveTimer = WAVE_DELAY + 1;
+    sync();
+  };
+
   // ── Canvas mouse helpers ────────────────────────────────────────────────
   const canvasScreenXY = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const r = canvasRef.current?.getBoundingClientRect();
@@ -256,6 +274,7 @@ export const useGameLoop = () => {
           updatePowerGrid(state);
           sync();
         } else if (state.gameMode !== 'custom' && state.wireInventory <= 0) {
+          showToast(t().noWires);
           return;
         }
         dragWireStartRef.current = { towerId: tower.id, portId: port.id };
@@ -790,7 +809,7 @@ export const useGameLoop = () => {
         const isSaboteur = enemy.enemyType === 'saboteur';
 
         for (const t of state.towers) {
-          if (t.type !== 'core' && !t.powered) continue;
+          if (t.type === 'target') continue;
           const tx = Math.max(t.x * CELL_SIZE, Math.min(enemy.x, (t.x + t.width) * CELL_SIZE));
           const ty = Math.max(t.y * CELL_SIZE, Math.min(enemy.y, (t.y + t.height) * CELL_SIZE));
           const d = Math.hypot(tx - enemy.x, ty - enemy.y);
@@ -1121,7 +1140,7 @@ export const useGameLoop = () => {
 
   return {
     canvasRef, cameraRef, gameState, startGame, startCustomGame, togglePause, returnToMenu, handlePick,
-    selectedTower, setSelectedTower,
+    selectedTower, setSelectedTower, skipToNextWave, toastMessage,
     handleCanvasMouseDown, handleCanvasMouseMove, handleCanvasMouseUp, handleCanvasMouseLeave,
     handleCanvasWheel, handleCanvasContextMenu,
   };

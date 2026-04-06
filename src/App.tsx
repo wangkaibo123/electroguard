@@ -3,7 +3,7 @@ import { Battery, Zap, Crosshair, Activity, Play, RotateCcw, Pause, Hexagon, Cab
 import { useGameLoop } from './game/useGameLoop';
 import { TOWER_STATS, TowerType, PickOption } from './game/types';
 import { t, getLocale, setLocale, Locale } from './game/i18n';
-import { GLOBAL_CONFIG } from './game/config';
+import { GLOBAL_CONFIG, TIPS_CONFIG } from './game/config';
 
 const TowerIcon = ({ type, size = 22 }: { type: string; size?: number }) => {
   const icons: Record<string, React.ComponentType<{ size: number }>> = {
@@ -31,6 +31,8 @@ export default function App() {
     handlePick,
     selectedTower,
     setSelectedTower,
+    skipToNextWave,
+    toastMessage,
     handleCanvasMouseDown,
     handleCanvasMouseMove,
     handleCanvasMouseUp,
@@ -47,6 +49,14 @@ export default function App() {
     _setLocale(next);
   };
   const i = t();
+
+  const [tipIndex, setTipIndex] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => {
+      setTipIndex(prev => (prev + 1) % TIPS_CONFIG.tips.length);
+    }, TIPS_CONFIG.intervalMs);
+    return () => clearInterval(id);
+  }, []);
 
   const [tutorialStep, setTutorialStep] = useState<number | null>(null);
   const startTutorial = () => { startGame(); setTutorialStep(0); };
@@ -133,8 +143,16 @@ export default function App() {
         </div>
 
         {gameState.gameMode !== 'custom' && gameState.status === 'playing' && gameState.enemiesToSpawn === 0 && gameState.enemies.length === 0 && (
-          <div className="text-blue-300 text-xs font-medium animate-pulse ml-2">
-            {i.nextWaveIn(Math.ceil(GLOBAL_CONFIG.waveDelay - gameState.waveTimer))}
+          <div className="flex items-center gap-3 ml-2">
+            <div className="text-blue-300 text-xs font-medium animate-pulse">
+              {i.nextWaveIn(Math.ceil(GLOBAL_CONFIG.waveDelay - gameState.waveTimer))}
+            </div>
+            <button
+              onClick={skipToNextWave}
+              className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1"
+            >
+              <Play size={12} /> {i.startNextWave}
+            </button>
           </div>
         )}
 
@@ -175,6 +193,13 @@ export default function App() {
               onContextMenu={handleCanvasContextMenu}
               className={`block w-full h-full ${gameState.status === 'playing' ? (selectedTower ? 'cursor-crosshair' : 'cursor-grab active:cursor-grabbing') : ''}`}
             />
+
+            {/* Toast Notification */}
+            {toastMessage && (
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 bg-gray-900/95 border border-amber-500/60 rounded-lg shadow-[0_0_15px_rgba(245,158,11,0.2)] text-amber-300 text-sm font-bold animate-bounce pointer-events-none">
+                {toastMessage}
+              </div>
+            )}
 
             {/* Menu Overlay */}
             {gameState.status === 'menu' && (
@@ -497,7 +522,7 @@ export default function App() {
               sidebarOpen ? 'w-[180px] opacity-100' : 'w-0 opacity-0 p-0 border-l-0'
             } ${tutorialStep === 3 || tutorialStep === 4 ? 'shadow-[0_0_20px_rgba(6,182,212,0.4),inset_0_0_20px_rgba(6,182,212,0.15)] border-l-cyan-500/50' : ''}`}
           >
-            <div className="min-w-[160px]">
+            <div className="min-w-[160px] flex flex-col h-full">
               <div className="text-xs font-bold uppercase tracking-widest text-gray-500 px-1 py-1.5">
                 {i.inventory}
               </div>
@@ -522,6 +547,18 @@ export default function App() {
               <div className="mt-4 text-xs text-gray-600 px-1 py-2 leading-relaxed">
                 <p>{i.clickToRotate}</p>
                 <p>{i.dragToWire}</p>
+              </div>
+
+              <div className="mt-auto pt-3 border-t border-gray-800">
+                <div className="px-2 py-2.5 rounded-lg bg-gray-800/60 border border-gray-700/50 min-h-[56px] flex items-start gap-2">
+                  <span className="text-amber-400/70 text-xs mt-0.5 shrink-0">💡</span>
+                  <p
+                    key={tipIndex}
+                    className="text-[11px] text-gray-400 leading-relaxed animate-[fadeIn_0.5s_ease-in-out]"
+                  >
+                    {i.gameTips[TIPS_CONFIG.tips[tipIndex]] ?? TIPS_CONFIG.tips[tipIndex]}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
