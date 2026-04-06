@@ -15,8 +15,8 @@ const WIRE_OFF  = '#374151';
 const PULSE_CLR = '#93c5fd';
 const PORT_OUT  = '#fbbf24';
 const PORT_OUT_USED = '#fcd34d';
-const PORT_IN   = '#60a5fa';
-const PORT_IN_USED  = '#93c5fd';
+const PORT_IN   = '#34d399';
+const PORT_IN_USED  = '#6ee7b7';
 const HP_BG     = '#1e293b';
 const HP_FG     = '#22c55e';
 const SHIELD_CLR = 'rgba(34,211,238,';
@@ -454,12 +454,19 @@ export const renderGame = (
       ctx.beginPath(); ctx.arc(cx, cy, baseR, 0, TWO_PI);
       ctx.fill();
       ctx.stroke();
+    } else if (tower.type === 'battery' || tower.type === 'bus') {
+      const vth = tw / 2;
+      const vpy = py + (th - vth) / 2;
+      ctx.fillRect(px + inset, vpy + inset, tw - inset * 2, vth - inset * 2);
+      ctx.strokeRect(px + inset, vpy + inset, tw - inset * 2, vth - inset * 2);
     } else {
       ctx.fillRect(px + inset, py + inset, tw - inset * 2, th - inset * 2);
       ctx.strokeRect(px + inset, py + inset, tw - inset * 2, th - inset * 2);
     }
 
-    drawTowerDetails(ctx, tower, px, py, tw, th, cx, cy, tColor, inset, now);
+    const detailPy = (tower.type === 'battery' || tower.type === 'bus') ? py + (th - tw / 2) / 2 : py;
+    const detailTh = (tower.type === 'battery' || tower.type === 'bus') ? tw / 2 : th;
+    drawTowerDetails(ctx, tower, px, detailPy, tw, detailTh, cx, cy, tColor, inset, now);
 
     ctx.restore();
 
@@ -490,14 +497,21 @@ export const renderGame = (
   if (hoverPos && selectedTower && state.status === 'playing') {
     const stats = TOWER_STATS[selectedTower];
     const pi = INSET;
+    const prevPx = hoverPos.x * CELL_SIZE;
+    const prevPy = hoverPos.y * CELL_SIZE;
+    const prevTw = stats.width * CELL_SIZE;
+    const prevTh = stats.height * CELL_SIZE;
+    const isVisual21 = selectedTower === 'battery' || selectedTower === 'bus';
+    const prevVth = isVisual21 ? prevTw / 2 : prevTh;
+    const prevVpy = isVisual21 ? prevPy + (prevTh - prevVth) / 2 : prevPy;
     ctx.strokeStyle = canPlaceFlag ? stats.color : '#ef4444';
     ctx.lineWidth = 2;
     ctx.globalAlpha = 0.6;
-    ctx.strokeRect(hoverPos.x * CELL_SIZE + pi, hoverPos.y * CELL_SIZE + pi, stats.width * CELL_SIZE - pi * 2, stats.height * CELL_SIZE - pi * 2);
+    ctx.strokeRect(prevPx + pi, prevVpy + pi, prevTw - pi * 2, prevVth - pi * 2);
     if (canPlaceFlag) {
       ctx.fillStyle = stats.color;
       ctx.globalAlpha = 0.15;
-      ctx.fillRect(hoverPos.x * CELL_SIZE + pi, hoverPos.y * CELL_SIZE + pi, stats.width * CELL_SIZE - pi * 2, stats.height * CELL_SIZE - pi * 2);
+      ctx.fillRect(prevPx + pi, prevVpy + pi, prevTw - pi * 2, prevVth - pi * 2);
     }
     ctx.globalAlpha = 1;
   }
@@ -534,6 +548,43 @@ export const renderGame = (
       ctx.shadowBlur = 0;
       ctx.fillStyle = BG_DARK;
       ctx.beginPath(); ctx.arc(kx, ky, 3, 0, TWO_PI); ctx.fill();
+
+      // Arc arrow wrapping around the knob (arch opening downward)
+      const arcR = 14;
+      const arcStart = Math.PI * 0.8;
+      const arcEnd = Math.PI * 0.2;
+      ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.arc(kx, ky, arcR, arcStart, arcEnd, false);
+      ctx.stroke();
+      const arrowLen = 5;
+      // Left arrowhead
+      const la = arcStart;
+      const lx = kx + arcR * Math.cos(la), ly = ky + arcR * Math.sin(la);
+      const lTan = la - Math.PI / 2;
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.beginPath();
+      ctx.moveTo(lx + arrowLen * Math.cos(lTan - 0.5), ly + arrowLen * Math.sin(lTan - 0.5));
+      ctx.lineTo(lx, ly);
+      ctx.lineTo(lx + arrowLen * Math.cos(lTan + 0.5), ly + arrowLen * Math.sin(lTan + 0.5));
+      ctx.fill();
+      // Right arrowhead
+      const ra = arcEnd;
+      const rx = kx + arcR * Math.cos(ra), ry = ky + arcR * Math.sin(ra);
+      const rTan = ra + Math.PI / 2;
+      ctx.beginPath();
+      ctx.moveTo(rx + arrowLen * Math.cos(rTan - 0.5), ry + arrowLen * Math.sin(rTan - 0.5));
+      ctx.lineTo(rx, ry);
+      ctx.lineTo(rx + arrowLen * Math.cos(rTan + 0.5), ry + arrowLen * Math.sin(rTan + 0.5));
+      ctx.fill();
+
+      // "拖动旋转" label
+      ctx.fillStyle = 'rgba(255,255,255,0.65)';
+      ctx.font = '10px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText('拖动旋转', kx, ky - arcR - 6);
     }
   }
 

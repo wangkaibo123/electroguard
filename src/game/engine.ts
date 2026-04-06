@@ -37,6 +37,17 @@ export const getPortPos = (t: Tower, p: Port): Position => {
   const px = t.x * CELL_SIZE, py = t.y * CELL_SIZE;
   const tw = t.width * CELL_SIZE, th = t.height * CELL_SIZE;
   const off = p.sideOffset ?? 0.5;
+  if (t.type === 'battery' || t.type === 'bus') {
+    const landscape = tw >= th;
+    const yIn = landscape ? Math.max((th - tw / 2) / 2, 0) : 0;
+    const xIn = !landscape ? Math.max((tw - th / 2) / 2, 0) : 0;
+    switch (p.direction) {
+      case 'top':    return { x: px + tw * off, y: py + yIn };
+      case 'bottom': return { x: px + tw * off, y: py + th - yIn };
+      case 'right':  return { x: px + tw - xIn, y: py + th * off };
+      case 'left':   return { x: px + xIn,      y: py + th * off };
+    }
+  }
   switch (p.direction) {
     case 'top':    return { x: px + tw * off, y: py };
     case 'right':  return { x: px + tw,       y: py + th * off };

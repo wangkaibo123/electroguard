@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  GameState, TowerType, Port, PortDirection, Wire, CELL_SIZE, GRID_WIDTH, GRID_HEIGHT,
+  GameState, Tower, TowerType, Port, PortDirection, Wire, CELL_SIZE, GRID_WIDTH, GRID_HEIGHT,
   TOWER_STATS, CANVAS_WIDTH, CANVAS_HEIGHT, WIRE_MAX_HP, ChainLightning,
   Camera, VIEWPORT_WIDTH, VIEWPORT_HEIGHT, HitEffect, ShieldBreakEffect,
 } from './types';
@@ -654,7 +654,7 @@ export const useGameLoop = () => {
         const range = t.type === 'sniper' ? SNIPER_RANGE : t.type === 'gatling' ? GATLING_RANGE : BLASTER_RANGE;
 
         // Find nearest target for barrel aiming
-        let bestD = range;
+        let bestD: number = range;
         let tgtX = 0, tgtY = 0, hasTarget = false;
         let bestEnemy: typeof state.enemies[0] | null = null;
         let bestTarget: typeof state.towers[0] | null = null;
