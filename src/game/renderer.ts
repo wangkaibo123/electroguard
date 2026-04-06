@@ -8,6 +8,7 @@ const SNIPER_COOLDOWN_MS = 4000; // must match useGameLoop
 const BG_DARK   = '#0a0e1a';
 const BG_MID    = '#111827';
 const BG_GRID   = 'rgba(140,180,255,0.04)';
+const MAP_BORDER = 'rgba(96,165,250,0.35)';
 const WIRE_ON   = '#60a5fa';
 const WIRE_OFF  = '#374151';
 const PULSE_CLR = '#93c5fd';
@@ -152,6 +153,15 @@ export const renderGame = (
   ctx.strokeStyle = BG_GRID;
   ctx.lineWidth = 1;
   ctx.stroke();
+
+  // ── Map border (adapts with cell size) ───────────────────────────────────
+  const borderW = Math.max(1.5, CELL_SIZE * 0.12);
+  ctx.fillStyle = MAP_BORDER;
+  // Draw border as 4 inner strips so it aligns exactly with map cell bounds.
+  ctx.fillRect(0, 0, CANVAS_WIDTH, borderW); // top
+  ctx.fillRect(0, CANVAS_HEIGHT - borderW, CANVAS_WIDTH, borderW); // bottom
+  ctx.fillRect(0, 0, borderW, CANVAS_HEIGHT); // left
+  ctx.fillRect(CANVAS_WIDTH - borderW, 0, borderW, CANVAS_HEIGHT); // right
 
   // ── Wires ─────────────────────────────────────────────────────────────────
   const WIRE_LINE_WIDTH = 5.5;

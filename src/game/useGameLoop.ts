@@ -94,6 +94,10 @@ export const useGameLoop = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stateRef = useRef<GameState>(createInitialState());
   const [gameState, setGameState] = useState<GameState>(stateRef.current);
+  const viewportRef = useRef<{ width: number; height: number }>({
+    width: VIEWPORT_WIDTH,
+    height: VIEWPORT_HEIGHT,
+  });
 
   const selectedTowerRef = useRef<TowerType | null>(null);
   const [selectedTower, _setSelectedTower] = useState<TowerType | null>(null);
@@ -111,9 +115,15 @@ export const useGameLoop = () => {
   const lastTimeRef = useRef(0);
 
   // Camera
-  const MIN_ZOOM = Math.min(VIEWPORT_WIDTH / CANVAS_WIDTH, VIEWPORT_HEIGHT / CANVAS_HEIGHT);
+  const INITIAL_MIN_ZOOM = Math.max(VIEWPORT_WIDTH / CANVAS_WIDTH, VIEWPORT_HEIGHT / CANVAS_HEIGHT);
   const MAX_ZOOM = 2.0;
-  const cameraRef = useRef<Camera>({ x: 0, y: 0, zoom: MIN_ZOOM });
+  const initialViewW = VIEWPORT_WIDTH / INITIAL_MIN_ZOOM;
+  const initialViewH = VIEWPORT_HEIGHT / INITIAL_MIN_ZOOM;
+  const cameraRef = useRef<Camera>({
+    x: Math.max(0, (CANVAS_WIDTH - initialViewW) / 2),
+    y: Math.max(0, (CANVAS_HEIGHT - initialViewH) / 2),
+    zoom: INITIAL_MIN_ZOOM,
+  });
 
   // Pan state
   const isPanningRef = useRef(false);
@@ -125,6 +135,12 @@ export const useGameLoop = () => {
   const dragOrigInventoryRef = useRef<number>(0);
 
   const sync = () => setGameState({ ...stateRef.current });
+
+  const getMinZoom = () => {
+    const vp = viewportRef.current;
+    // Keep viewport fully inside world bounds on both axes.
+    return Math.max(vp.width / CANVAS_WIDTH, vp.height / CANVAS_HEIGHT);
+  };
 
   const cancelTowerDrag = () => {
     if (dragTowerRef.current && dragOrigPosRef.current) {
@@ -215,10 +231,13 @@ export const useGameLoop = () => {
   };
 
   const clampCamera = (cam: Camera) => {
-    const viewW = VIEWPORT_WIDTH / cam.zoom;
-    const viewH = VIEWPORT_HEIGHT / cam.zoom;
-    cam.x = Math.max(0, Math.min(cam.x, CANVAS_WIDTH - viewW));
-    cam.y = Math.max(0, Math.min(cam.y, CANVAS_HEIGHT - viewH));
+    const vp = viewportRef.current;
+    const viewW = vp.width / cam.zoom;
+    const viewH = vp.height / cam.zoom;
+    const maxX = Math.max(0, CANVAS_WIDTH - viewW);
+    const maxY = Math.max(0, CANVAS_HEIGHT - viewH);
+    cam.x = Math.max(0, Math.min(cam.x, maxX));
+    cam.y = Math.max(0, Math.min(cam.y, maxY));
   };
 
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -541,7 +560,8 @@ export const useGameLoop = () => {
 
     // Adjust zoom
     const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
-    cam.zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, cam.zoom * factor));
+    const minZoom = getMinZoom();
+    cam.zoom = Math.max(minZoom, Math.min(MAX_ZOOM, cam.zoom * factor));
 
     // Keep world point under cursor after zoom
     cam.x = wx - sx / cam.zoom;
@@ -1018,10 +1038,13 @@ export const useGameLoop = () => {
     // ── Render ────────────────────────────────────────────────────────────
     const ctx = canvasRef.current?.getContext('2d');
     if (ctx) {
+      const dpr = window.devicePixelRatio || 1;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const vp = viewportRef.current;
       const hover = hoverRef.current;
       const sel = selectedTowerRef.current;
       renderGame(
-        ctx, state, VIEWPORT_WIDTH, VIEWPORT_HEIGHT, cameraRef.current,
+        ctx, state, vp.width, vp.height, cameraRef.current,
         hover, sel,
         hover && sel ? canPlace(hover.x, hover.y, sel, state) : false,
         dragWireStartRef.current,
@@ -1038,6 +1061,39 @@ export const useGameLoop = () => {
     const id = requestAnimationFrame(gameLoop);
     return () => cancelAnimationFrame(id);
   }, [gameLoop]);
+
+  // ── Adaptive canvas resolution (CSS size + DPR backing store) ─────────────
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const updateCanvasSize = () => {
+      const rect = canvas.getBoundingClientRect();
+      const width = Math.max(1, Math.round(rect.width));
+      const height = Math.max(1, Math.round(rect.height));
+      const dpr = window.devicePixelRatio || 1;
+      const pixelW = Math.max(1, Math.round(width * dpr));
+      const pixelH = Math.max(1, Math.round(height * dpr));
+
+      if (canvas.width !== pixelW) canvas.width = pixelW;
+      if (canvas.height !== pixelH) canvas.height = pixelH;
+
+      viewportRef.current = { width, height };
+      const cam = cameraRef.current;
+      const minZoom = getMinZoom();
+      if (cam.zoom < minZoom) cam.zoom = minZoom;
+      clampCamera(cam);
+    };
+
+    updateCanvasSize();
+    const ro = new ResizeObserver(updateCanvasSize);
+    ro.observe(canvas);
+    window.addEventListener('resize', updateCanvasSize);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', updateCanvasSize);
+    };
+  }, []);
 
   // ── Keyboard shortcuts ──────────────────────────────────────────────
   useEffect(() => {

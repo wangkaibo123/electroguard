@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Battery, Zap, Crosshair, Activity, Play, RotateCcw, Pause, Hexagon, Cable, Target, Wrench, ChevronRight, ChevronLeft, Flame, Focus, Radio, GitMerge, Globe, LogOut } from 'lucide-react';
 import { useGameLoop } from './game/useGameLoop';
-import { TOWER_STATS, TowerType, VIEWPORT_WIDTH, VIEWPORT_HEIGHT, PickOption } from './game/types';
+import { TOWER_STATS, TowerType, PickOption } from './game/types';
 import { t, getLocale, setLocale, Locale } from './game/i18n';
 
 const TowerIcon = ({ type, size = 22 }: { type: string; size?: number }) => {
@@ -140,19 +140,17 @@ export default function App() {
       <div className="flex-1 flex min-h-0">
 
         {/* Canvas Area */}
-        <div className="flex-1 flex items-center justify-center min-w-0 p-2">
-          <div className="relative rounded-xl overflow-hidden shadow-[0_0_30px_rgba(0,0,0,0.6)] border-2 border-gray-800 bg-gray-900 shrink-0">
+        <div className="flex-1 min-w-0 p-2">
+          <div className="relative rounded-xl overflow-hidden shadow-[0_0_30px_rgba(0,0,0,0.6)] bg-gray-900 w-full h-full">
             <canvas
               ref={canvasRef}
-              width={VIEWPORT_WIDTH}
-              height={VIEWPORT_HEIGHT}
               onMouseDown={handleCanvasMouseDown}
               onMouseMove={handleCanvasMouseMove}
               onMouseUp={handleCanvasMouseUp}
               onMouseLeave={handleCanvasMouseLeave}
               onWheel={handleCanvasWheel}
               onContextMenu={handleCanvasContextMenu}
-              className={`block ${gameState.status === 'playing' ? (selectedTower ? 'cursor-crosshair' : 'cursor-grab active:cursor-grabbing') : ''}`}
+              className={`block w-full h-full ${gameState.status === 'playing' ? (selectedTower ? 'cursor-crosshair' : 'cursor-grab active:cursor-grabbing') : ''}`}
             />
 
             {/* Menu Overlay */}
