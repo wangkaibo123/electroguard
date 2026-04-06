@@ -46,6 +46,12 @@ export const GLOBAL_CONFIG = {
 
   /** 敌人近战攻击距离（px），进入此范围开始攻击 */
   attackRange: 14,
+  /** Boss（Overlord）每隔多少毫秒生成侦察兵小怪 */
+  bossSpawnInterval: 15000,
+  /** Boss 每次生成侦察兵的数量 */
+  bossSpawnCount: 2,
+  /** 全敌人基础移速倍率（在随机速度与波次加成之后再乘） */
+  enemyBaseSpeedMul: 1.1,
 } as const;
 
 // ── 2. 建筑 / 机器数据 ──────────────────────────────────────────────────────
@@ -139,6 +145,8 @@ export const WEAPON_CONFIG = {
     bulletSpeed: 800,
     /** 子弹最大直线飞行距离（px），穿透后仍沿直线前进 */
     maxRange: 800,
+    /** 炮管对准目标后需保持的瞄准时间（ms）才允许开火 */
+    minAimMs: 320,
   },
   /** 特斯拉 */
   tesla: {
@@ -179,15 +187,15 @@ export const ENEMY_CONFIG: Record<EnemyType, {
   unlockWave: number;
 }> = {
   /* 侦察兵：速度快、血薄 */
-  scout:    { baseHp: 12,  speedMin: 50, speedMax: 65, baseDamage: 3,  cooldown: 800,  radius: 9,  color: '#4ade80', wireDamageMul: 1, baseShield: 0,  unlockWave: 1 },
+  scout:    { baseHp: 12,  speedMin: 55, speedMax: 72, baseDamage: 3,  cooldown: 800,  radius: 9,  color: '#4ade80', wireDamageMul: 1, baseShield: 0,  unlockWave: 1 },
   /* 步兵：中等属性 */
-  grunt:    { baseHp: 25,  speedMin: 28, speedMax: 40, baseDamage: 6,  cooldown: 1000, radius: 12, color: '#f87171', wireDamageMul: 1, baseShield: 0,  unlockWave: 1 },
+  grunt:    { baseHp: 25,  speedMin: 32, speedMax: 44, baseDamage: 6,  cooldown: 1000, radius: 12, color: '#f87171', wireDamageMul: 1, baseShield: 0,  unlockWave: 1 },
   /* 坦克：高血高伤、移速慢 */
-  tank:     { baseHp: 60,  speedMin: 15, speedMax: 22, baseDamage: 10, cooldown: 1200, radius: 17, color: '#a78bfa', wireDamageMul: 1, baseShield: 0,  unlockWave: 3 },
+  tank:     { baseHp: 60,  speedMin: 17, speedMax: 25, baseDamage: 10, cooldown: 1200, radius: 17, color: '#a78bfa', wireDamageMul: 1, baseShield: 0,  unlockWave: 3 },
   /* 破坏者：优先攻击导线，对线伤害 ×2 */
-  saboteur: { baseHp: 18,  speedMin: 35, speedMax: 45, baseDamage: 4,  cooldown: 600,  radius: 10, color: '#fbbf24', wireDamageMul: 2, baseShield: 0,  unlockWave: 5 },
-  /* 霸主（Boss）：每 N 波出现，自带护盾 */
-  overlord: { baseHp: 200, speedMin: 12, speedMax: 16, baseDamage: 20, cooldown: 1500, radius: 26, color: '#ef4444', wireDamageMul: 1, baseShield: 50, unlockWave: -1 },
+  saboteur: { baseHp: 18,  speedMin: 39, speedMax: 50, baseDamage: 4,  cooldown: 600,  radius: 10, color: '#fbbf24', wireDamageMul: 2, baseShield: 0,  unlockWave: 5 },
+  /* 霸主（Boss）：每 N 波出现，自带护盾，体型大 */
+  overlord: { baseHp: 200, speedMin: 14, speedMax: 18, baseDamage: 20, cooldown: 1500, radius: 52, color: '#ef4444', wireDamageMul: 1, baseShield: 50, unlockWave: -1 },
 };
 
 /** 敌人属性随波次的缩放系数 */
@@ -209,8 +217,10 @@ export const ENEMY_SCALING = {
 // ── 5. 护盾与充能参数 ───────────────────────────────────────────────────────
 
 export const SHIELD_CONFIG = {
-  /** 护盾自动充能冷却（ms），两次充能之间的最短间隔 */
+  /** 核心护盾自动充能冷却（ms），两次充能之间的最短间隔 */
   cooldown: 500,
+  /** 护盾塔专用充能冷却（ms），每 15 秒消耗一度电 */
+  shieldTowerCooldown: 15000,
   /** 电池 / Core 快速放电间隔（ms） */
   batteryInterval: 100,
   /** 护盾归零后重启所需电力 */

@@ -5,6 +5,8 @@ import {
 import { t, pickKey } from './i18n';
 import { GLOBAL_CONFIG, ENEMY_CONFIG, ENEMY_SCALING, STARTING_INVENTORY, PICK_POOL_CONFIG } from './config';
 
+const ENEMY_SPEED_MUL = GLOBAL_CONFIG.enemyBaseSpeedMul;
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 let _idCounter = 0;
@@ -428,11 +430,12 @@ const pushEnemy = (state: GameState, type: EnemyType, wave: number) => {
   state.enemies.push({
     id: genId(), enemyType: type, x, y,
     hp, maxHp: hp,
-    speed: (def.speedMin + Math.random() * (def.speedMax - def.speedMin)) * speedBonus,
+    speed: (def.speedMin + Math.random() * (def.speedMax - def.speedMin)) * speedBonus * ENEMY_SPEED_MUL,
     damage: def.baseDamage + Math.floor(wave * sc.damagePerWave),
     attackCooldown: def.cooldown, lastAttackTime: 0, targetId: null, heading: 0,
     radius: def.radius, color: def.color, wireDamageMul: def.wireDamageMul,
     shieldAbsorb: shieldHp, maxShieldAbsorb: shieldHp,
+    lastSpawnTime: 0,
   });
 };
 
@@ -442,6 +445,25 @@ export const spawnEnemy = (state: GameState, wave: number) => {
 
 export const spawnBoss = (state: GameState, wave: number) => {
   pushEnemy(state, 'overlord', wave);
+};
+
+export const spawnEnemyAt = (state: GameState, type: EnemyType, wave: number, x: number, y: number) => {
+  const def = ENEMY_CONFIG[type];
+  const sc = ENEMY_SCALING;
+  const hpMul = 1 + wave * sc.hpPerWave;
+  const hp = def.baseHp * hpMul;
+  const shieldHp = def.baseShield * hpMul;
+  const speedBonus = 1 + wave * sc.speedPerWave;
+  state.enemies.push({
+    id: genId(), enemyType: type, x, y,
+    hp, maxHp: hp,
+    speed: (def.speedMin + Math.random() * (def.speedMax - def.speedMin)) * speedBonus * ENEMY_SPEED_MUL,
+    damage: def.baseDamage + Math.floor(wave * sc.damagePerWave),
+    attackCooldown: def.cooldown, lastAttackTime: 0, targetId: null, heading: 0,
+    radius: def.radius, color: def.color, wireDamageMul: def.wireDamageMul,
+    shieldAbsorb: shieldHp, maxShieldAbsorb: shieldHp,
+    lastSpawnTime: 0,
+  });
 };
 
 // ── Particle effects ─────────────────────────────────────────────────────────

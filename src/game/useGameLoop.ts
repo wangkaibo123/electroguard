@@ -5,7 +5,7 @@ import {
   Camera, VIEWPORT_WIDTH, VIEWPORT_HEIGHT, HitEffect, ShieldBreakEffect,
 } from './types';
 import {
-  createInitialState, updatePowerGrid, spawnEnemy, spawnBoss, createExplosion,
+  createInitialState, updatePowerGrid, spawnEnemy, spawnBoss, spawnEnemyAt, createExplosion,
   getPortPos, generatePorts, getPortCell, findWirePath, dispatchPulse,
   snapRotation, applyTowerRotation, canPlace, collidesWithTowers,
   collidesWithWires, repathConnectedWires, genId, rebuildTowerMap,
@@ -17,12 +17,13 @@ import { t } from './i18n';
 
 // ── Constants (derived from config) ──────────────────────────────────────────
 const TWO_PI = Math.PI * 2;
-const { pulseSpeed: PULSE_SPEED, powerInterval: POWER_INTERVAL, attackRange: ATTACK_RANGE, waveDelay: WAVE_DELAY, barrelSpeed: BARREL_SPEED, maxZoom: MAX_ZOOM, spawnInterval: SPAWN_INTERVAL, bossWaveInterval: BOSS_WAVE_INTERVAL, waveClearScoreMul: WAVE_CLEAR_SCORE_MUL } = GLOBAL_CONFIG;
-const { cooldown: SHIELD_COOLDOWN, batteryInterval: BATTERY_INTERVAL } = SHIELD_CONFIG;
+const { pulseSpeed: PULSE_SPEED, powerInterval: POWER_INTERVAL, attackRange: ATTACK_RANGE, waveDelay: WAVE_DELAY, barrelSpeed: BARREL_SPEED, maxZoom: MAX_ZOOM, spawnInterval: SPAWN_INTERVAL, bossWaveInterval: BOSS_WAVE_INTERVAL, waveClearScoreMul: WAVE_CLEAR_SCORE_MUL, bossSpawnInterval: BOSS_SPAWN_INTERVAL, bossSpawnCount: BOSS_SPAWN_COUNT } = GLOBAL_CONFIG;
+const { cooldown: SHIELD_COOLDOWN, shieldTowerCooldown: SHIELD_TOWER_COOLDOWN, batteryInterval: BATTERY_INTERVAL } = SHIELD_CONFIG;
+const SNIPER_AIM_THRESHOLD = 0.05;
 const { cooldown: BLASTER_COOLDOWN, range: BLASTER_RANGE, damage: BLASTER_DAMAGE, powerCost: BLASTER_POWER_COST, bulletSpeed: BLASTER_BULLET_SPEED } = WEAPON_CONFIG.blaster;
 const { range: GATLING_RANGE, damage: GATLING_DAMAGE, bulletRange: GATLING_BULLET_RANGE, minInterval: GATLING_MIN_INTERVAL, maxInterval: GATLING_MAX_INTERVAL, heatDecay: GATLING_HEAT_DECAY, minSpread: GATLING_MIN_SPREAD, maxSpread: GATLING_MAX_SPREAD, bulletSpeed: GATLING_BULLET_SPEED } = WEAPON_CONFIG.gatling;
 const GATLING_HEAT_PER_POWER = 0.35;
-const { cooldown: SNIPER_COOLDOWN, range: SNIPER_RANGE, damage: SNIPER_DAMAGE, powerCost: SNIPER_POWER_COST, bulletSpeed: SNIPER_SPEED, maxRange: SNIPER_MAX_RANGE } = WEAPON_CONFIG.sniper;
+const { cooldown: SNIPER_COOLDOWN, range: SNIPER_RANGE, damage: SNIPER_DAMAGE, powerCost: SNIPER_POWER_COST, bulletSpeed: SNIPER_SPEED, maxRange: SNIPER_MAX_RANGE, minAimMs: SNIPER_MIN_AIM_MS } = WEAPON_CONFIG.sniper;
 const { cooldown: TESLA_COOLDOWN, range: TESLA_RANGE, bounceRange: TESLA_BOUNCE_RANGE, damagePerPower: TESLA_DAMAGE_PER_POWER } = WEAPON_CONFIG.tesla;
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
@@ -343,7 +344,7 @@ export const useGameLoop = () => {
         hp: stats.hp, maxHp: stats.hp,
         powered: false, storedPower: 0, maxPower: stats.maxPower, incomingPower: 0,
         shieldHp: stats.maxShieldHp, maxShieldHp: stats.maxShieldHp, shieldRadius: stats.shieldRadius,
-        lastActionTime: 0, ports, rotation: 0, barrelAngle: 0, heat: 0,
+        lastActionTime: sel === 'shield' ? performance.now() : 0, ports, rotation: 0, barrelAngle: 0, heat: 0,
       };
       state.towers.push(t);
       state.towerMap.set(t.id, t);
@@ -590,7 +591,13 @@ export const useGameLoop = () => {
       for (const t of state.towers) {
         if (t.maxShieldHp <= 0 || t.shieldHp >= t.maxShieldHp) continue;
         if ((t.type !== 'core' && t.type !== 'shield') || !t.powered) continue;
-        if (now - t.lastActionTime <= SHIELD_COOLDOWN) continue;
+        const shieldCd = t.type === 'shield' ? SHIELD_TOWER_COOLDOWN : SHIELD_COOLDOWN;
+        if (t.type === 'shield' && t.lastActionTime === 0) {
+          t.lastActionTime = now;
+          changed = true;
+          continue;
+        }
+        if (now - t.lastActionTime <= shieldCd) continue;
         if (t.shieldHp <= 0) {
           if (t.storedPower >= SHIELD_CONFIG.rebootCost) { t.storedPower -= SHIELD_CONFIG.rebootCost; t.shieldHp = SHIELD_CONFIG.rebootHp; t.lastActionTime = now; changed = true; }
         } else {
@@ -681,6 +688,7 @@ export const useGameLoop = () => {
           changed = true;
         }
 
+        if (t.type === 'sniper' && (!t.powered || !hasTarget)) t.sniperAimSince = undefined;
         if (!t.powered || !hasTarget) continue;
 
         const barrelLen = Math.min(t.width, t.height) * CELL_SIZE / 2 - 4 + 6;
@@ -720,9 +728,19 @@ export const useGameLoop = () => {
           t.lastActionTime = now; changed = true;
         }
 
-        // ── Sniper: straight-line piercing shot, long CD ──
+        // ── Sniper: straight-line piercing shot, long CD, must hold aim before firing ──
         if (t.type === 'sniper') {
+          const desiredAngle = Math.atan2(tgtY - by, tgtX - bx);
+          let aimDiff = desiredAngle - t.barrelAngle;
+          while (aimDiff > Math.PI) aimDiff -= TWO_PI;
+          while (aimDiff < -Math.PI) aimDiff += TWO_PI;
+          const aligned = Math.abs(aimDiff) <= SNIPER_AIM_THRESHOLD;
+          if (!aligned) t.sniperAimSince = undefined;
+          else if (t.sniperAimSince === undefined) t.sniperAimSince = now;
+
           if (t.storedPower < SNIPER_POWER_COST || now - t.lastActionTime <= SNIPER_COOLDOWN) continue;
+          if (!aligned || t.sniperAimSince === undefined || now - t.sniperAimSince < SNIPER_MIN_AIM_MS) continue;
+
           t.storedPower -= SNIPER_POWER_COST;
           const fireAngle = t.barrelAngle;
           state.projectiles.push({
@@ -732,6 +750,7 @@ export const useGameLoop = () => {
             piercing: true, piercedIds: [],
             color: '#a78bfa', size: 4,
           });
+          t.sniperAimSince = undefined;
           t.lastActionTime = now; changed = true;
         }
       }
@@ -901,6 +920,48 @@ export const useGameLoop = () => {
             }
           }
           enemy.lastAttackTime = now;
+          changed = true;
+        }
+      }
+
+      // ── Boss: spawn scouts & movement trail ──────────────────────────────
+      for (const enemy of state.enemies) {
+        if (enemy.enemyType !== 'overlord') continue;
+        if (enemy.lastSpawnTime === 0) { enemy.lastSpawnTime = now; continue; }
+        if (now - enemy.lastSpawnTime >= BOSS_SPAWN_INTERVAL) {
+          for (let i = 0; i < BOSS_SPAWN_COUNT; i++) {
+            const offset = (Math.random() - 0.5) * enemy.radius * 2;
+            spawnEnemyAt(state, 'scout', state.wave, enemy.x + offset, enemy.y + offset);
+          }
+          enemy.lastSpawnTime = now;
+          createExplosion(state, enemy.x, enemy.y, '#ef4444', 8);
+          changed = true;
+        }
+        if (Math.random() < 0.32) {
+          const ox = (Math.random() - 0.5) * enemy.radius * 0.8;
+          const oy = (Math.random() - 0.5) * enemy.radius * 0.8;
+          state.particles.push({
+            x: enemy.x + ox, y: enemy.y + oy,
+            vx: -Math.cos(enemy.heading) * 20 + (Math.random() - 0.5) * 15,
+            vy: -Math.sin(enemy.heading) * 20 + (Math.random() - 0.5) * 15,
+            life: 0, maxLife: 0.4 + Math.random() * 0.3,
+            color: '#ef4444', size: 2 + Math.random() * 3,
+          });
+          changed = true;
+        }
+        if (Math.random() < 0.45) {
+          const back = enemy.radius * 1.35;
+          const ox = (Math.random() - 0.5) * enemy.radius * 0.4;
+          const oy = (Math.random() - 0.5) * enemy.radius * 0.4;
+          state.particles.push({
+            x: enemy.x - Math.cos(enemy.heading) * back + ox,
+            y: enemy.y - Math.sin(enemy.heading) * back + oy,
+            vx: -Math.cos(enemy.heading) * (35 + Math.random() * 25) + (Math.random() - 0.5) * 20,
+            vy: -Math.sin(enemy.heading) * (35 + Math.random() * 25) + (Math.random() - 0.5) * 20,
+            life: 0, maxLife: 0.35 + Math.random() * 0.35,
+            color: Math.random() < 0.5 ? '#fca5a5' : '#ef4444',
+            size: 2 + Math.random() * 4,
+          });
           changed = true;
         }
       }

@@ -54,6 +54,7 @@ export interface Tower {
   rotation: number;
   barrelAngle: number;
   heat: number;           // gatling heat 0–1
+  sniperAimSince?: number; // sniper: time (performance.now) when barrel locked on target
 }
 
 export interface Enemy {
@@ -74,6 +75,7 @@ export interface Enemy {
   wireDamageMul: number;   // saboteur does 2x wire damage
   shieldAbsorb: number;    // overlord shield HP
   maxShieldAbsorb: number;
+  lastSpawnTime: number;   // overlord: last time it spawned minions
 }
 
 export interface Projectile {
