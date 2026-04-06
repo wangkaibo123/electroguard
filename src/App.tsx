@@ -3,6 +3,7 @@ import { Battery, Zap, Crosshair, Activity, Play, RotateCcw, Pause, Hexagon, Cab
 import { useGameLoop } from './game/useGameLoop';
 import { TOWER_STATS, TowerType, PickOption } from './game/types';
 import { t, getLocale, setLocale, Locale } from './game/i18n';
+import { GLOBAL_CONFIG } from './game/config';
 
 const TowerIcon = ({ type, size = 22 }: { type: string; size?: number }) => {
   const icons: Record<string, React.ComponentType<{ size: number }>> = {
@@ -111,7 +112,7 @@ export default function App() {
 
         {gameState.gameMode !== 'custom' && gameState.status === 'playing' && gameState.enemiesToSpawn === 0 && gameState.enemies.length === 0 && (
           <div className="text-blue-300 text-xs font-medium animate-pulse ml-2">
-            {i.nextWaveIn(Math.ceil(5 - gameState.waveTimer))}
+            {i.nextWaveIn(Math.ceil(GLOBAL_CONFIG.waveDelay - gameState.waveTimer))}
           </div>
         )}
 
@@ -187,7 +188,7 @@ export default function App() {
                 {gameState.wave > 0 ? (
                   <>
                     <h2 className="text-3xl font-black mb-1 text-emerald-400 tracking-tight">{i.waveCleared(gameState.wave)}</h2>
-                    <p className="text-emerald-300/60 text-sm font-mono mb-6">+{gameState.wave * 20} pts</p>
+                    <p className="text-emerald-300/60 text-sm font-mono mb-6">+{gameState.wave * GLOBAL_CONFIG.waveClearScoreMul} pts</p>
                   </>
                 ) : (
                   <>

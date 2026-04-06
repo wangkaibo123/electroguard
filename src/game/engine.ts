@@ -3,6 +3,7 @@ import {
   GRID_WIDTH, GRID_HEIGHT, CELL_SIZE, HALF_CELL, TOWER_STATS, CANVAS_WIDTH, CANVAS_HEIGHT, WIRE_MAX_HP,
 } from './types';
 import { t, pickKey } from './i18n';
+import { GLOBAL_CONFIG, ENEMY_CONFIG, ENEMY_SCALING, STARTING_INVENTORY, PICK_POOL_CONFIG } from './config';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -120,7 +121,7 @@ export const findWirePath = (
   const parent = new Map<number, number>();
   const parentDir = new Map<number, number>(); // track incoming direction index
   const h = (x: number, y: number) => Math.abs(x - end.x) + Math.abs(y - end.y);
-  const TURN_COST = 0.001; // small penalty for direction changes → prefers straight paths
+  const TURN_COST = GLOBAL_CONFIG.turnCost;
 
   const open: { k: number; x: number; y: number; f: number }[] =
     [{ k: sk, x: start.x, y: start.y, f: h(start.x, start.y) }];
@@ -166,15 +167,15 @@ export const findWirePath = (
   return null;
 };
 
-// ── Port generation (always 2 random-direction ports) ────────────────────────
+// ── Port generation ─────────────────────────────────────────────────────────
 
-export const generatePorts = (portType: PortType): Port[] => {
+export const generatePorts = (portType: PortType, count = GLOBAL_CONFIG.portCount): Port[] => {
   const dirs = [...PORT_DIRS];
   for (let i = dirs.length - 1; i > 0; i--) {
     const j = (Math.random() * (i + 1)) | 0;
     [dirs[i], dirs[j]] = [dirs[j], dirs[i]];
   }
-  return dirs.slice(0, 2).map(d => ({ id: genId(), direction: d, portType }));
+  return dirs.slice(0, count).map(d => ({ id: genId(), direction: d, portType }));
 };
 
 // ── Tower map rebuild helper ─────────────────────────────────────────────────
@@ -186,25 +187,10 @@ export const rebuildTowerMap = (state: GameState) => {
 
 // ── Roguelike pick system ────────────────────────────────────────────────────
 
-/** Base pick pool — labels/descriptions resolved at generation time via i18n */
-const PICK_POOL_BASE: { kind: 'tower' | 'wire'; towerType?: TowerType; count: number }[] = [
-  { kind: 'tower', towerType: 'blaster',   count: 1 },
-  { kind: 'tower', towerType: 'blaster',   count: 2 },
-  { kind: 'tower', towerType: 'gatling',   count: 1 },
-  { kind: 'tower', towerType: 'sniper',    count: 1 },
-  { kind: 'tower', towerType: 'tesla',     count: 1 },
-  { kind: 'tower', towerType: 'generator', count: 1 },
-  { kind: 'tower', towerType: 'shield',    count: 1 },
-  { kind: 'tower', towerType: 'battery',   count: 1 },
-  { kind: 'tower', towerType: 'bus',       count: 1 },
-  { kind: 'wire',                          count: 3 },
-  { kind: 'wire',                          count: 5 },
-];
-
 export const generatePickOptions = (): PickOption[] => {
   const loc = t();
-  const shuffled = [...PICK_POOL_BASE].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, 3).map(o => {
+  const shuffled = [...PICK_POOL_CONFIG.pool].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, PICK_POOL_CONFIG.pickCount).map(o => {
     const key = pickKey(o.kind, o.towerType, o.count);
     return {
       ...o,
@@ -241,8 +227,8 @@ export const createInitialState = (): GameState => {
     gameMode: 'normal',
     wave: 0,
     powerTimer: 0,
-    wireInventory: 5,
-    towerInventory: { blaster: 1, gatling: 0, sniper: 0, tesla: 0, generator: 1, shield: 0, battery: 0 },
+    wireInventory: STARTING_INVENTORY.wires,
+    towerInventory: { ...STARTING_INVENTORY.towers },
     pickOptions: [],
     needsPick: true,
     towers: [core], wires: [], pulses: [], enemies: [], projectiles: [], chainLightnings: [], particles: [], hitEffects: [], shieldBreakEffects: [],
@@ -387,24 +373,12 @@ export const applyTowerRotation = (
 
 // ── Enemy spawning ───────────────────────────────────────────────────────────
 
-const ENEMY_DEFS: Record<EnemyType, {
-  baseHp: number; speedMin: number; speedMax: number; baseDamage: number;
-  cooldown: number; radius: number; color: string; wireDamageMul: number;
-  baseShield: number;
-}> = {
-  scout:    { baseHp: 12,  speedMin: 50, speedMax: 65, baseDamage: 3,  cooldown: 800,  radius: 9,  color: '#4ade80', wireDamageMul: 1, baseShield: 0 },
-  grunt:    { baseHp: 25,  speedMin: 28, speedMax: 40, baseDamage: 6,  cooldown: 1000, radius: 12, color: '#f87171', wireDamageMul: 1, baseShield: 0 },
-  tank:     { baseHp: 60,  speedMin: 15, speedMax: 22, baseDamage: 10, cooldown: 1200, radius: 17, color: '#a78bfa', wireDamageMul: 1, baseShield: 0 },
-  saboteur: { baseHp: 18,  speedMin: 35, speedMax: 45, baseDamage: 4,  cooldown: 600,  radius: 10, color: '#fbbf24', wireDamageMul: 2, baseShield: 0 },
-  overlord: { baseHp: 200, speedMin: 12, speedMax: 16, baseDamage: 20, cooldown: 1500, radius: 26, color: '#ef4444', wireDamageMul: 1, baseShield: 50 },
-};
-
 /** Pick a random enemy type valid for the given wave */
 const pickEnemyType = (wave: number): EnemyType => {
-  const pool: EnemyType[] = ['scout', 'grunt'];
-  if (wave >= 3) pool.push('tank');
-  if (wave >= 5) pool.push('saboteur');
-  // Overlords are spawned explicitly, not from the random pool
+  const pool: EnemyType[] = [];
+  for (const [type, def] of Object.entries(ENEMY_CONFIG) as [EnemyType, typeof ENEMY_CONFIG[EnemyType]][]) {
+    if (def.unlockWave >= 0 && wave >= def.unlockWave) pool.push(type);
+  }
   return pool[(Math.random() * pool.length) | 0];
 };
 
@@ -419,17 +393,18 @@ const spawnPos = (): { x: number; y: number } => {
 };
 
 const pushEnemy = (state: GameState, type: EnemyType, wave: number) => {
-  const def = ENEMY_DEFS[type];
-  const hpMul = 1 + wave * 0.15;
+  const def = ENEMY_CONFIG[type];
+  const sc = ENEMY_SCALING;
+  const hpMul = 1 + wave * sc.hpPerWave;
   const hp = def.baseHp * hpMul;
   const { x, y } = spawnPos();
   const shieldHp = def.baseShield * hpMul;
-  const speedBonus = 1 + wave * 0.02; // slight speed increase per wave
+  const speedBonus = 1 + wave * sc.speedPerWave;
   state.enemies.push({
     id: genId(), enemyType: type, x, y,
     hp, maxHp: hp,
     speed: (def.speedMin + Math.random() * (def.speedMax - def.speedMin)) * speedBonus,
-    damage: def.baseDamage + Math.floor(wave * 0.8),
+    damage: def.baseDamage + Math.floor(wave * sc.damagePerWave),
     attackCooldown: def.cooldown, lastAttackTime: 0, targetId: null, heading: 0,
     radius: def.radius, color: def.color, wireDamageMul: def.wireDamageMul,
     shieldAbsorb: shieldHp, maxShieldAbsorb: shieldHp,

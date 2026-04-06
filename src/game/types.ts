@@ -1,3 +1,5 @@
+import { GLOBAL_CONFIG, TOWER_CONFIG, WEAPON_CONFIG } from './config';
+
 export type Position = { x: number; y: number };
 export type TowerType = 'core' | 'blaster' | 'gatling' | 'sniper' | 'tesla' | 'generator' | 'shield' | 'battery' | 'bus' | 'target';
 export type GameMode = 'normal' | 'custom';
@@ -171,29 +173,17 @@ export interface TowerStats {
   shieldRadius: number;
 }
 
-export const TOWER_STATS: Record<TowerType, TowerStats> = {
-  core:      { hp: 1000, description: 'The heart of your defense. Generates power.',             color: '#93c5fd', width: 5, height: 5, maxPower: 9, maxShieldHp: 500, shieldRadius: 180 },
-  blaster:   { hp: 100,  description: 'Fires a bullet per 2 power. Reliable turret.',           color: '#f87171', width: 3, height: 3, maxPower: 2, maxShieldHp: 0,   shieldRadius: 0 },
-  gatling:   { hp: 100,  description: 'Heat-based rapid fire. Spins up with power.',              color: '#f59e0b', width: 3, height: 3, maxPower: 5, maxShieldHp: 0,   shieldRadius: 0 },
-  sniper:    { hp: 80,   description: 'High-damage piercing shot. Costs 4 power.',              color: '#a78bfa', width: 3, height: 3, maxPower: 4, maxShieldHp: 0,   shieldRadius: 0 },
-  tesla:     { hp: 100,  description: 'Chain lightning bounces between enemies.',                color: '#e879f9', width: 3, height: 3, maxPower: 9, maxShieldHp: 0,   shieldRadius: 0 },
-  generator: { hp: 100,  description: 'Power source for the network. Dispatches energy.',        color: '#fbbf24', width: 3, height: 3, maxPower: 0, maxShieldHp: 0,   shieldRadius: 0 },
+export const TOWER_STATS: Record<TowerType, TowerStats> = TOWER_CONFIG;
 
-  shield:    { hp: 100,  description: 'Projects a protective shield. Consumes power to recharge.', color: '#22d3ee', width: 1, height: 1, maxPower: 4, maxShieldHp: 300, shieldRadius: 60 },
-  battery:   { hp: 150,  description: 'Stores 4 units of power and discharges quickly.',         color: '#34d399', width: 3, height: 2, maxPower: 4, maxShieldHp: 0,   shieldRadius: 0 },
-  bus:       { hp: 120,  description: 'Merges up to 3 input wires into 3 outputs.',             color: '#38bdf8', width: 3, height: 2, maxPower: 0, maxShieldHp: 0,   shieldRadius: 0 },
-  target:    { hp: 200,  description: 'Practice target. Treated as an enemy by turrets.',       color: '#fb923c', width: 1, height: 1, maxPower: 0, maxShieldHp: 0,   shieldRadius: 0 },
-};
-
-export const WIRE_MAX_HP = 50;
-export const GRID_WIDTH = 100;
-export const GRID_HEIGHT = 100;
-export const CELL_SIZE = 20;
-export const CANVAS_WIDTH = GRID_WIDTH * CELL_SIZE;   // world width in pixels
-export const CANVAS_HEIGHT = GRID_HEIGHT * CELL_SIZE;  // world height in pixels
+export const WIRE_MAX_HP = GLOBAL_CONFIG.wireMaxHp;
+export const GRID_WIDTH = GLOBAL_CONFIG.gridWidth;
+export const GRID_HEIGHT = GLOBAL_CONFIG.gridHeight;
+export const CELL_SIZE = GLOBAL_CONFIG.cellSize;
+export const CANVAS_WIDTH = GRID_WIDTH * CELL_SIZE;
+export const CANVAS_HEIGHT = GRID_HEIGHT * CELL_SIZE;
 export const HALF_CELL = CELL_SIZE / 2;
-export const VIEWPORT_WIDTH = 1200;
-export const VIEWPORT_HEIGHT = 680;
+export const VIEWPORT_WIDTH = GLOBAL_CONFIG.viewportWidth;
+export const VIEWPORT_HEIGHT = GLOBAL_CONFIG.viewportHeight;
 
 export interface Camera {
   x: number;    // world X of viewport top-left
@@ -202,8 +192,8 @@ export interface Camera {
 }
 
 export const TURRET_RANGE: Partial<Record<TowerType, number>> = {
-  blaster: 150,
-  gatling: 130,
-  sniper: 300,
-  tesla: 180,
+  blaster: WEAPON_CONFIG.blaster.range,
+  gatling: WEAPON_CONFIG.gatling.range,
+  sniper: WEAPON_CONFIG.sniper.range,
+  tesla: WEAPON_CONFIG.tesla.range,
 };

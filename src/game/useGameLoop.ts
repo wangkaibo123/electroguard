@@ -12,45 +12,16 @@ import {
   generatePickOptions,
 } from './engine';
 import { renderGame } from './renderer';
+import { GLOBAL_CONFIG, WEAPON_CONFIG, SHIELD_CONFIG, SCORE_CONFIG, ENEMY_SCALING, ENEMY_AI_CONFIG } from './config';
 
-// ── Constants ────────────────────────────────────────────────────────────────
+// ── Constants (derived from config) ──────────────────────────────────────────
 const TWO_PI = Math.PI * 2;
-const PULSE_SPEED = 400;
-const POWER_INTERVAL = 2;
-const SHIELD_COOLDOWN = 500;
-const BATTERY_INTERVAL = 100;
-const BLASTER_COOLDOWN = 1000;
-const BLASTER_RANGE = 150;
-const BLASTER_DAMAGE = 50;
-const BLASTER_POWER_COST = 2;
-
-const GATLING_RANGE = 130;
-const GATLING_DAMAGE = 8;
-const GATLING_BULLET_RANGE = 200;
-const GATLING_MIN_INTERVAL = 200;  // ms at max heat (5 shots/sec)
-const GATLING_MAX_INTERVAL = 500;  // ms when cold
-const GATLING_HEAT_PER_SHOT = 0.12;
-const GATLING_HEAT_DECAY = 0.15;   // per second
-const GATLING_MIN_SPREAD = 0.04;   // ~2 degrees when cold
-const GATLING_MAX_SPREAD = 0.35;   // ~20 degrees at max heat
-
-const SNIPER_COOLDOWN = 4000;
-const SNIPER_RANGE = 300;
-const SNIPER_DAMAGE = 200;
-const SNIPER_POWER_COST = 4;
-const SNIPER_SPEED = 800;
-const SNIPER_MAX_RANGE = 600; // straight-line max travel
-
-const TESLA_COOLDOWN = 3000;
-const TESLA_RANGE = 180;
-const TESLA_BOUNCE_RANGE = 120;
-const TESLA_DAMAGE_PER_POWER = 25;
-const WAVE_DELAY = 5;
-const ATTACK_RANGE = 14;
-
-const ENEMY_SCORE: Record<string, number> = {
-  scout: 5, grunt: 10, tank: 25, saboteur: 15, overlord: 100,
-};
+const { pulseSpeed: PULSE_SPEED, powerInterval: POWER_INTERVAL, attackRange: ATTACK_RANGE, waveDelay: WAVE_DELAY, barrelSpeed: BARREL_SPEED, maxZoom: MAX_ZOOM, spawnInterval: SPAWN_INTERVAL, bossWaveInterval: BOSS_WAVE_INTERVAL, waveClearScoreMul: WAVE_CLEAR_SCORE_MUL } = GLOBAL_CONFIG;
+const { cooldown: SHIELD_COOLDOWN, batteryInterval: BATTERY_INTERVAL } = SHIELD_CONFIG;
+const { cooldown: BLASTER_COOLDOWN, range: BLASTER_RANGE, damage: BLASTER_DAMAGE, powerCost: BLASTER_POWER_COST, bulletSpeed: BLASTER_BULLET_SPEED } = WEAPON_CONFIG.blaster;
+const { range: GATLING_RANGE, damage: GATLING_DAMAGE, bulletRange: GATLING_BULLET_RANGE, minInterval: GATLING_MIN_INTERVAL, maxInterval: GATLING_MAX_INTERVAL, heatPerShot: GATLING_HEAT_PER_SHOT, heatDecay: GATLING_HEAT_DECAY, minSpread: GATLING_MIN_SPREAD, maxSpread: GATLING_MAX_SPREAD, bulletSpeed: GATLING_BULLET_SPEED } = WEAPON_CONFIG.gatling;
+const { cooldown: SNIPER_COOLDOWN, range: SNIPER_RANGE, damage: SNIPER_DAMAGE, powerCost: SNIPER_POWER_COST, bulletSpeed: SNIPER_SPEED, maxRange: SNIPER_MAX_RANGE } = WEAPON_CONFIG.sniper;
+const { cooldown: TESLA_COOLDOWN, range: TESLA_RANGE, bounceRange: TESLA_BOUNCE_RANGE, damagePerPower: TESLA_DAMAGE_PER_POWER } = WEAPON_CONFIG.tesla;
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -65,7 +36,7 @@ const applyDamageToEnemy = (state: GameState, enemy: typeof state.enemies[0], da
   createExplosion(state, enemy.x, enemy.y, color, bigExplosion ? 10 : 3);
   if (enemy.hp <= 0) {
     state.enemies = state.enemies.filter(e => e.id !== enemy.id);
-    state.score += (ENEMY_SCORE[enemy.enemyType] ?? 10);
+    state.score += (SCORE_CONFIG[enemy.enemyType] ?? SCORE_CONFIG.default);
     createExplosion(state, enemy.x, enemy.y, enemy.color, bigExplosion ? 15 : 10);
     return true; // enemy died
   }
@@ -116,7 +87,6 @@ export const useGameLoop = () => {
 
   // Camera
   const INITIAL_MIN_ZOOM = Math.max(VIEWPORT_WIDTH / CANVAS_WIDTH, VIEWPORT_HEIGHT / CANVAS_HEIGHT);
-  const MAX_ZOOM = 2.0;
   const initialViewW = VIEWPORT_WIDTH / INITIAL_MIN_ZOOM;
   const initialViewH = VIEWPORT_HEIGHT / INITIAL_MIN_ZOOM;
   const cameraRef = useRef<Camera>({
@@ -602,9 +572,9 @@ export const useGameLoop = () => {
         if ((t.type !== 'core' && t.type !== 'shield') || !t.powered) continue;
         if (now - t.lastActionTime <= SHIELD_COOLDOWN) continue;
         if (t.shieldHp <= 0) {
-          if (t.storedPower >= 3) { t.storedPower -= 3; t.shieldHp = 150; t.lastActionTime = now; changed = true; }
+          if (t.storedPower >= SHIELD_CONFIG.rebootCost) { t.storedPower -= SHIELD_CONFIG.rebootCost; t.shieldHp = SHIELD_CONFIG.rebootHp; t.lastActionTime = now; changed = true; }
         } else {
-          if (t.storedPower >= 1) { t.storedPower -= 1; t.shieldHp = Math.min(t.maxShieldHp, t.shieldHp + 50); t.lastActionTime = now; changed = true; }
+          if (t.storedPower >= SHIELD_CONFIG.rechargeCost) { t.storedPower -= SHIELD_CONFIG.rechargeCost; t.shieldHp = Math.min(t.maxShieldHp, t.shieldHp + SHIELD_CONFIG.rechargeAmount); t.lastActionTime = now; changed = true; }
         }
       }
 
@@ -650,7 +620,6 @@ export const useGameLoop = () => {
       }
 
       // ── Turret barrel tracking + shooting (blaster, gatling, sniper) ───
-      const BARREL_SPEED = 4; // radians per second for smooth tracking
       const TURRET_TYPES = new Set(['blaster', 'gatling', 'sniper']);
       for (const t of state.towers) {
         if (!TURRET_TYPES.has(t.type)) continue;
@@ -696,11 +665,11 @@ export const useGameLoop = () => {
           if (t.storedPower < BLASTER_POWER_COST || now - t.lastActionTime <= BLASTER_COOLDOWN) continue;
           if (bestEnemy) {
             t.storedPower -= BLASTER_POWER_COST;
-            state.projectiles.push({ id: genId(), x: mx, y: my, targetId: bestEnemy.id, speed: 300, damage: BLASTER_DAMAGE });
+            state.projectiles.push({ id: genId(), x: mx, y: my, targetId: bestEnemy.id, speed: BLASTER_BULLET_SPEED, damage: BLASTER_DAMAGE });
             t.lastActionTime = now; changed = true;
           } else if (bestTarget) {
             t.storedPower -= BLASTER_POWER_COST;
-            state.projectiles.push({ id: genId(), x: mx, y: my, targetId: bestTarget.id, speed: 300, damage: BLASTER_DAMAGE, isTargetTower: true });
+            state.projectiles.push({ id: genId(), x: mx, y: my, targetId: bestTarget.id, speed: BLASTER_BULLET_SPEED, damage: BLASTER_DAMAGE, isTargetTower: true });
             t.lastActionTime = now; changed = true;
           }
         }
@@ -717,7 +686,7 @@ export const useGameLoop = () => {
           const targetId = bestEnemy?.id ?? bestTarget?.id ?? '';
           state.projectiles.push({
             id: genId(), x: mx, y: my, targetId,
-            speed: 280, damage: GATLING_DAMAGE,
+            speed: GATLING_BULLET_SPEED, damage: GATLING_DAMAGE,
             isTargetTower: !!bestTarget && !bestEnemy,
             angle: spreadAngle, traveled: 0, maxRange: GATLING_BULLET_RANGE,
             color: '#f59e0b', size: 2,
@@ -783,7 +752,7 @@ export const useGameLoop = () => {
         if (state.enemies.length === 0 && state.enemiesToSpawn === 0) {
           if (state.needsPick) {
             // Wave cleared — enter pick phase
-            if (state.wave > 0) state.score += state.wave * 20; // wave clear bonus
+            if (state.wave > 0) state.score += state.wave * WAVE_CLEAR_SCORE_MUL;
             state.pickOptions = generatePickOptions();
             state.status = 'pick';
             changed = true;
@@ -792,18 +761,17 @@ export const useGameLoop = () => {
             state.waveTimer += dt;
             if (state.waveTimer > WAVE_DELAY) {
               state.wave++;
-              state.enemiesToSpawn = Math.floor(2 + state.wave * 0.8 + Math.sqrt(state.wave) * 0.5);
+              state.enemiesToSpawn = Math.floor(ENEMY_SCALING.spawnBase + state.wave * ENEMY_SCALING.spawnLinear + Math.sqrt(state.wave) * ENEMY_SCALING.spawnSqrt);
               state.waveTimer = 0;
               state.needsPick = true; // will trigger pick after this wave clears
-              // Spawn boss every 5 waves
-              if (state.wave % 5 === 0) spawnBoss(state, state.wave);
+              if (state.wave % BOSS_WAVE_INTERVAL === 0) spawnBoss(state, state.wave);
               changed = true;
             }
           }
         }
         if (state.enemiesToSpawn > 0) {
           state.spawnTimer += dt;
-          if (state.spawnTimer > 1) {
+          if (state.spawnTimer > SPAWN_INTERVAL) {
             spawnEnemy(state, state.wave);
             state.enemiesToSpawn--;
             state.spawnTimer = 0;
@@ -826,13 +794,12 @@ export const useGameLoop = () => {
           const tx = Math.max(t.x * CELL_SIZE, Math.min(enemy.x, (t.x + t.width) * CELL_SIZE));
           const ty = Math.max(t.y * CELL_SIZE, Math.min(enemy.y, (t.y + t.height) * CELL_SIZE));
           const d = Math.hypot(tx - enemy.x, ty - enemy.y);
-          // Saboteurs deprioritize towers (1.5x effective distance)
-          const ed = isSaboteur ? d * 1.5 : d;
+          const ed = isSaboteur ? d * ENEMY_AI_CONFIG.saboteurTowerDistMul : d;
           if (ed < minD) { minD = ed; tgtTower = t; tgtWire = null; isShield = false; tgtPos = { x: tx, y: ty }; }
           if (t.shieldHp > 0 && t.shieldRadius > 0) {
             const scx = (t.x + t.width / 2) * CELL_SIZE, scy = (t.y + t.height / 2) * CELL_SIZE;
             const sd = Math.max(0, Math.hypot(scx - enemy.x, scy - enemy.y) - t.shieldRadius);
-            const esd = isSaboteur ? sd * 1.5 : sd;
+            const esd = isSaboteur ? sd * ENEMY_AI_CONFIG.saboteurTowerDistMul : sd;
             if (esd < minD) {
               minD = esd; tgtTower = t; tgtWire = null; isShield = true;
               const a = Math.atan2(enemy.y - scy, enemy.x - scx);
@@ -844,8 +811,7 @@ export const useGameLoop = () => {
           for (const p of w.path) {
             const wx = p.x * CELL_SIZE + CELL_SIZE / 2, wy = p.y * CELL_SIZE + CELL_SIZE / 2;
             const d = Math.hypot(wx - enemy.x, wy - enemy.y);
-            // Saboteurs get a distance bonus toward wires (0.6x effective distance)
-            const ed = isSaboteur ? d * 0.6 : d;
+            const ed = isSaboteur ? d * ENEMY_AI_CONFIG.saboteurWireDistMul : d;
             if (ed < minD) { minD = ed; tgtTower = null; tgtWire = w; isShield = false; tgtPos = { x: wx, y: wy }; }
           }
         }

@@ -1,8 +1,9 @@
 import { GameState, Tower, TowerType, CELL_SIZE, HALF_CELL, TOWER_STATS, Camera, CANVAS_WIDTH, CANVAS_HEIGHT, TURRET_RANGE, HitEffect, ShieldBreakEffect } from './types';
 import { getPortPos } from './engine';
+import { WEAPON_CONFIG } from './config';
 
 const TWO_PI = Math.PI * 2;
-const SNIPER_COOLDOWN_MS = 4000; // must match useGameLoop
+const SNIPER_COOLDOWN_MS = WEAPON_CONFIG.sniper.cooldown;
 
 // ── Blue palette ──────────────────────────────────────────────────────────────
 const BG_DARK   = '#0a0e1a';
