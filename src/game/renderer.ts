@@ -402,14 +402,64 @@ export const renderGame = (
 
     const tColor = (!tower.powered && tower.type !== 'core') ? UNPOWERED : TOWER_STATS[tower.type].color;
 
-    // Outlined style: dark fill + colored border
+    // Outlined style: dark fill + colored border (shape varies by turret type)
     ctx.fillStyle = 'rgba(10,14,26,0.85)';
-    ctx.fillRect(px + inset, py + inset, tw - inset * 2, th - inset * 2);
     ctx.strokeStyle = tColor;
     ctx.lineWidth = 1.75;
-    ctx.strokeRect(px + inset, py + inset, tw - inset * 2, th - inset * 2);
 
-    drawTowerDetails(ctx, tower, px, py, tw, th, cx, cy, tColor, inset);
+    if (tower.type === 'gatling') {
+      const cr = 8;
+      ctx.beginPath();
+      ctx.roundRect(px + inset, py + inset, tw - inset * 2, th - inset * 2, cr);
+      ctx.fill();
+      ctx.stroke();
+      ctx.strokeStyle = tColor; ctx.lineWidth = 1; ctx.globalAlpha = 0.4;
+      const ventCount = 3;
+      const ventSpacing = (th - inset * 2) / (ventCount + 1);
+      for (let v = 1; v <= ventCount; v++) {
+        const vy = py + inset + v * ventSpacing;
+        ctx.beginPath(); ctx.moveTo(px + inset + 2, vy); ctx.lineTo(px + inset + 7, vy); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(px + tw - inset - 2, vy); ctx.lineTo(px + tw - inset - 7, vy); ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    } else if (tower.type === 'sniper') {
+      ctx.beginPath();
+      ctx.moveTo(cx, py + inset);
+      ctx.lineTo(px + tw - inset, cy);
+      ctx.lineTo(cx, py + th - inset);
+      ctx.lineTo(px + inset, cy);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = tColor;
+      const dotR = 1.8;
+      ctx.beginPath(); ctx.arc(cx, py + inset, dotR, 0, TWO_PI); ctx.fill();
+      ctx.beginPath(); ctx.arc(px + tw - inset, cy, dotR, 0, TWO_PI); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx, py + th - inset, dotR, 0, TWO_PI); ctx.fill();
+      ctx.beginPath(); ctx.arc(px + inset, cy, dotR, 0, TWO_PI); ctx.fill();
+    } else if (tower.type === 'tesla') {
+      const hexR = Math.min(tw, th) / 2 - inset;
+      ctx.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const angle = i * Math.PI / 3 - Math.PI / 6;
+        const hx = cx + hexR * Math.cos(angle);
+        const hy = cy + hexR * Math.sin(angle);
+        if (i === 0) ctx.moveTo(hx, hy); else ctx.lineTo(hx, hy);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    } else if (tower.type === 'blaster') {
+      const baseR = Math.min(tw, th) / 2 - inset - 3;
+      ctx.beginPath(); ctx.arc(cx, cy, baseR, 0, TWO_PI);
+      ctx.fill();
+      ctx.stroke();
+    } else {
+      ctx.fillRect(px + inset, py + inset, tw - inset * 2, th - inset * 2);
+      ctx.strokeRect(px + inset, py + inset, tw - inset * 2, th - inset * 2);
+    }
+
+    drawTowerDetails(ctx, tower, px, py, tw, th, cx, cy, tColor, inset, now);
 
     ctx.restore();
 
@@ -417,32 +467,6 @@ export const renderGame = (
     if (tower.hp < tower.maxHp) {
       ctx.fillStyle = HP_BG; ctx.fillRect(px, py - 5, tw, 3);
       ctx.fillStyle = HP_FG; ctx.fillRect(px, py - 5, tw * (tower.hp / tower.maxHp), 3);
-    }
-    // Sniper cooldown bar
-    if (tower.type === 'sniper') {
-      const elapsed = now - tower.lastActionTime;
-      const cdRatio = tower.lastActionTime > 0 ? Math.min(1, elapsed / SNIPER_COOLDOWN_MS) : 1;
-      if (cdRatio < 1) {
-        const barY = py + th + 2;
-        ctx.fillStyle = HP_BG; ctx.fillRect(px, barY, tw, 3);
-        ctx.fillStyle = '#a78bfa'; ctx.fillRect(px, barY, tw * cdRatio, 3);
-      } else if (tower.storedPower >= 4 && tower.powered) {
-        // Ready indicator glow
-        const pulse = 0.4 + 0.3 * Math.sin(now / 300);
-        ctx.fillStyle = `rgba(167,139,250,${pulse})`;
-        ctx.fillRect(px, py + th + 2, tw, 3);
-      }
-    }
-    // Gatling heat bar
-    if (tower.type === 'gatling' && tower.heat > 0.01) {
-      const barY = py + th + 2;
-      ctx.fillStyle = HP_BG; ctx.fillRect(px, barY, tw, 3);
-      // Gradient from yellow to red based on heat
-      const r = Math.floor(245 + 10 * tower.heat);
-      const g = Math.floor(158 * (1 - tower.heat * 0.7));
-      const b = Math.floor(11 * (1 - tower.heat));
-      ctx.fillStyle = `rgb(${r},${g},${b})`;
-      ctx.fillRect(px, barY, tw * tower.heat, 3);
     }
     if (tower.maxPower > 0 && tower.type !== 'core' && tower.type !== 'battery' && tower.type !== 'blaster' && tower.type !== 'gatling' && tower.type !== 'sniper' && tower.type !== 'tesla') {
       const pr = Math.min(tw, th) / 3;
@@ -630,6 +654,24 @@ export const renderGame = (
     for (const p of state.projectiles) {
       const color = p.color ?? PROJ_CLR;
       const sz = p.size ?? 3;
+
+      if (p.piercing && p.angle !== undefined) {
+        const trailLen = 28;
+        const tailX = p.x - Math.cos(p.angle) * trailLen;
+        const tailY = p.y - Math.sin(p.angle) * trailLen;
+        const tGrd = ctx.createLinearGradient(tailX, tailY, p.x, p.y);
+        tGrd.addColorStop(0, 'rgba(167,139,250,0)');
+        tGrd.addColorStop(0.6, 'rgba(167,139,250,0.25)');
+        tGrd.addColorStop(1, 'rgba(167,139,250,0.7)');
+        ctx.strokeStyle = tGrd;
+        ctx.lineWidth = sz * 1.5;
+        ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(tailX, tailY); ctx.lineTo(p.x, p.y); ctx.stroke();
+        ctx.strokeStyle = 'rgba(167,139,250,0.15)';
+        ctx.lineWidth = sz * 3.5;
+        ctx.beginPath(); ctx.moveTo(tailX, tailY); ctx.lineTo(p.x, p.y); ctx.stroke();
+      }
+
       ctx.fillStyle = color;
       ctx.shadowColor = color;
       ctx.shadowBlur = 6;
@@ -748,6 +790,80 @@ const drawRangeCircle = (ctx: CanvasRenderingContext2D, cx: number, cy: number, 
   ctx.fill();
 };
 
+const FLASH_DUR_BLASTER = 150;
+const FLASH_DUR_GATLING = 100;
+const FLASH_DUR_SNIPER = 250;
+const FLASH_DUR_TESLA = 300;
+
+const drawMuzzleFlash = (
+  ctx: CanvasRenderingContext2D, x: number, y: number, angle: number,
+  progress: number, _color: string, rgb: string, size: number, directional: boolean,
+  seed: number,
+) => {
+  const alpha = 1 - progress;
+  const expand = 1 + progress * 0.8;
+
+  // Outer glow halo
+  const glowR = size * expand * 3;
+  const grd = ctx.createRadialGradient(x, y, 0, x, y, glowR);
+  grd.addColorStop(0, `rgba(${rgb},${alpha * 0.5})`);
+  grd.addColorStop(0.3, `rgba(${rgb},${alpha * 0.25})`);
+  grd.addColorStop(1, `rgba(${rgb},0)`);
+  ctx.fillStyle = grd;
+  ctx.beginPath(); ctx.arc(x, y, glowR, 0, TWO_PI); ctx.fill();
+
+  // Bright colored core
+  ctx.fillStyle = `rgba(${rgb},${alpha * 0.8})`;
+  ctx.beginPath(); ctx.arc(x, y, size * expand, 0, TWO_PI); ctx.fill();
+
+  // White-hot center
+  const coreR = size * 0.7 * (1 - progress * 0.4);
+  ctx.fillStyle = `rgba(255,255,255,${alpha * 0.9})`;
+  ctx.shadowColor = `rgba(${rgb},1)`; ctx.shadowBlur = size * 2 * alpha;
+  ctx.beginPath(); ctx.arc(x, y, coreR, 0, TWO_PI); ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // Sparks flying outward
+  const sparkCount = directional ? 6 : 8;
+  let rng = seed;
+  const nextRng = () => { rng = (rng * 16807 + 7) % 2147483647; return (rng & 0x7fffffff) / 0x7fffffff; };
+  ctx.lineCap = 'round';
+  for (let i = 0; i < sparkCount; i++) {
+    const baseA = directional
+      ? angle + (nextRng() - 0.5) * Math.PI * 0.8
+      : nextRng() * TWO_PI;
+    const sparkLen = size * (1.5 + nextRng() * 2.5) * alpha;
+    const sparkDist = size * 0.5 + size * progress * (1 + nextRng() * 2);
+    const sx = x + Math.cos(baseA) * sparkDist;
+    const sy = y + Math.sin(baseA) * sparkDist;
+    const ex = sx + Math.cos(baseA) * sparkLen;
+    const ey = sy + Math.sin(baseA) * sparkLen;
+    const sparkOp = alpha * (0.5 + nextRng() * 0.5);
+    ctx.strokeStyle = `rgba(${rgb},${sparkOp})`;
+    ctx.lineWidth = 1 + nextRng() * 1.5;
+    ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
+    // Bright spark tip
+    ctx.fillStyle = `rgba(255,255,255,${sparkOp * 0.8})`;
+    ctx.beginPath(); ctx.arc(ex, ey, 0.8 + nextRng(), 0, TWO_PI); ctx.fill();
+  }
+
+  // Directional blast cone
+  if (directional) {
+    const coneLen = size * 4 * alpha;
+    const coneSpread = 0.3;
+    ctx.globalAlpha = alpha * 0.4;
+    ctx.fillStyle = `rgba(${rgb},0.6)`;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + Math.cos(angle - coneSpread) * coneLen, y + Math.sin(angle - coneSpread) * coneLen);
+    ctx.lineTo(x + Math.cos(angle) * coneLen * 1.2, y + Math.sin(angle) * coneLen * 1.2);
+    ctx.lineTo(x + Math.cos(angle + coneSpread) * coneLen, y + Math.sin(angle + coneSpread) * coneLen);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+};
+
 const drawBarrel = (ctx: CanvasRenderingContext2D, cx: number, cy: number, localAngle: number, r: number, barrelLen: number, tColor: string, lineWidth: number, startFrac: number, muzzleR: number) => {
   const bx = cx + Math.cos(localAngle) * r * startFrac;
   const by = cy + Math.sin(localAngle) * r * startFrac;
@@ -764,7 +880,7 @@ const drawBarrel = (ctx: CanvasRenderingContext2D, cx: number, cy: number, local
 function drawTowerDetails(
   ctx: CanvasRenderingContext2D, t: Tower,
   px: number, py: number, tw: number, th: number, cx: number, cy: number,
-  tColor: string, inset: number,
+  tColor: string, inset: number, now: number,
 ) {
   if (t.type === 'core') {
     const R = Math.min(tw, th);
@@ -793,18 +909,33 @@ function drawTowerDetails(
       ctx.shadowBlur = 0;
     }
   } else if (t.type === 'blaster') {
-    const r = Math.min(tw, th) / 4 - 1;
-    ctx.strokeStyle = tColor; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.arc(cx, cy, r, 0, TWO_PI); ctx.stroke();
-    drawPowerArc(ctx, cx, cy, r, t.maxPower, t.storedPower);
+    const r = Math.min(tw, th) / 5;
+    const hs = r * 0.9;
     const localAngle = t.barrelAngle - t.rotation;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(localAngle);
+    ctx.strokeStyle = tColor; ctx.lineWidth = 1.5;
+    ctx.strokeRect(-hs, -hs, hs * 2, hs * 2);
+    if (t.maxPower > 0 && t.storedPower > 0) {
+      ctx.fillStyle = PULSE_CLR;
+      ctx.globalAlpha = 0.5;
+      ctx.fillRect(-hs, -hs, hs * 2, hs * 2 * (t.storedPower / t.maxPower));
+      ctx.globalAlpha = 1;
+    }
+    ctx.restore();
     const barrelLen = Math.min(tw, th) / 2 - inset + 6;
     drawBarrel(ctx, cx, cy, localAngle, r, barrelLen, tColor, 5, 0.3, 3.5);
+    const flashT = now - t.lastActionTime;
+    if (flashT < FLASH_DUR_BLASTER && t.lastActionTime > 0) {
+      const fmx = cx + Math.cos(localAngle) * barrelLen;
+      const fmy = cy + Math.sin(localAngle) * barrelLen;
+      drawMuzzleFlash(ctx, fmx, fmy, localAngle, flashT / FLASH_DUR_BLASTER, tColor, '248,113,113', 8, true, t.lastActionTime);
+    }
   } else if (t.type === 'gatling') {
     const r = Math.min(tw, th) / 4 - 1;
     ctx.strokeStyle = tColor; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.arc(cx, cy, r, 0, TWO_PI); ctx.stroke();
-    drawPowerArc(ctx, cx, cy, r, t.maxPower, t.storedPower);
     const localAngle = t.barrelAngle - t.rotation;
     const barrelLen = Math.min(tw, th) / 2 - inset + 4;
     // Heat glow on barrels
@@ -818,21 +949,65 @@ function drawTowerDetails(
       ctx.fillStyle = hGrd;
       ctx.beginPath(); ctx.arc(cx, cy, glowR, 0, TWO_PI); ctx.fill();
     }
-    for (let b = -1; b <= 1; b++) {
-      const offset = b * 3;
-      const perpX = -Math.sin(localAngle) * offset;
-      const perpY = Math.cos(localAngle) * offset;
-      const sx = cx + perpX + Math.cos(localAngle) * r * 0.3;
-      const sy = cy + perpY + Math.sin(localAngle) * r * 0.3;
+    const spinSpeed = 2 + heat * 8;
+    const spinOffset = now / 1000 * spinSpeed * TWO_PI;
+    const barrelCount = 5;
+    const maxSpread = 8;
+    for (let b = 0; b < barrelCount; b++) {
+      const bAngle = spinOffset + b * TWO_PI / barrelCount;
+      const perpDist = Math.sin(bAngle) * maxSpread;
+      const depth = Math.cos(bAngle);
+      const perpX = -Math.sin(localAngle) * perpDist;
+      const perpY = Math.cos(localAngle) * perpDist;
+      const sx = cx + perpX + Math.cos(localAngle) * r * -0.5;
+      const sy = cy + perpY + Math.sin(localAngle) * r * -0.5;
       const ex = cx + perpX + Math.cos(localAngle) * barrelLen;
       const ey = cy + perpY + Math.sin(localAngle) * barrelLen;
-      // Barrel color shifts toward red with heat
       const bColorR = Math.floor(245 + 10 * heat);
       const bColorG = Math.floor(158 * (1 - heat * 0.6));
       const bColorB = Math.floor(11 * (1 - heat));
       const barrelColor = heat > 0.1 ? `rgb(${bColorR},${bColorG},${bColorB})` : tColor;
-      ctx.strokeStyle = barrelColor; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+      const bAlpha = 0.4 + 0.6 * (depth * 0.5 + 0.5);
+      ctx.globalAlpha = bAlpha;
+      ctx.strokeStyle = barrelColor; ctx.lineWidth = 2.5 + (depth * 0.5 + 0.5); ctx.lineCap = 'round';
       ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    const gFlashT = now - t.lastActionTime;
+    if (gFlashT < FLASH_DUR_GATLING && t.lastActionTime > 0) {
+      const gfx = cx + Math.cos(localAngle) * barrelLen;
+      const gfy = cy + Math.sin(localAngle) * barrelLen;
+      drawMuzzleFlash(ctx, gfx, gfy, localAngle, gFlashT / FLASH_DUR_GATLING, tColor, '245,158,11', 6, true, t.lastActionTime);
+    }
+
+    // Ring heat indicator
+    if (t.heat > 0.01) {
+      const ringR = Math.min(tw, th) / 2 - inset;
+      const hStartA = -Math.PI / 2;
+      ctx.strokeStyle = 'rgba(30,41,59,0.6)';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(cx, cy, ringR, 0, TWO_PI); ctx.stroke();
+      const hEndA = hStartA + TWO_PI * heat;
+      const hR = Math.floor(245 + 10 * heat);
+      const hG = Math.floor(158 * (1 - heat * 0.7));
+      const hB = Math.floor(11 * (1 - heat));
+      ctx.strokeStyle = `rgb(${hR},${hG},${hB})`;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(cx, cy, ringR, hStartA, hEndA); ctx.stroke();
+      const htipX = cx + Math.cos(hEndA) * ringR;
+      const htipY = cy + Math.sin(hEndA) * ringR;
+      ctx.fillStyle = `rgb(${hR},${hG},${hB})`;
+      ctx.shadowColor = `rgb(${hR},${hG},${hB})`; ctx.shadowBlur = 6;
+      ctx.beginPath(); ctx.arc(htipX, htipY, 3, 0, TWO_PI); ctx.fill();
+      ctx.shadowBlur = 0;
+      if (heat > 0.8) {
+        const wPulse = 0.1 + 0.08 * Math.sin(now / 200);
+        const wGrd = ctx.createRadialGradient(cx, cy, ringR - 3, cx, cy, ringR + 8);
+        wGrd.addColorStop(0, `rgba(255,50,0,${wPulse})`);
+        wGrd.addColorStop(1, 'rgba(255,50,0,0)');
+        ctx.fillStyle = wGrd;
+        ctx.beginPath(); ctx.arc(cx, cy, ringR + 8, 0, TWO_PI); ctx.fill();
+      }
     }
   } else if (t.type === 'sniper') {
     const r = Math.min(tw, th) / 5;
@@ -847,13 +1022,50 @@ function drawTowerDetails(
     const scopeY = cy + Math.sin(localAngle) * scopeD;
     ctx.strokeStyle = tColor; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.arc(scopeX, scopeY, 4, 0, TWO_PI); ctx.stroke();
+    const sFlashT = now - t.lastActionTime;
+    if (sFlashT < FLASH_DUR_SNIPER && t.lastActionTime > 0) {
+      drawMuzzleFlash(ctx, mx, my, localAngle, sFlashT / FLASH_DUR_SNIPER, tColor, '167,139,250', 12, true, t.lastActionTime);
+    }
+
+    // Ring cooldown indicator
+    const ringR = Math.min(tw, th) / 2 - inset;
+    const elapsed = now - t.lastActionTime;
+    const cdRatio = t.lastActionTime > 0 ? Math.min(1, elapsed / SNIPER_COOLDOWN_MS) : 1;
+    const startA = -Math.PI / 2;
+    ctx.strokeStyle = 'rgba(30,41,59,0.6)';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(cx, cy, ringR, 0, TWO_PI); ctx.stroke();
+    if (cdRatio < 1) {
+      const endA = startA + TWO_PI * cdRatio;
+      ctx.strokeStyle = '#a78bfa';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(cx, cy, ringR, startA, endA); ctx.stroke();
+      const tipX = cx + Math.cos(endA) * ringR;
+      const tipY = cy + Math.sin(endA) * ringR;
+      const tipGrd = ctx.createRadialGradient(tipX, tipY, 0, tipX, tipY, 5);
+      tipGrd.addColorStop(0, 'rgba(167,139,250,0.8)');
+      tipGrd.addColorStop(1, 'rgba(167,139,250,0)');
+      ctx.fillStyle = tipGrd;
+      ctx.beginPath(); ctx.arc(tipX, tipY, 5, 0, TWO_PI); ctx.fill();
+    } else if (t.storedPower >= 4 && t.powered) {
+      const pulse = 0.4 + 0.3 * Math.sin(now / 300);
+      ctx.strokeStyle = `rgba(167,139,250,${pulse})`;
+      ctx.lineWidth = 2.5;
+      ctx.shadowColor = '#a78bfa'; ctx.shadowBlur = 8 * pulse;
+      ctx.beginPath(); ctx.arc(cx, cy, ringR, 0, TWO_PI); ctx.stroke();
+      ctx.shadowBlur = 0;
+      const glowGrd = ctx.createRadialGradient(cx, cy, ringR - 3, cx, cy, ringR + 6);
+      glowGrd.addColorStop(0, `rgba(167,139,250,${pulse * 0.2})`);
+      glowGrd.addColorStop(1, 'rgba(167,139,250,0)');
+      ctx.fillStyle = glowGrd;
+      ctx.beginPath(); ctx.arc(cx, cy, ringR + 6, 0, TWO_PI); ctx.fill();
+    }
   } else if (t.type === 'tesla') {
     const r1 = Math.min(tw, th) / 3; const r2 = Math.min(tw, th) / 5;
     ctx.strokeStyle = tColor; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.arc(cx, cy, r1, 0, TWO_PI); ctx.stroke();
     ctx.beginPath(); ctx.arc(cx, cy, r2, 0, TWO_PI); ctx.stroke();
     drawPowerArc(ctx, cx, cy, r1, t.maxPower, t.storedPower, tColor);
-    const now = performance.now();
     ctx.strokeStyle = tColor; ctx.lineWidth = 1; ctx.globalAlpha = 0.6;
     for (let s = 0; s < 4; s++) {
       const a = s * Math.PI / 2 + (now / 500);
@@ -866,8 +1078,11 @@ function drawTowerDetails(
     ctx.globalAlpha = 1;
     ctx.fillStyle = tColor;
     ctx.beginPath(); ctx.arc(cx, cy, 2.5, 0, TWO_PI); ctx.fill();
+    const tFlashT = now - t.lastActionTime;
+    if (tFlashT < FLASH_DUR_TESLA && t.lastActionTime > 0) {
+      drawMuzzleFlash(ctx, cx, cy, 0, tFlashT / FLASH_DUR_TESLA, tColor, '232,121,249', 14, false, t.lastActionTime);
+    }
   } else if (t.type === 'generator') {
-    const now = performance.now();
     const s = Math.min(tw, th) * 0.25;
 
     // Rotating energy arcs

@@ -20,7 +20,8 @@ const TWO_PI = Math.PI * 2;
 const { pulseSpeed: PULSE_SPEED, powerInterval: POWER_INTERVAL, attackRange: ATTACK_RANGE, waveDelay: WAVE_DELAY, barrelSpeed: BARREL_SPEED, maxZoom: MAX_ZOOM, spawnInterval: SPAWN_INTERVAL, bossWaveInterval: BOSS_WAVE_INTERVAL, waveClearScoreMul: WAVE_CLEAR_SCORE_MUL } = GLOBAL_CONFIG;
 const { cooldown: SHIELD_COOLDOWN, batteryInterval: BATTERY_INTERVAL } = SHIELD_CONFIG;
 const { cooldown: BLASTER_COOLDOWN, range: BLASTER_RANGE, damage: BLASTER_DAMAGE, powerCost: BLASTER_POWER_COST, bulletSpeed: BLASTER_BULLET_SPEED } = WEAPON_CONFIG.blaster;
-const { range: GATLING_RANGE, damage: GATLING_DAMAGE, bulletRange: GATLING_BULLET_RANGE, minInterval: GATLING_MIN_INTERVAL, maxInterval: GATLING_MAX_INTERVAL, heatPerShot: GATLING_HEAT_PER_SHOT, heatDecay: GATLING_HEAT_DECAY, minSpread: GATLING_MIN_SPREAD, maxSpread: GATLING_MAX_SPREAD, bulletSpeed: GATLING_BULLET_SPEED } = WEAPON_CONFIG.gatling;
+const { range: GATLING_RANGE, damage: GATLING_DAMAGE, bulletRange: GATLING_BULLET_RANGE, minInterval: GATLING_MIN_INTERVAL, maxInterval: GATLING_MAX_INTERVAL, heatDecay: GATLING_HEAT_DECAY, minSpread: GATLING_MIN_SPREAD, maxSpread: GATLING_MAX_SPREAD, bulletSpeed: GATLING_BULLET_SPEED } = WEAPON_CONFIG.gatling;
+const GATLING_HEAT_PER_POWER = 0.35;
 const { cooldown: SNIPER_COOLDOWN, range: SNIPER_RANGE, damage: SNIPER_DAMAGE, powerCost: SNIPER_POWER_COST, bulletSpeed: SNIPER_SPEED, maxRange: SNIPER_MAX_RANGE } = WEAPON_CONFIG.sniper;
 const { cooldown: TESLA_COOLDOWN, range: TESLA_RANGE, bounceRange: TESLA_BOUNCE_RANGE, damagePerPower: TESLA_DAMAGE_PER_POWER } = WEAPON_CONFIG.tesla;
 
@@ -570,7 +571,7 @@ export const useGameLoop = () => {
     const state = stateRef.current;
 
     if (state.status === 'playing') {
-      const now = Date.now();
+      const now = performance.now();
       let changed = false;
 
       // ── Power dispatch (no resource generation) ─────────────────────────
@@ -624,7 +625,14 @@ export const useGameLoop = () => {
         }
         if (reached) {
           const tgt = state.towerMap.get(p.targetTowerId);
-          if (tgt) { tgt.incomingPower = Math.max(0, tgt.incomingPower - 1); tgt.storedPower = Math.min(tgt.maxPower, tgt.storedPower + 1); }
+          if (tgt) {
+            tgt.incomingPower = Math.max(0, tgt.incomingPower - 1);
+            if (tgt.type === 'gatling') {
+              tgt.heat = Math.min(1, tgt.heat + GATLING_HEAT_PER_POWER);
+            } else {
+              tgt.storedPower = Math.min(tgt.maxPower, tgt.storedPower + 1);
+            }
+          }
           state.pulses.splice(i, 1);
         }
         changed = true;
@@ -633,7 +641,7 @@ export const useGameLoop = () => {
       // ── Gatling heat decay ──────────────────────────────────────────
       for (const t of state.towers) {
         if (t.type === 'gatling' && t.heat > 0) {
-          t.heat = Math.max(0, t.heat - GATLING_HEAT_DECAY * dt);
+          t.heat = Math.max(0, t.heat - GATLING_HEAT_DECAY * 0.5 * dt);
           changed = true;
         }
       }
@@ -693,13 +701,12 @@ export const useGameLoop = () => {
           }
         }
 
-        // ── Gatling: heat-based rapid fire, single bullet ──
+        // ── Gatling: heat-driven rapid fire, power fuels heat ──
         if (t.type === 'gatling') {
           const heat = t.heat;
-          const interval = GATLING_MAX_INTERVAL - (GATLING_MAX_INTERVAL - GATLING_MIN_INTERVAL) * heat;
-          if (t.storedPower < 1 || now - t.lastActionTime <= interval) continue;
-          t.storedPower -= 1;
-          t.heat = Math.min(1, heat + GATLING_HEAT_PER_SHOT);
+          if (heat < 0.05) continue;
+          const interval = (GATLING_MAX_INTERVAL - (GATLING_MAX_INTERVAL - GATLING_MIN_INTERVAL) * heat) / 2;
+          if (now - t.lastActionTime <= interval) continue;
           const spread = GATLING_MIN_SPREAD + (GATLING_MAX_SPREAD - GATLING_MIN_SPREAD) * t.heat;
           const spreadAngle = t.barrelAngle + (Math.random() - 0.5) * spread * 2;
           const targetId = bestEnemy?.id ?? bestTarget?.id ?? '';
@@ -735,29 +742,42 @@ export const useGameLoop = () => {
         if (now - t.lastActionTime <= TESLA_COOLDOWN) continue;
         const bx = (t.x + t.width / 2) * CELL_SIZE, by = (t.y + t.height / 2) * CELL_SIZE;
 
-        // Find first enemy in range
-        const firstEnemy = findNearestEnemy(state.enemies, bx, by, TESLA_RANGE);
-        if (!firstEnemy) continue;
+        // Find first target: enemy or practice target tower
+        let firstEnemy = findNearestEnemy(state.enemies, bx, by, TESLA_RANGE);
+        let firstTarget: Tower | null = null;
+        let firstTargetDist = firstEnemy ? Math.hypot(firstEnemy.x - bx, firstEnemy.y - by) : TESLA_RANGE;
+        for (const tgt of state.towers) {
+          if (tgt.type !== 'target') continue;
+          const tx = (tgt.x + tgt.width / 2) * CELL_SIZE, ty = (tgt.y + tgt.height / 2) * CELL_SIZE;
+          const d = Math.hypot(tx - bx, ty - by);
+          if (d < firstTargetDist) { firstTargetDist = d; firstTarget = tgt; firstEnemy = null; }
+        }
+        if (!firstEnemy && !firstTarget) continue;
 
         const power = t.storedPower;
         t.storedPower = 0;
         const totalDmg = power * TESLA_DAMAGE_PER_POWER;
         const bounces = power;
 
-        // Chain lightning: hit first, then bounce
         const clSegments: { x1: number; y1: number; x2: number; y2: number }[] = [];
         const hitIds = new Set<string>();
         let cx = bx, cy = by;
-        let curEnemy: typeof state.enemies[0] | null = firstEnemy;
 
-        for (let b = 0; b < bounces && curEnemy; b++) {
-          clSegments.push({ x1: cx, y1: cy, x2: curEnemy.x, y2: curEnemy.y });
-          applyDamageToEnemy(state, curEnemy, totalDmg / bounces, curEnemy.color, true);
-          hitIds.add(curEnemy.id);
-          cx = curEnemy.x; cy = curEnemy.y;
-
-          // Find next bounce target
-          curEnemy = findNearestEnemy(state.enemies, cx, cy, TESLA_BOUNCE_RANGE, hitIds);
+        if (firstTarget) {
+          const tx = (firstTarget.x + firstTarget.width / 2) * CELL_SIZE;
+          const ty = (firstTarget.y + firstTarget.height / 2) * CELL_SIZE;
+          clSegments.push({ x1: cx, y1: cy, x2: tx, y2: ty });
+          firstTarget.hp -= totalDmg;
+          createExplosion(state, tx, ty, '#e879f9', 5);
+        } else {
+          let curEnemy: typeof state.enemies[0] | null = firstEnemy;
+          for (let b = 0; b < bounces && curEnemy; b++) {
+            clSegments.push({ x1: cx, y1: cy, x2: curEnemy.x, y2: curEnemy.y });
+            applyDamageToEnemy(state, curEnemy, totalDmg / bounces, curEnemy.color, true);
+            hitIds.add(curEnemy.id);
+            cx = curEnemy.x; cy = curEnemy.y;
+            curEnemy = findNearestEnemy(state.enemies, cx, cy, TESLA_BOUNCE_RANGE, hitIds);
+          }
         }
 
         if (clSegments.length > 0) {
