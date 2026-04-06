@@ -1120,7 +1120,7 @@ export const useGameLoop = () => {
   }, []);
 
   return {
-    canvasRef, gameState, startGame, startCustomGame, togglePause, returnToMenu, handlePick,
+    canvasRef, cameraRef, gameState, startGame, startCustomGame, togglePause, returnToMenu, handlePick,
     selectedTower, setSelectedTower,
     handleCanvasMouseDown, handleCanvasMouseMove, handleCanvasMouseUp, handleCanvasMouseLeave,
     handleCanvasWheel, handleCanvasContextMenu,
