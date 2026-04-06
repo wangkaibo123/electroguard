@@ -42,6 +42,7 @@ export default function App() {
   } = useGameLoop();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [codexTower, setCodexTower] = useState<TowerType | null>(null);
   const [locale, _setLocale] = useState<Locale>(getLocale());
   const toggleLocale = () => {
     const next: Locale = locale === 'en' ? 'zh' : 'en';
@@ -88,25 +89,34 @@ export default function App() {
     const label = i.towerName[type] ?? type;
 
     return (
-      <button
-        key={type}
-        onClick={() => setSelectedTower(isSelected ? null : type)}
-        disabled={!hasStock || gameState.status !== 'playing'}
-        className={`flex items-center gap-2.5 px-4 py-3 rounded-lg border transition-all w-full ${
-          isSelected
-            ? 'border-blue-500 bg-blue-500/15 shadow-[0_0_10px_rgba(59,130,246,0.3)]'
-            : hasStock
-              ? 'border-gray-700 bg-gray-800/80 hover:bg-gray-700 hover:border-gray-500'
-              : 'border-gray-800 bg-gray-900/50 opacity-40 cursor-not-allowed'
-        }`}
-        title={i.towerDesc[type] ?? TOWER_STATS[type].description}
-      >
-        <div className="text-gray-400 shrink-0"><TowerIcon type={type} size={20} /></div>
-        <div className="flex flex-col items-start min-w-0">
-          <span className="text-sm font-bold text-gray-200 leading-tight">{label}</span>
-          <span className="text-xs text-emerald-400 font-mono leading-tight">{isCustom ? '\u221E' : `x${count}`}</span>
-        </div>
-      </button>
+      <div key={type} className="flex gap-2 w-full items-stretch min-w-0">
+        <button
+          onClick={() => setSelectedTower(isSelected ? null : type)}
+          disabled={!hasStock || gameState.status !== 'playing'}
+          className={`flex flex-1 min-w-0 items-center gap-2.5 px-3 py-3 rounded-lg border transition-all ${
+            isSelected
+              ? 'border-blue-500 bg-blue-500/15 shadow-[0_0_10px_rgba(59,130,246,0.3)]'
+              : hasStock
+                ? 'border-gray-700 bg-gray-800/80 hover:bg-gray-700 hover:border-gray-500'
+                : 'border-gray-800 bg-gray-900/50 opacity-40 cursor-not-allowed'
+          }`}
+          title={i.towerDesc[type] ?? TOWER_STATS[type].description}
+        >
+          <div className="text-gray-400 shrink-0"><TowerIcon type={type} size={22} /></div>
+          <div className="flex flex-col items-start min-w-0">
+            <span className="text-sm font-bold text-gray-200 leading-tight truncate w-full text-left">{label}</span>
+            <span className="text-xs text-emerald-400 font-mono leading-tight">{isCustom ? '\u221E' : `x${count}`}</span>
+          </div>
+        </button>
+        <button
+          type="button"
+          title={i.codexButton}
+          onClick={() => setCodexTower(type)}
+          className="shrink-0 min-w-[3rem] max-w-[3.25rem] px-1.5 py-2 rounded-lg border text-center text-[11px] font-bold leading-snug transition-all border-amber-700/50 bg-amber-950/35 text-amber-100 hover:bg-amber-900/45 hover:border-amber-500/60"
+        >
+          {i.codexButton}
+        </button>
+      </div>
     );
   };
 
@@ -531,19 +541,19 @@ export default function App() {
           {/* Toggle button */}
           <button
             onClick={() => setSidebarOpen(v => !v)}
-            className="absolute -left-8 top-1/2 -translate-y-1/2 z-10 w-7 h-14 bg-gray-800 hover:bg-gray-700 border border-gray-700 border-r-0 rounded-l-lg flex items-center justify-center text-gray-400 hover:text-white transition-colors"
+            className="absolute -left-9 top-1/2 -translate-y-1/2 z-10 w-9 h-16 bg-gray-800 hover:bg-gray-700 border border-gray-700 border-r-0 rounded-l-lg flex items-center justify-center text-gray-400 hover:text-white transition-colors"
             title={sidebarOpen ? i.hidePanel : i.showPanel}
           >
-            {sidebarOpen ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+            {sidebarOpen ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
           </button>
 
           {/* Right Build Panel — Inventory based */}
           <div
-            className={`bg-gray-900/80 border-l border-gray-800 p-3 flex flex-col gap-2 overflow-y-auto overflow-x-hidden transition-all duration-300 ease-in-out ${
-              sidebarOpen ? 'w-[180px] opacity-100' : 'w-0 opacity-0 p-0 border-l-0'
+            className={`bg-gray-900/80 border-l border-gray-800 p-3.5 flex flex-col gap-2.5 overflow-y-auto overflow-x-hidden transition-all duration-300 ease-in-out ${
+              sidebarOpen ? 'w-[260px] opacity-100' : 'w-0 opacity-0 p-0 border-l-0'
             } ${tutorialStep === 3 || tutorialStep === 4 ? 'shadow-[0_0_20px_rgba(6,182,212,0.4),inset_0_0_20px_rgba(6,182,212,0.15)] border-l-cyan-500/50' : ''}`}
           >
-            <div className="min-w-[160px] flex flex-col h-full">
+            <div className="min-w-[236px] flex flex-col h-full">
               <div className="text-xs font-bold uppercase tracking-widest text-gray-500 px-1 py-1.5">
                 {i.inventory}
               </div>
@@ -557,8 +567,8 @@ export default function App() {
               {renderTowerButton('bus')}
               {gameState.gameMode === 'custom' && renderTowerButton('target')}
 
-              <div className="flex items-center gap-2.5 px-4 py-3 rounded-lg border border-gray-800 bg-gray-900/50 w-full">
-                <div className="text-blue-400 shrink-0"><Cable size={20} /></div>
+              <div className="flex items-center gap-2.5 px-3 py-3 rounded-lg border border-gray-800 bg-gray-900/50 w-full">
+                <div className="text-blue-400 shrink-0"><Cable size={22} /></div>
                 <div className="flex flex-col items-start min-w-0">
                   <span className="text-sm font-bold text-gray-200 leading-tight">{i.wires}</span>
                   <span className="text-xs text-blue-400 font-mono leading-tight">{gameState.gameMode === 'custom' ? '\u221E' : `x${gameState.wireInventory}`}</span>
@@ -574,6 +584,47 @@ export default function App() {
           </div>
         </div>
       </div>
+
+      {/* Machine codex modal */}
+      {codexTower && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/55 backdrop-blur-sm"
+          onClick={() => setCodexTower(null)}
+          role="presentation"
+        >
+          <div
+            className="max-w-md w-full bg-gray-900/98 border border-gray-700 rounded-xl shadow-[0_0_40px_rgba(0,0,0,0.5)] overflow-hidden"
+            onClick={e => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="codex-title"
+          >
+            <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-3 border-b border-gray-800">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="text-gray-300 shrink-0 p-2 rounded-lg bg-gray-800/80 border border-gray-700">
+                  <TowerIcon type={codexTower} size={26} />
+                </div>
+                <h2 id="codex-title" className="text-lg font-bold text-white leading-tight truncate">
+                  {i.towerName[codexTower] ?? codexTower}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCodexTower(null)}
+                className="shrink-0 p-2 rounded-lg text-gray-500 hover:text-white hover:bg-gray-800 transition-colors"
+                aria-label={getLocale() === 'zh' ? '关闭' : 'Close'}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="px-5 py-4 max-h-[min(70vh,28rem)] overflow-y-auto">
+              <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-line">
+                {i.towerCodex[codexTower] ?? i.towerDesc[codexTower] ?? TOWER_STATS[codexTower].description}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

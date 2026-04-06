@@ -66,6 +66,10 @@ export interface I18nStrings {
   // Tower descriptions (for tooltip & pick cards)
   towerDesc: Record<string, string>;
 
+  /** Sidebar codex button + full machine guide (multi-paragraph, \\n\\n separated) */
+  codexButton: string;
+  towerCodex: Record<string, string>;
+
   // Pick labels (may differ from tower names, e.g. "Blaster x2")
   pickLabel: Record<string, string>;
   // Pick descriptions
@@ -159,6 +163,28 @@ const en: I18nStrings = {
     battery: 'Stores 4 units of power and discharges quickly.',
     bus: 'Merges up to 3 input wires into 3 outputs.',
     target: 'Practice target. Treated as an enemy by turrets.',
+  },
+
+  codexButton: 'Codex',
+  towerCodex: {
+    blaster:
+      'Role: steady single-target damage.\n\nEach shot costs 2 power. Power pulses travel along wires from the Core or Generators; the turret must be connected and receiving energy to fire.\n\nTips: place with a clear line of sight to spawn lanes; click the placed turret to rotate the barrel toward threats. Good as a backbone turret when power is stable.',
+    gatling:
+      'Role: sustained DPS that ramps up over time.\n\nFiring speed increases as the turret stays powered and keeps shooting (heat/spin-up mechanic). Uses more power when firing fast—balance with Generators and Batteries.\n\nTips: best against waves and clusters; pair with reliable wiring so it does not stall mid-fight.',
+    sniper:
+      'Role: burst damage on a line.\n\nEach shot costs 4 power and pierces all enemies along its firing line, with a longer cooldown between shots.\n\nTips: align the turret so enemies walk in a straight line through the beam; excellent for choke points. Rotate after placement to maximize pierce value.',
+    tesla:
+      'Role: area control via chained lightning.\n\nLightning jumps between nearby enemies, strong against tight groups. Higher max power storage than basic turrets—plan wiring accordingly.\n\nTips: pull enemies into clusters before arcs connect; less ideal for very spread-out paths unless you have multiple teslas.',
+    generator:
+      'Role: extends your power network.\n\nLike the Core, it dispatches energy pulses on an interval. Use it when turrets are far from the Core or when one line cannot supply enough devices.\n\nTips: place between the Core and forward defenses; connect inputs from the network and outputs toward front-line turrets.',
+    shield:
+      'Role: bubble shield that absorbs damage for buildings inside.\n\nThe shield recharges using power. If broken, it needs enough stored power (e.g. 3 units) to reboot—keep it wired.\n\nTips: center the bubble on the Core or a cluster of key turrets; do not leave it unwired or it will fall quickly under focus fire.',
+    battery:
+      'Role: short-term energy reservoir.\n\nStores up to 4 power and releases it quickly to nearby consumers, smoothing spikes when many turrets fire at once.\n\nTips: place between your main power path and hungry turrets (Gatling, Sniper, Tesla); wire battery input from generators/core and output toward the front line.',
+    bus:
+      'Role: wiring hub — simplifies messy layouts.\n\nAccepts up to 3 input wires and can drive up to 3 outputs, merging and redistributing pulses.\n\nTips: use at junctions where many cables would cross; not a power source by itself—still needs energy from Core/Generators upstream.',
+    target:
+      'Role: training dummy in Custom Mode.\n\nTurrets treat it as an enemy, so you can test ranges, rotation, and damage without waves.\n\nTips: place in open space, wire your test turrets, and observe firing behavior; remove or reposition as needed.',
   },
 
   pickLabel: {
@@ -277,6 +303,28 @@ const zh: I18nStrings = {
     battery: '存储4格电，快速放电。',
     bus: '合并最多3条输入线为3条输出。',
     target: '练习靶标，被炮塔视为敌人。',
+  },
+
+  codexButton: '图鉴',
+  towerCodex: {
+    blaster:
+      '定位：稳定单体输出，性价比高。\n\n每次开火消耗 2 格电力。能量沿线缆从核心或发电机传来，必须连通电网且正在受电才能射击。\n\n用法建议：放在能俯视刷怪方向的位置；放置后点击旋转炮口。电力稳定时适合作为主力炮塔。',
+    gatling:
+      '定位：持续火力，越久射得越快。\n\n通电连射时会“升温”加速，射速提高后耗电也会增加，注意与发电机、蓄电池搭配。\n\n用法建议：适合应对密集波次；务必保证线缆可靠，避免打一半断供。',
+    sniper:
+      '定位：直线高爆发、穿透杀伤。\n\n每发消耗 4 格电，冷却较长，但一发可穿透路径上所有敌人。\n\n用法建议：把敌人走位收成一条线时收益最大，适合隘口；放置后旋转找好穿透角度。',
+    tesla:
+      '定位：连锁闪电，克制聚堆敌人。\n\n电弧在临近敌人之间跳跃，对成群目标特别有效。储电上限较高，布线时预留容量。\n\n用法建议：引诱或迫使敌人聚拢；若路线过于分散，可多座配合覆盖。',
+    generator:
+      '定位：扩展电网，远程供电。\n\n与核心类似，按周期向网络派发能量脉冲。当前方炮塔离核心太远或单线负载不足时使用。\n\n用法建议：放在核心与前线之间作“中继”；输入接上游，输出指向下游炮塔。',
+    shield:
+      '定位：范围护盾，吸收伤害保护圈内建筑。\n\n护盾会消耗电力充能；被击破后需要积累一定电力（例如 3 格）才能重启，请保持连接。\n\n用法建议：罩住核心或关键炮塔群；不要长时间断电否则极易被集火打穿。',
+    battery:
+      '定位：缓冲池，平滑用电尖峰。\n\n最多存 4 格电并快速放出，适合多炮塔同时开火的瞬间。\n\n用法建议：放在主供电路径与耗电大户（加特林、狙击、特斯拉等）之间；输入接发电机/核心，输出通往前线。',
+    bus:
+      '定位：汇流与分线，整理复杂布线。\n\n最多合并 3 条输入线，并分出最多 3 条输出，用于十字路口式走线。\n\n用法建议：线缆容易交叉纠缠时用并联器收束；它本身不产生能量，上游仍需核心或发电机供能。',
+    target:
+      '定位：自定义模式下的练习靶。\n\n炮塔会把它当作敌人攻击，可在没有波次时测试射程、旋转与伤害。\n\n用法建议：空地放置靶标，接好测试炮塔的线缆，观察开火行为；随时可挪位重测。',
   },
 
   pickLabel: {
