@@ -76,7 +76,7 @@ export const TOWER_CONFIG: Record<TowerType, {
   gatling:   { hp: 100,  description: 'Heat-based rapid fire. Spins up with power.',               color: '#f59e0b', width: 3, height: 3, maxPower: 5, maxShieldHp: 0,   shieldRadius: 0 },
   /* 狙击塔：高伤害穿透弹，冷却长 */
   sniper:    { hp: 80,   description: 'High-damage piercing shot. Costs 4 power.',                 color: '#a78bfa', width: 3, height: 3, maxPower: 4, maxShieldHp: 0,   shieldRadius: 0 },
-  /* 特斯拉：链式闪电，在敌人之间弹跳 */
+  /* 电磁炮（tesla）：链式闪电，在敌人之间弹跳 */
   tesla:     { hp: 100,  description: 'Chain lightning bounces between enemies.',                   color: '#e879f9', width: 3, height: 3, maxPower: 9, maxShieldHp: 0,   shieldRadius: 0 },
   /* 发电机：电网的能量来源 */
   generator: { hp: 100,  description: 'Power source for the network. Dispatches energy.',           color: '#fbbf24', width: 3, height: 3, maxPower: 0, maxShieldHp: 0,   shieldRadius: 0 },
@@ -148,7 +148,7 @@ export const WEAPON_CONFIG = {
     /** 炮管对准目标后需保持的瞄准时间（ms）才允许开火 */
     minAimMs: 320,
   },
-  /** 特斯拉 */
+  /** 电磁炮（tesla） */
   tesla: {
     /** 开火冷却（ms） */
     cooldown: 3000,
