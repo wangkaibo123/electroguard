@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Battery, Zap, Crosshair, Activity, Play, RotateCcw, Pause, Hexagon, Cable, Target, Wrench, ChevronRight, ChevronLeft, Flame, Focus, Radio, GitMerge, Globe, LogOut, BookOpen, X } from 'lucide-react';
+import { Battery, Zap, Crosshair, Activity, Play, RotateCcw, Pause, Hexagon, Cable, Target, Wrench, ChevronRight, ChevronLeft, Flame, Focus, Radio, GitMerge, Globe, LogOut, BookOpen, X, Keyboard, Menu } from 'lucide-react';
 import { useGameLoop } from './game/useGameLoop';
 import { TOWER_STATS, TowerType, PickOption } from './game/types';
 import { t, getLocale, setLocale, Locale } from './game/i18n';
@@ -39,11 +39,28 @@ export default function App() {
     handleCanvasMouseLeave,
     handleCanvasWheel,
     handleCanvasContextMenu,
+    handleCanvasTouchStart,
+    handleCanvasTouchMove,
+    handleCanvasTouchEnd,
   } = useGameLoop();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [codexTower, setCodexTower] = useState<TowerType | null>(null);
   const [locale, _setLocale] = useState<Locale>(getLocale());
+
+  // Mobile detection
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  // On mobile, sidebar starts closed; on mobile the sidebar is an overlay
+  useEffect(() => {
+    if (isMobile) setSidebarOpen(false);
+  }, [isMobile]);
+
   const toggleLocale = () => {
     const next: Locale = locale === 'en' ? 'zh' : 'en';
     setLocale(next);
@@ -53,6 +70,7 @@ export default function App() {
 
   const [tipIndex, setTipIndex] = useState(0);
   const [tipHidden, setTipHidden] = useState(false);
+  const [controlsHidden, setControlsHidden] = useState(() => window.innerWidth < 768);
   useEffect(() => {
     const id = setInterval(() => {
       setTipIndex(prev => (prev + 1) % TIPS_CONFIG.tips.length);
@@ -124,62 +142,62 @@ export default function App() {
     <div className="h-screen bg-gray-950 text-gray-100 font-sans flex flex-col overflow-hidden">
 
       {/* Top Stats Bar */}
-      <div className="shrink-0 bg-gray-900/90 border-b border-gray-800 px-4 py-2 flex items-center gap-6">
-        <h1 className="text-lg font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500 shrink-0">
+      <div className="shrink-0 bg-gray-900/90 border-b border-gray-800 px-2 sm:px-4 py-1.5 sm:py-2 flex items-center gap-2 sm:gap-6">
+        <h1 className="text-sm sm:text-lg font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500 shrink-0">
           ELECTROGUARD
         </h1>
 
         {gameState.gameMode === 'custom' ? (
-          <div className="flex items-center gap-1.5 text-orange-400">
+          <div className="flex items-center gap-1 sm:gap-1.5 text-orange-400">
             <Wrench size={14} />
-            <span className="text-xs uppercase font-bold">{i.customMode}</span>
+            <span className="text-xs uppercase font-bold hidden sm:inline">{i.customMode}</span>
           </div>
         ) : (
-          <div className="flex items-center gap-1.5 text-red-400">
+          <div className="flex items-center gap-1 sm:gap-1.5 text-red-400">
             <Activity size={14} />
-            <span className="text-xs text-gray-500 uppercase font-bold">{i.wave}</span>
-            <span className="text-lg font-mono font-bold ml-1">{gameState.wave || '-'}</span>
+            <span className="text-xs text-gray-500 uppercase font-bold hidden sm:inline">{i.wave}</span>
+            <span className="text-base sm:text-lg font-mono font-bold ml-0.5 sm:ml-1">{gameState.wave || '-'}</span>
           </div>
         )}
 
-        <div className="flex items-center gap-1.5 text-blue-400">
+        <div className="flex items-center gap-1 sm:gap-1.5 text-blue-400">
           <Cable size={14} />
-          <span className="text-xs text-gray-500 uppercase font-bold">{i.wires}</span>
-          <span className="text-lg font-mono font-bold ml-1">{gameState.gameMode === 'custom' ? '\u221E' : gameState.wireInventory}</span>
+          <span className="text-xs text-gray-500 uppercase font-bold hidden sm:inline">{i.wires}</span>
+          <span className="text-base sm:text-lg font-mono font-bold ml-0.5 sm:ml-1">{gameState.gameMode === 'custom' ? '\u221E' : gameState.wireInventory}</span>
         </div>
 
-        <div className="flex items-center gap-1.5 text-white">
-          <span className="text-xs text-gray-500 uppercase font-bold">{i.score}</span>
-          <span className="text-lg font-mono font-bold ml-1">{gameState.score}</span>
+        <div className="flex items-center gap-1 sm:gap-1.5 text-white">
+          <span className="text-xs text-gray-500 uppercase font-bold hidden sm:inline">{i.score}</span>
+          <span className="text-base sm:text-lg font-mono font-bold ml-0.5 sm:ml-1">{gameState.score}</span>
         </div>
 
         {gameState.gameMode !== 'custom' && gameState.status === 'playing' && gameState.enemiesToSpawn === 0 && gameState.enemies.length === 0 && (
-          <div className="flex items-center gap-3 ml-2">
-            <div className="text-blue-300 text-xs font-medium animate-pulse">
+          <div className="flex items-center gap-1 sm:gap-3 ml-1 sm:ml-2">
+            <div className="text-blue-300 text-[10px] sm:text-xs font-medium animate-pulse hidden sm:block">
               {i.nextWaveIn(Math.ceil(GLOBAL_CONFIG.waveDelay - gameState.waveTimer))}
             </div>
             <button
               onClick={skipToNextWave}
-              className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1"
+              className="px-2 sm:px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white text-[10px] sm:text-xs font-bold rounded-lg transition-colors flex items-center gap-1"
             >
-              <Play size={12} /> {i.startNextWave}
+              <Play size={10} /> <span className="hidden sm:inline">{i.startNextWave}</span><span className="sm:hidden">GO</span>
             </button>
           </div>
         )}
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
           <button
             onClick={toggleLocale}
-            className="p-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-400 hover:text-white transition-colors text-xs font-bold flex items-center gap-1"
+            className="p-1 sm:p-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-400 hover:text-white transition-colors text-xs font-bold flex items-center gap-1"
             title="EN / 中文"
           >
             <Globe size={14} />
-            {locale === 'en' ? '中文' : 'EN'}
+            <span className="hidden sm:inline">{locale === 'en' ? '中文' : 'EN'}</span>
           </button>
           {(gameState.status === 'playing' || gameState.status === 'paused') && (
             <button
               onClick={togglePause}
-              className="p-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-white transition-colors"
+              className="p-1 sm:p-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-white transition-colors"
               title={gameState.status === 'playing' ? i.pause : i.resume}
             >
               {gameState.status === 'playing' ? <Pause size={16} /> : <Play size={16} />}
@@ -188,8 +206,8 @@ export default function App() {
         </div>
       </div>
 
-      {/* Tips Bar */}
-      {(gameState.status === 'playing' || gameState.status === 'paused') && !tipHidden && (
+      {/* Tips Bar — hidden on mobile */}
+      {!isMobile && (gameState.status === 'playing' || gameState.status === 'paused') && !tipHidden && (
         <div className="shrink-0 bg-gray-900/80 border-b border-gray-800 px-4 py-1.5 flex items-center gap-3">
           <span className="text-amber-400 text-sm shrink-0">💡</span>
           <p
@@ -209,10 +227,10 @@ export default function App() {
       )}
 
       {/* Main Area: Canvas + Build Panel */}
-      <div className="flex-1 flex min-h-0">
+      <div className="flex-1 flex min-h-0 relative">
 
         {/* Canvas Area */}
-        <div className="flex-1 min-w-0 p-2">
+        <div className="flex-1 min-w-0 p-1 sm:p-2">
           <div className="relative rounded-xl overflow-hidden shadow-[0_0_30px_rgba(0,0,0,0.6)] bg-gray-900 w-full h-full">
             <canvas
               ref={canvasRef}
@@ -222,8 +240,45 @@ export default function App() {
               onMouseLeave={handleCanvasMouseLeave}
               onWheel={handleCanvasWheel}
               onContextMenu={handleCanvasContextMenu}
-              className={`block w-full h-full ${gameState.status === 'playing' ? (selectedTower ? 'cursor-crosshair' : 'cursor-grab active:cursor-grabbing') : ''}`}
+              onTouchStart={handleCanvasTouchStart}
+              onTouchMove={handleCanvasTouchMove}
+              onTouchEnd={handleCanvasTouchEnd}
+              onTouchCancel={handleCanvasTouchEnd}
+              className={`block w-full h-full touch-none ${gameState.status === 'playing' ? (selectedTower ? 'cursor-crosshair' : 'cursor-grab active:cursor-grabbing') : ''}`}
             />
+
+            {/* Controls Guide — top-left (desktop only) */}
+            {!isMobile && (gameState.status === 'playing' || gameState.status === 'paused') && (
+              controlsHidden ? (
+                <button
+                  onClick={() => setControlsHidden(false)}
+                  className="absolute top-2 left-2 p-1.5 bg-gray-950/60 backdrop-blur-sm rounded-lg border border-gray-700/40 text-gray-500 hover:text-gray-300 hover:bg-gray-800/70 transition-colors"
+                  title={locale === 'zh' ? '显示操作指南' : 'Show Controls'}
+                >
+                  <Keyboard size={14} />
+                </button>
+              ) : (
+                <div className="absolute top-2 left-2 select-none">
+                  <div className="bg-gray-950/60 backdrop-blur-sm rounded-lg px-3 py-2 border border-gray-700/40">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider">{locale === 'zh' ? '操作指南' : 'Controls'}</span>
+                      <button
+                        onClick={() => setControlsHidden(true)}
+                        className="p-0.5 rounded hover:bg-gray-700 text-gray-500 hover:text-gray-300 transition-colors ml-3"
+                        title={i.hidePanel}
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                    <ul className="space-y-0.5 pointer-events-none">
+                      {i.controlsGuide.map((line, idx) => (
+                        <li key={idx} className="text-[11px] text-gray-400 leading-snug font-mono whitespace-nowrap">{line}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )
+            )}
 
             {/* Toast Notification */}
             {toastMessage && (
@@ -234,36 +289,36 @@ export default function App() {
 
             {/* Menu Overlay */}
             {gameState.status === 'menu' && (
-              <div className="absolute inset-0 bg-gray-950/80 backdrop-blur-sm flex flex-col items-center justify-center p-8 text-center">
-                <h2 className="text-5xl font-black mb-4 text-white tracking-tight">{i.systemOffline}</h2>
-                <p className="text-gray-400 mb-8 max-w-lg text-sm">
+              <div className="absolute inset-0 bg-gray-950/80 backdrop-blur-sm flex flex-col items-center justify-center p-4 sm:p-8 text-center">
+                <h2 className="text-3xl sm:text-5xl font-black mb-3 sm:mb-4 text-white tracking-tight">{i.systemOffline}</h2>
+                <p className="text-gray-400 mb-6 sm:mb-8 max-w-lg text-xs sm:text-sm px-2">
                   {i.menuDescription}
                 </p>
                 <button
                   onClick={handleStartGame}
-                  className="group relative w-64 px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-all overflow-hidden"
+                  className="group relative w-52 sm:w-64 px-6 sm:px-8 py-3 sm:py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-all overflow-hidden"
                 >
                   <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform"></div>
-                  <span className="relative flex items-center justify-center gap-2">
-                    <Play size={20} /> {i.initializeCore}
+                  <span className="relative flex items-center justify-center gap-2 text-sm sm:text-base">
+                    <Play size={18} /> {i.initializeCore}
                   </span>
                 </button>
                 <button
                   onClick={startTutorial}
-                  className="group relative w-64 px-8 py-4 bg-cyan-700 hover:bg-cyan-600 text-white font-bold rounded-xl transition-all overflow-hidden mt-3 border border-cyan-600"
+                  className="group relative w-52 sm:w-64 px-6 sm:px-8 py-3 sm:py-4 bg-cyan-700 hover:bg-cyan-600 text-white font-bold rounded-xl transition-all overflow-hidden mt-2 sm:mt-3 border border-cyan-600"
                 >
                   <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform"></div>
-                  <span className="relative flex items-center justify-center gap-2">
-                    <BookOpen size={20} /> {i.tutorial}
+                  <span className="relative flex items-center justify-center gap-2 text-sm sm:text-base">
+                    <BookOpen size={18} /> {i.tutorial}
                   </span>
                 </button>
                 <button
                   onClick={startCustomGame}
-                  className="group relative w-64 px-8 py-4 bg-gray-700 hover:bg-gray-600 text-white font-bold rounded-xl transition-all overflow-hidden mt-3 border border-gray-600"
+                  className="group relative w-52 sm:w-64 px-6 sm:px-8 py-3 sm:py-4 bg-gray-700 hover:bg-gray-600 text-white font-bold rounded-xl transition-all overflow-hidden mt-2 sm:mt-3 border border-gray-600"
                 >
                   <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform"></div>
-                  <span className="relative flex items-center justify-center gap-2">
-                    <Wrench size={20} /> {i.customMode}
+                  <span className="relative flex items-center justify-center gap-2 text-sm sm:text-base">
+                    <Wrench size={18} /> {i.customMode}
                   </span>
                 </button>
               </div>
@@ -271,44 +326,46 @@ export default function App() {
 
             {/* Pick Overlay (Roguelike 3-choice) */}
             {gameState.status === 'pick' && (
-              <div className="absolute inset-0 bg-gray-950/85 backdrop-blur-sm flex flex-col items-center justify-center p-8 text-center">
+              <div className="absolute inset-0 bg-gray-950/85 backdrop-blur-sm flex flex-col items-center justify-center p-4 sm:p-8 text-center overflow-y-auto">
                 {gameState.pickUiPhase === 'boss_bonus' ? (
                   <>
-                    <h2 className="text-3xl font-black mb-1 text-amber-400 tracking-tight">{i.bossBonusPickTitle}</h2>
-                    <p className="text-gray-400 text-sm mb-6 max-w-md leading-relaxed">{i.bossBonusPickDescription}</p>
+                    <h2 className="text-2xl sm:text-3xl font-black mb-1 text-amber-400 tracking-tight">{i.bossBonusPickTitle}</h2>
+                    <p className="text-gray-400 text-xs sm:text-sm mb-4 sm:mb-6 max-w-md leading-relaxed px-2">{i.bossBonusPickDescription}</p>
                   </>
                 ) : gameState.wave > 0 ? (
                   <>
-                    <h2 className="text-3xl font-black mb-1 text-emerald-400 tracking-tight">{i.waveCleared(gameState.wave)}</h2>
-                    <p className="text-emerald-300/60 text-sm font-mono mb-6">+{gameState.wave * GLOBAL_CONFIG.waveClearScoreMul} pts</p>
+                    <h2 className="text-2xl sm:text-3xl font-black mb-1 text-emerald-400 tracking-tight">{i.waveCleared(gameState.wave)}</h2>
+                    <p className="text-emerald-300/60 text-xs sm:text-sm font-mono mb-4 sm:mb-6">+{gameState.wave * GLOBAL_CONFIG.waveClearScoreMul} pts</p>
                   </>
                 ) : (
                   <>
-                    <h2 className="text-3xl font-black mb-1 text-blue-400 tracking-tight">{i.systemUpgrade}</h2>
-                    <p className="text-gray-400 text-sm mb-6">{i.pickDescription}</p>
+                    <h2 className="text-2xl sm:text-3xl font-black mb-1 text-blue-400 tracking-tight">{i.systemUpgrade}</h2>
+                    <p className="text-gray-400 text-xs sm:text-sm mb-4 sm:mb-6">{i.pickDescription}</p>
                   </>
                 )}
 
-                <div className="flex gap-4">
+                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full sm:w-auto items-center">
                   {gameState.pickOptions.map(opt => {
                     const color = getPickColor(opt);
                     return (
                       <button
                         key={opt.id}
                         onClick={() => handlePick(opt.id)}
-                        className="group w-44 p-5 rounded-xl border-2 border-gray-700 bg-gray-900/95 hover:bg-gray-800/95 transition-all flex flex-col items-center text-center gap-3 hover:scale-105 hover:shadow-lg"
+                        className="group w-full max-w-[200px] sm:w-44 p-4 sm:p-5 rounded-xl border-2 border-gray-700 bg-gray-900/95 hover:bg-gray-800/95 transition-all flex flex-row sm:flex-col items-center text-center gap-3 hover:scale-105 hover:shadow-lg active:scale-95"
                         style={{ '--pick-color': color } as React.CSSProperties}
                         onMouseEnter={e => (e.currentTarget.style.borderColor = color)}
                         onMouseLeave={e => (e.currentTarget.style.borderColor = '')}
                       >
                         <div
-                          className="w-12 h-12 rounded-lg flex items-center justify-center text-white"
+                          className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center text-white shrink-0"
                           style={{ backgroundColor: color + '22', color }}
                         >
-                          {opt.kind === 'wire' ? <Cable size={22} /> : <TowerIcon type={opt.towerType!} />}
+                          {opt.kind === 'wire' ? <Cable size={20} /> : <TowerIcon type={opt.towerType!} size={20} />}
                         </div>
-                        <div className="text-sm font-bold text-white">{opt.label}</div>
-                        <div className="text-[11px] text-gray-400 leading-snug">{opt.description}</div>
+                        <div className="flex flex-col items-start sm:items-center min-w-0">
+                          <div className="text-sm font-bold text-white">{opt.label}</div>
+                          <div className="text-[11px] text-gray-400 leading-snug">{opt.description}</div>
+                        </div>
                       </button>
                     );
                   })}
@@ -318,8 +375,8 @@ export default function App() {
 
             {/* Paused Overlay */}
             {gameState.status === 'paused' && (
-              <div className="absolute inset-0 bg-gray-950/50 backdrop-blur-sm flex flex-col items-center justify-center p-8 text-center">
-                <h2 className="text-5xl font-black mb-6 text-white tracking-tight">{i.systemPaused}</h2>
+              <div className="absolute inset-0 bg-gray-950/50 backdrop-blur-sm flex flex-col items-center justify-center p-4 sm:p-8 text-center">
+                <h2 className="text-3xl sm:text-5xl font-black mb-4 sm:mb-6 text-white tracking-tight">{i.systemPaused}</h2>
                 <button
                   onClick={togglePause}
                   className="group relative px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-all overflow-hidden"
@@ -343,9 +400,9 @@ export default function App() {
 
             {/* Game Over Overlay */}
             {gameState.status === 'gameover' && (
-              <div className="absolute inset-0 bg-red-950/90 backdrop-blur-md flex flex-col items-center justify-center p-8 text-center">
-                <h2 className="text-6xl font-black mb-2 text-red-500 tracking-tight">{i.coreBreached}</h2>
-                <p className="text-red-300/70 text-xl mb-8 font-mono">{i.systemFailure}</p>
+              <div className="absolute inset-0 bg-red-950/90 backdrop-blur-md flex flex-col items-center justify-center p-4 sm:p-8 text-center">
+                <h2 className="text-4xl sm:text-6xl font-black mb-2 text-red-500 tracking-tight">{i.coreBreached}</h2>
+                <p className="text-red-300/70 text-base sm:text-xl mb-6 sm:mb-8 font-mono">{i.systemFailure}</p>
                 {gameState.gameMode !== 'custom' && (
                   <div className="bg-black/50 rounded-xl p-6 mb-8 min-w-[200px]">
                     <div className="text-gray-400 text-sm uppercase tracking-wider mb-2">{i.finalScore}</div>
@@ -498,7 +555,7 @@ export default function App() {
                   })()}
 
                   {/* Tutorial card */}
-                  <div className="relative pointer-events-auto bg-gray-900/95 border border-cyan-500/40 rounded-xl p-5 shadow-[0_0_25px_rgba(6,182,212,0.2)] max-w-md w-full mx-4 backdrop-blur-sm">
+                  <div className="relative pointer-events-auto bg-gray-900/95 border border-cyan-500/40 rounded-xl p-4 sm:p-5 shadow-[0_0_25px_rgba(6,182,212,0.2)] max-w-md w-full mx-2 sm:mx-4 backdrop-blur-sm">
                     <div className="flex items-center justify-between mb-3">
                       <span className="text-cyan-400/70 text-xs font-mono">{tutorialStep + 1} / {i.tutorialSteps.length}</span>
                       <button onClick={dismissTutorial} className="text-gray-500 hover:text-gray-300 text-xs transition-colors">{i.tutorialSkip}</button>
@@ -542,58 +599,114 @@ export default function App() {
         </div>
 
         {/* Sidebar toggle + panel */}
-        <div className="relative shrink-0 flex">
-          {/* Toggle button */}
-          <button
-            onClick={() => setSidebarOpen(v => !v)}
-            className="absolute -left-9 top-1/2 -translate-y-1/2 z-10 w-9 h-16 bg-gray-800 hover:bg-gray-700 border border-gray-700 border-r-0 rounded-l-lg flex items-center justify-center text-gray-400 hover:text-white transition-colors"
-            title={sidebarOpen ? i.hidePanel : i.showPanel}
-          >
-            {sidebarOpen ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-          </button>
+        {/* Mobile: floating toggle button + overlay sidebar */}
+        {isMobile ? (
+          <>
+            {/* Mobile sidebar toggle FAB */}
+            {(gameState.status === 'playing' || gameState.status === 'paused') && !sidebarOpen && (
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="absolute bottom-3 right-3 z-30 w-12 h-12 bg-gray-800/90 backdrop-blur-sm hover:bg-gray-700 rounded-full border border-gray-600 flex items-center justify-center text-gray-300 shadow-lg active:scale-95 transition-transform"
+                title={i.showPanel}
+              >
+                <Menu size={20} />
+              </button>
+            )}
+            {/* Mobile sidebar overlay */}
+            {sidebarOpen && (
+              <div className="absolute inset-0 z-40 flex" onClick={() => setSidebarOpen(false)}>
+                <div className="flex-1" />
+                <div
+                  className="w-[240px] bg-gray-900/95 backdrop-blur-md border-l border-gray-800 p-3 flex flex-col gap-2 overflow-y-auto animate-[slideInRight_0.2s_ease-out]"
+                  onClick={e => e.stopPropagation()}
+                >
+                  <div className="flex items-center justify-between px-1 py-1">
+                    <span className="text-xs font-bold uppercase tracking-widest text-gray-500">{i.inventory}</span>
+                    <button onClick={() => setSidebarOpen(false)} className="p-1 rounded hover:bg-gray-700 text-gray-500 hover:text-gray-300 transition-colors">
+                      <X size={16} />
+                    </button>
+                  </div>
+                  {renderTowerButton('blaster')}
+                  {renderTowerButton('gatling')}
+                  {renderTowerButton('sniper')}
+                  {renderTowerButton('tesla')}
+                  {renderTowerButton('generator')}
+                  {renderTowerButton('shield')}
+                  {renderTowerButton('battery')}
+                  {renderTowerButton('bus')}
+                  {gameState.gameMode === 'custom' && renderTowerButton('target')}
 
-          {/* Right Build Panel — Inventory based */}
-          <div
-            className={`bg-gray-900/80 border-l border-gray-800 p-3.5 flex flex-col gap-2.5 overflow-y-auto overflow-x-hidden transition-all duration-300 ease-in-out ${
-              sidebarOpen ? 'w-[260px] opacity-100' : 'w-0 opacity-0 p-0 border-l-0'
-            } ${tutorialStep === 3 || tutorialStep === 4 ? 'shadow-[0_0_20px_rgba(6,182,212,0.4),inset_0_0_20px_rgba(6,182,212,0.15)] border-l-cyan-500/50' : ''}`}
-          >
-            <div className="min-w-[236px] flex flex-col h-full">
-              <div className="text-xs font-bold uppercase tracking-widest text-gray-500 px-1 py-1.5">
-                {i.inventory}
-              </div>
-              {renderTowerButton('blaster')}
-              {renderTowerButton('gatling')}
-              {renderTowerButton('sniper')}
-              {renderTowerButton('tesla')}
-              {renderTowerButton('generator')}
-              {renderTowerButton('shield')}
-              {renderTowerButton('battery')}
-              {renderTowerButton('bus')}
-              {gameState.gameMode === 'custom' && renderTowerButton('target')}
+                  <div className="flex items-center gap-2.5 px-3 py-3 rounded-lg border border-gray-800 bg-gray-900/50 w-full">
+                    <div className="text-blue-400 shrink-0"><Cable size={22} /></div>
+                    <div className="flex flex-col items-start min-w-0">
+                      <span className="text-sm font-bold text-gray-200 leading-tight">{i.wires}</span>
+                      <span className="text-xs text-blue-400 font-mono leading-tight">{gameState.gameMode === 'custom' ? '\u221E' : `x${gameState.wireInventory}`}</span>
+                    </div>
+                  </div>
 
-              <div className="flex items-center gap-2.5 px-3 py-3 rounded-lg border border-gray-800 bg-gray-900/50 w-full">
-                <div className="text-blue-400 shrink-0"><Cable size={22} /></div>
-                <div className="flex flex-col items-start min-w-0">
-                  <span className="text-sm font-bold text-gray-200 leading-tight">{i.wires}</span>
-                  <span className="text-xs text-blue-400 font-mono leading-tight">{gameState.gameMode === 'custom' ? '\u221E' : `x${gameState.wireInventory}`}</span>
+                  <div className="mt-2 text-xs text-gray-600 px-1 py-1 leading-relaxed">
+                    <p>{i.clickToRotate}</p>
+                    <p>{i.dragToWire}</p>
+                  </div>
                 </div>
               </div>
+            )}
+          </>
+        ) : (
+          /* Desktop: original sidebar */
+          <div className="relative shrink-0 flex">
+            {/* Toggle button */}
+            <button
+              onClick={() => setSidebarOpen(v => !v)}
+              className="absolute -left-9 top-1/2 -translate-y-1/2 z-10 w-9 h-16 bg-gray-800 hover:bg-gray-700 border border-gray-700 border-r-0 rounded-l-lg flex items-center justify-center text-gray-400 hover:text-white transition-colors"
+              title={sidebarOpen ? i.hidePanel : i.showPanel}
+            >
+              {sidebarOpen ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+            </button>
 
-              <div className="mt-4 text-xs text-gray-600 px-1 py-2 leading-relaxed">
-                <p>{i.clickToRotate}</p>
-                <p>{i.dragToWire}</p>
+            {/* Right Build Panel — Inventory based */}
+            <div
+              className={`bg-gray-900/80 border-l border-gray-800 p-3.5 flex flex-col gap-2.5 overflow-y-auto overflow-x-hidden transition-all duration-300 ease-in-out ${
+                sidebarOpen ? 'w-[260px] opacity-100' : 'w-0 opacity-0 p-0 border-l-0'
+              } ${tutorialStep === 3 || tutorialStep === 4 ? 'shadow-[0_0_20px_rgba(6,182,212,0.4),inset_0_0_20px_rgba(6,182,212,0.15)] border-l-cyan-500/50' : ''}`}
+            >
+              <div className="min-w-[236px] flex flex-col h-full">
+                <div className="text-xs font-bold uppercase tracking-widest text-gray-500 px-1 py-1.5">
+                  {i.inventory}
+                </div>
+                {renderTowerButton('blaster')}
+                {renderTowerButton('gatling')}
+                {renderTowerButton('sniper')}
+                {renderTowerButton('tesla')}
+                {renderTowerButton('generator')}
+                {renderTowerButton('shield')}
+                {renderTowerButton('battery')}
+                {renderTowerButton('bus')}
+                {gameState.gameMode === 'custom' && renderTowerButton('target')}
+
+                <div className="flex items-center gap-2.5 px-3 py-3 rounded-lg border border-gray-800 bg-gray-900/50 w-full">
+                  <div className="text-blue-400 shrink-0"><Cable size={22} /></div>
+                  <div className="flex flex-col items-start min-w-0">
+                    <span className="text-sm font-bold text-gray-200 leading-tight">{i.wires}</span>
+                    <span className="text-xs text-blue-400 font-mono leading-tight">{gameState.gameMode === 'custom' ? '\u221E' : `x${gameState.wireInventory}`}</span>
+                  </div>
+                </div>
+
+                <div className="mt-4 text-xs text-gray-600 px-1 py-2 leading-relaxed">
+                  <p>{i.clickToRotate}</p>
+                  <p>{i.dragToWire}</p>
+                </div>
+
               </div>
-
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Machine codex modal */}
       {codexTower && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/55 backdrop-blur-sm"
+          className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 bg-black/55 backdrop-blur-sm"
           onClick={() => setCodexTower(null)}
           role="presentation"
         >

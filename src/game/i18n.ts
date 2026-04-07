@@ -73,6 +73,9 @@ export interface I18nStrings {
   codexButton: string;
   towerCodex: Record<string, string>;
 
+  // Controls guide (top-left overlay)
+  controlsGuide: string[];
+
   // Pick labels (may differ from tower names, e.g. "Blaster x2")
   pickLabel: Record<string, string>;
   // Pick descriptions
@@ -191,6 +194,17 @@ const en: I18nStrings = {
     target:
       'Role: training dummy in Custom Mode.\n\nTurrets treat it as an enemy, so you can test ranges, rotation, and damage without waves.\n\nTips: place in open space, wire your test turrets, and observe firing behavior; remove or reposition as needed.',
   },
+
+  controlsGuide: [
+    'ESC — Cancel current action',
+    'Left Click — Select / Place tower',
+    'Left Drag — Pan the map',
+    'Left Click Tower — Rotate tower',
+    'Q — Quick rotate selected tower',
+    'Right Click — Delete wire / tower',
+    'Scroll — Zoom in / out',
+    'Drag Port → Port — Connect wire',
+  ],
 
   pickLabel: {
     'blaster_1': 'Blaster',
@@ -333,6 +347,17 @@ const zh: I18nStrings = {
     target:
       '定位：自定义模式下的练习靶。\n\n炮塔会把它当作敌人攻击，可在没有波次时测试射程、旋转与伤害。\n\n用法建议：空地放置靶标，接好测试炮塔的线缆，观察开火行为；随时可挪位重测。',
   },
+
+  controlsGuide: [
+    'ESC — 取消当前操作',
+    '左键点击 — 选中 / 放置设备',
+    '左键拖拽 — 平移地图',
+    '左键点击已放置设备 — 旋转设备',
+    'Q — 快速旋转选中设备',
+    '右键 — 删除线缆 / 设备',
+    '滚轮 — 缩放地图',
+    '拖拽端口→端口 — 连接线缆',
+  ],
 
   pickLabel: {
     'blaster_1': '加农炮',

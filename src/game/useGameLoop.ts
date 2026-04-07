@@ -148,12 +148,32 @@ export const useGameLoop = () => {
   const updateRotating = (id: string | null) => { rotatingRef.current = id; setRotatingTowerId(id); };
 
   // ── Actions ─────────────────────────────────────────────────────────────
+
+  /** Center camera on the core tower using the actual viewport size */
+  const centerOnCore = (state: GameState) => {
+    const core = state.towers.find(tw => tw.type === 'core');
+    if (!core) return;
+    const vp = viewportRef.current;
+    const cam = cameraRef.current;
+    // Core center in world pixels
+    const cx = (core.x + core.width / 2) * CELL_SIZE;
+    const cy = (core.y + core.height / 2) * CELL_SIZE;
+    // Recalculate zoom from actual viewport
+    const minZoom = getMinZoom();
+    cam.zoom = Math.max(minZoom, Math.min(MAX_ZOOM, 1.0));
+    // Position camera so core is centered
+    cam.x = cx - (vp.width / cam.zoom) / 2;
+    cam.y = cy - (vp.height / cam.zoom) / 2;
+    clampCamera(cam);
+  };
+
   const startGame = () => {
     const s = createInitialState();
     s.status = 'pick';
     s.gameMode = 'normal';
     s.pickOptions = generatePickOptions();
     stateRef.current = s;
+    centerOnCore(s);
     sync();
   };
 
@@ -164,6 +184,7 @@ export const useGameLoop = () => {
     s.wireInventory = Infinity;
     s.needsPick = false;
     stateRef.current = s;
+    centerOnCore(s);
     sync();
   };
 
@@ -179,6 +200,7 @@ export const useGameLoop = () => {
     s.status = 'menu';
     stateRef.current = s;
     setSelectedTower(null);
+    centerOnCore(s);
     sync();
   };
 
@@ -572,6 +594,339 @@ export const useGameLoop = () => {
 
   const handleCanvasContextMenu = (e: React.MouseEvent<HTMLCanvasElement>) => {
     e.preventDefault();
+  };
+
+  // ── Touch support ────────────────────────────────────────────────────────
+  const lastPinchDistRef = useRef<number | null>(null);
+
+  const touchScreenXY = (touch: React.Touch) => {
+    const r = canvasRef.current?.getBoundingClientRect();
+    return r ? { sx: touch.clientX - r.left, sy: touch.clientY - r.top } : null;
+  };
+
+  const handleCanvasTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    if (e.touches.length === 2) {
+      // Start pinch zoom
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      lastPinchDistRef.current = Math.hypot(dx, dy);
+      isPanningRef.current = false;
+      return;
+    }
+    if (e.touches.length !== 1) return;
+    const touch = e.touches[0];
+    const spos = touchScreenXY(touch);
+    if (!spos) return;
+    const { sx, sy } = spos;
+    const state = stateRef.current;
+
+    if (state.status !== 'playing') {
+      // Just start panning outside of playing state
+      isPanningRef.current = true;
+      panLastRef.current = { x: sx, y: sy };
+      return;
+    }
+    const { wx, wy } = toWorld(sx, sy);
+    mouseDownPosRef.current = { x: wx, y: wy };
+
+    // Rotation knob check
+    if (rotatingRef.current) {
+      const tower = state.towerMap.get(rotatingRef.current);
+      if (tower) {
+        const cx = (tower.x + tower.width / 2) * CELL_SIZE;
+        const cy = (tower.y + tower.height / 2) * CELL_SIZE;
+        const kd = Math.max(tower.width, tower.height) * CELL_SIZE / 2 + 20;
+        const kx = cx + Math.cos(tower.rotation - Math.PI / 2) * kd;
+        const ky = cy + Math.sin(tower.rotation - Math.PI / 2) * kd;
+        if (Math.hypot(wx - kx, wy - ky) < 20) {
+          rotStartAngleRef.current = 0;
+          isRotKnobRef.current = true;
+          return;
+        }
+      }
+    }
+
+    // Port check
+    for (const tower of state.towers) {
+      for (const port of tower.ports) {
+        const pp = getPortPos(tower, port);
+        if (Math.hypot(pp.x - wx, pp.y - wy) >= 18) continue;
+        const existIdx = state.wires.findIndex(w => w.startPortId === port.id || w.endPortId === port.id);
+        if (existIdx !== -1) {
+          state.wires.splice(existIdx, 1);
+          if (state.gameMode !== 'custom') state.wireInventory++;
+          updatePowerGrid(state);
+          sync();
+        } else if (state.gameMode !== 'custom' && state.wireInventory <= 0) {
+          showToast(t().noWires);
+          return;
+        }
+        dragWireStartRef.current = { towerId: tower.id, portId: port.id };
+        return;
+      }
+    }
+
+    // Tower drag check
+    for (const tower of state.towers) {
+      if (wx >= tower.x * CELL_SIZE && wx <= (tower.x + tower.width) * CELL_SIZE &&
+          wy >= tower.y * CELL_SIZE && wy <= (tower.y + tower.height) * CELL_SIZE) {
+        if (tower.type === 'core') {
+          updateRotating(rotatingRef.current === tower.id ? null : tower.id);
+          return;
+        }
+        dragTowerRef.current = tower.id;
+        dragOrigPosRef.current = { x: tower.x, y: tower.y };
+        const connWires = state.wires.filter(w => w.startTowerId === tower.id || w.endTowerId === tower.id);
+        dragOrigWiresRef.current = connWires.map(w => ({ ...w, path: w.path.map(p => ({ ...p })) }));
+        dragOrigInventoryRef.current = state.wireInventory;
+        return;
+      }
+    }
+
+    // Place tower from inventory
+    const gx = (wx / CELL_SIZE) | 0, gy = (wy / CELL_SIZE) | 0;
+    const sel = selectedTowerRef.current;
+    if (sel && canPlace(gx, gy, sel, state)) {
+      const stats = TOWER_STATS[sel];
+      if (state.gameMode !== 'custom') state.towerInventory[sel]--;
+
+      let ports: Port[];
+      if (sel === 'battery') {
+        ports = [
+          { id: genId(), direction: 'left', portType: 'input' },
+          { id: genId(), direction: 'right', portType: 'output' },
+        ];
+      } else if (sel === 'generator') {
+        ports = generatePorts('output');
+      } else if (sel === 'shield') {
+        const dirs: PortDirection[] = ['top', 'right', 'bottom', 'left'];
+        ports = [{ id: genId(), direction: dirs[(Math.random() * 4) | 0], portType: 'input' }];
+      } else if (sel === 'bus') {
+        ports = [
+          { id: genId(), direction: 'top',    portType: 'input',  sideOffset: 1 / 6 },
+          { id: genId(), direction: 'top',    portType: 'input',  sideOffset: 3 / 6 },
+          { id: genId(), direction: 'top',    portType: 'input',  sideOffset: 5 / 6 },
+          { id: genId(), direction: 'bottom', portType: 'output', sideOffset: 1 / 6 },
+          { id: genId(), direction: 'bottom', portType: 'output', sideOffset: 3 / 6 },
+          { id: genId(), direction: 'bottom', portType: 'output', sideOffset: 5 / 6 },
+        ];
+      } else if (sel === 'blaster' || sel === 'gatling' || sel === 'sniper' || sel === 'tesla') {
+        ports = generatePorts('input');
+      } else {
+        ports = [];
+      }
+
+      const t = {
+        id: genId(), type: sel, x: gx, y: gy,
+        width: stats.width, height: stats.height,
+        hp: stats.hp, maxHp: stats.hp,
+        powered: false, storedPower: 0, maxPower: stats.maxPower, incomingPower: 0,
+        shieldHp: stats.maxShieldHp, maxShieldHp: stats.maxShieldHp, shieldRadius: stats.shieldRadius,
+        lastActionTime: sel === 'shield' ? performance.now() : 0, ports, rotation: 0, barrelAngle: 0, heat: 0,
+      };
+      state.towers.push(t);
+      state.towerMap.set(t.id, t);
+      updatePowerGrid(state);
+      sync();
+      if (state.gameMode !== 'custom' && (state.towerInventory[sel] ?? 0) <= 0) setSelectedTower(null);
+      return;
+    }
+
+    // Empty space: start pan
+    setSelectedTower(null);
+    updateRotating(null);
+    isPanningRef.current = true;
+    panLastRef.current = { x: sx, y: sy };
+  };
+
+  const handleCanvasTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    // Pinch zoom
+    if (e.touches.length === 2 && lastPinchDistRef.current !== null) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const dist = Math.hypot(dx, dy);
+      const cam = cameraRef.current;
+      // Midpoint in screen space
+      const r = canvasRef.current?.getBoundingClientRect();
+      if (r) {
+        const mx = (e.touches[0].clientX + e.touches[1].clientX) / 2 - r.left;
+        const my = (e.touches[0].clientY + e.touches[1].clientY) / 2 - r.top;
+        const wx = mx / cam.zoom + cam.x;
+        const wy = my / cam.zoom + cam.y;
+        const factor = dist / lastPinchDistRef.current;
+        const minZoom = getMinZoom();
+        cam.zoom = Math.max(minZoom, Math.min(MAX_ZOOM, cam.zoom * factor));
+        cam.x = wx - mx / cam.zoom;
+        cam.y = wy - my / cam.zoom;
+        clampCamera(cam);
+      }
+      lastPinchDistRef.current = dist;
+      return;
+    }
+    if (e.touches.length !== 1) return;
+    const touch = e.touches[0];
+    const spos = touchScreenXY(touch);
+    if (!spos) return;
+    const { sx, sy } = spos;
+
+    // Panning
+    if (isPanningRef.current && panLastRef.current) {
+      const cam = cameraRef.current;
+      cam.x -= (sx - panLastRef.current.x) / cam.zoom;
+      cam.y -= (sy - panLastRef.current.y) / cam.zoom;
+      clampCamera(cam);
+      panLastRef.current = { x: sx, y: sy };
+      return;
+    }
+
+    const state = stateRef.current;
+    if (state.status !== 'playing') return;
+    const { wx, wy } = toWorld(sx, sy);
+    mousePxRef.current = { x: wx, y: wy };
+
+    if (isRotKnobRef.current && rotatingRef.current) {
+      const tower = state.towerMap.get(rotatingRef.current);
+      if (tower) {
+        const cx = (tower.x + tower.width / 2) * CELL_SIZE;
+        const cy = (tower.y + tower.height / 2) * CELL_SIZE;
+        tower.rotation = Math.atan2(wy - cy, wx - cx) + Math.PI / 2;
+        sync();
+      }
+      return;
+    }
+
+    const gx = (wx / CELL_SIZE) | 0, gy = (wy / CELL_SIZE) | 0;
+    hoverRef.current = (gx >= 0 && gx < GRID_WIDTH && gy >= 0 && gy < GRID_HEIGHT)
+      ? { x: gx, y: gy } : null;
+
+    if (dragWireStartRef.current) {
+      const dw = dragWireStartRef.current;
+      const st = state.towerMap.get(dw.towerId);
+      const sp = st?.ports.find(p => p.id === dw.portId);
+      if (st && sp) {
+        const sc = getPortCell(st, sp);
+        let endCell = { x: gx, y: gy };
+        for (const tower of state.towers) {
+          for (const port of tower.ports) {
+            const pp = getPortPos(tower, port);
+            if (Math.hypot(pp.x - wx, pp.y - wy) < 20 && tower.id !== st.id) {
+              endCell = getPortCell(tower, port);
+              break;
+            }
+          }
+        }
+        dragWirePathRef.current = findWirePath(sc, endCell, state);
+      }
+    }
+
+    if (dragTowerRef.current) {
+      const tower = state.towerMap.get(dragTowerRef.current);
+      if (!tower) return;
+      const nx = (wx / CELL_SIZE | 0) - (tower.width >> 1);
+      const ny = (wy / CELL_SIZE | 0) - (tower.height >> 1);
+      if (nx < 0 || ny < 0 || nx + tower.width > GRID_WIDTH || ny + tower.height > GRID_HEIGHT) return;
+      if (collidesWithTowers(nx, ny, tower.width, tower.height, state.towers, tower.id)) return;
+      if (collidesWithWires(nx, ny, tower.width, tower.height, state.wires, tower.id)) return;
+      if (tower.x === nx && tower.y === ny) return;
+      tower.x = nx;
+      tower.y = ny;
+      repathConnectedWires(state, tower.id);
+      sync();
+    }
+  };
+
+  const handleCanvasTouchEnd = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    // End pinch
+    if (lastPinchDistRef.current !== null && e.touches.length < 2) {
+      lastPinchDistRef.current = null;
+      return;
+    }
+
+    // End pan
+    if (isPanningRef.current) {
+      isPanningRef.current = false;
+      panLastRef.current = null;
+      return;
+    }
+
+    const state = stateRef.current;
+
+    if (isRotKnobRef.current) {
+      isRotKnobRef.current = false;
+      mouseDownPosRef.current = null;
+      if (rotatingRef.current) {
+        const tower = state.towerMap.get(rotatingRef.current);
+        if (tower) {
+          if (!applyTowerRotation(tower, snapRotation(tower.rotation), snapRotation(rotStartAngleRef.current), state)) {
+            tower.rotation = 0;
+          }
+          sync();
+        }
+      }
+      return;
+    }
+
+    if (dragTowerRef.current) {
+      const dp = mouseDownPosRef.current;
+      const mpx = mousePxRef.current;
+      if (dp && mpx && Math.hypot(mpx.x - dp.x, mpx.y - dp.y) < 5) {
+        updateRotating(rotatingRef.current === dragTowerRef.current ? null : dragTowerRef.current);
+      }
+      dragTowerRef.current = null;
+      dragOrigPosRef.current = null;
+      dragOrigWiresRef.current = null;
+    } else if (!dragWireStartRef.current) {
+      // no-op
+    }
+
+    if (dragWireStartRef.current && mousePxRef.current) {
+      const dw = dragWireStartRef.current;
+      const mx = mousePxRef.current;
+      let dropPort: Port | null = null, dropTowerId: string | null = null;
+
+      for (const tower of state.towers) {
+        for (const port of tower.ports) {
+          const pp = getPortPos(tower, port);
+          if (Math.hypot(pp.x - mx.x, pp.y - mx.y) < 20) {
+            dropPort = port; dropTowerId = tower.id; break;
+          }
+        }
+        if (dropPort) break;
+      }
+
+      if (dropPort && dropTowerId && dropTowerId !== dw.towerId) {
+        const isUsed = state.wires.some(w => w.startPortId === dropPort!.id || w.endPortId === dropPort!.id);
+        if (!isUsed) {
+          const srcT = state.towerMap.get(dw.towerId);
+          const srcP = srcT?.ports.find(p => p.id === dw.portId);
+          if (srcT && srcP) {
+            let sT = srcT, sP = srcP, dT = state.towerMap.get(dropTowerId)!, dP = dropPort;
+            if (srcP.portType === 'input' && dropPort.portType === 'output') {
+              [sT, sP, dT, dP] = [dT, dP, sT, sP];
+            } else if (srcP.portType === dropPort.portType) {
+              dragWireStartRef.current = null;
+              dragWirePathRef.current = null;
+              return;
+            }
+            const path = findWirePath(getPortCell(sT, sP), getPortCell(dT, dP), state);
+            if (path) {
+              if (state.gameMode !== 'custom') state.wireInventory--;
+              state.wires.push({
+                id: genId(), startTowerId: sT.id, startPortId: sP.id,
+                endTowerId: dT.id, endPortId: dP.id, path, hp: WIRE_MAX_HP, maxHp: WIRE_MAX_HP,
+              });
+              updatePowerGrid(state);
+              sync();
+            }
+          }
+        }
+      }
+      dragWireStartRef.current = null;
+      dragWirePathRef.current = null;
+    }
   };
 
   // ── Game loop ──────────────────────────────────────────────────────────
@@ -1161,6 +1516,8 @@ export const useGameLoop = () => {
     };
 
     updateCanvasSize();
+    // Center on core after first measurement so all devices start with the same view
+    centerOnCore(stateRef.current);
     const ro = new ResizeObserver(updateCanvasSize);
     ro.observe(canvas);
     window.addEventListener('resize', updateCanvasSize);
@@ -1233,5 +1590,6 @@ export const useGameLoop = () => {
     selectedTower, setSelectedTower, skipToNextWave, toastMessage,
     handleCanvasMouseDown, handleCanvasMouseMove, handleCanvasMouseUp, handleCanvasMouseLeave,
     handleCanvasWheel, handleCanvasContextMenu,
+    handleCanvasTouchStart, handleCanvasTouchMove, handleCanvasTouchEnd,
   };
 };
