@@ -1007,27 +1007,6 @@ function drawTowerDetails(
     ctx.strokeStyle = tColor; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.arc(cx, cy, R / 3 - 2, 0, TWO_PI); ctx.stroke();
     ctx.beginPath(); ctx.arc(cx, cy, R / 5, 0, TWO_PI); ctx.stroke();
-
-    const gs = 3;
-    const margin = Math.max(15, R * 0.125);
-    const inner = R - inset * 2 - margin * 2;
-    const gap = Math.max(2.5, inner * 0.065);
-    const cell = (inner - gap * (gs - 1)) / gs;
-    const tot = gs * cell + (gs - 1) * gap;
-    const sx = cx - tot / 2, sy = cy - tot / 2;
-
-    for (let row = 0; row < gs; row++) for (let col = 0; col < gs; col++) {
-      const idx = row * gs + col;
-      const x = sx + col * (cell + gap);
-      const y = sy + row * (cell + gap);
-      if (idx < t.storedPower) {
-        ctx.fillStyle = POWER_ON; ctx.shadowColor = POWER_ON; ctx.shadowBlur = 4;
-      } else {
-        ctx.fillStyle = POWER_OFF; ctx.shadowBlur = 0;
-      }
-      ctx.fillRect(x, y, cell, cell);
-      ctx.shadowBlur = 0;
-    }
   } else if (t.type === 'blaster') {
     const r = Math.min(tw, th) / 5;
     const hs = r * 0.9;

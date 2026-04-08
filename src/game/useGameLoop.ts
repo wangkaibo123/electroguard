@@ -591,7 +591,7 @@ export const useGameLoop = () => {
         state.powerTimer -= POWER_INTERVAL;
         for (const t of state.towers) {
           if (t.type === 'core' || (t.type === 'generator' && t.powered)) {
-            if (!dispatchPulse(state, t) && t.storedPower < t.maxPower) t.storedPower++;
+            dispatchPulse(state, t);
             changed = true;
           }
         }
@@ -621,10 +621,6 @@ export const useGameLoop = () => {
           if (!t.powered || t.storedPower <= 0) continue;
           if (now - t.lastActionTime <= BATTERY_INTERVAL) continue;
           if (dispatchPulse(state, t, true)) { t.storedPower--; t.lastActionTime = now; changed = true; }
-        } else if (t.type === 'core') {
-          if (t.storedPower <= 0) continue;
-          if (now - t.lastActionTime <= BATTERY_INTERVAL) continue;
-          if (dispatchPulse(state, t)) { t.storedPower--; t.lastActionTime = now; changed = true; }
         }
       }
 

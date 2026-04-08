@@ -69,7 +69,7 @@ export const TOWER_CONFIG: Record<TowerType, {
   shieldRadius: number;
 }> = {
   /* 核心：玩家基地，被摧毁即失败 */
-  core:      { hp: 1000, description: 'The heart of your defense. Generates power.',                color: '#93c5fd', width: 5, height: 5, maxPower: 9, maxShieldHp: 500, shieldRadius: 240 },
+  core:      { hp: 1000, description: 'The heart of your defense. Generates power.',                color: '#93c5fd', width: 5, height: 5, maxPower: 0, maxShieldHp: 500, shieldRadius: 240 },
   /* 爆破炮：每次消耗 2 电力发射追踪弹 */
   blaster:   { hp: 100,  description: 'Fires a bullet per 2 power. Reliable turret.',              color: '#f87171', width: 3, height: 3, maxPower: 2, maxShieldHp: 0,   shieldRadius: 0 },
   /* 加特林：热量驱动的连射炮塔，越打越快 */
