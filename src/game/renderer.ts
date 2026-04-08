@@ -1265,36 +1265,58 @@ function drawTowerDetails(
     ctx.beginPath(); ctx.arc(cx, cy, r, -Math.PI * 0.8, Math.PI * 0.8); ctx.stroke();
     ctx.beginPath(); ctx.arc(cx, cy, r * 0.5, 0, TWO_PI); ctx.stroke();
   } else if (t.type === 'bus') {
-    // Bus 3×2: 3 inputs on top long edge, 3 outputs on bottom long edge
+    // Bus: 3 inputs on one long edge, 3 outputs on opposite long edge
+    // Support both landscape (3×2) and portrait (2×3) orientations
+    const isLandscape = tw >= th;
     ctx.strokeStyle = tColor; ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.moveTo(cx, py + inset + 2);
-    ctx.lineTo(cx, py + th - inset - 2);
+    if (isLandscape) {
+      ctx.moveTo(cx, py + inset + 2);
+      ctx.lineTo(cx, py + th - inset - 2);
+    } else {
+      ctx.moveTo(px + inset + 2, cy);
+      ctx.lineTo(px + tw - inset - 2, cy);
+    }
     ctx.stroke();
     for (let i = 0; i < 3; i++) {
-      const sx = px + tw * ((i * 2 + 1) / 6);
+      const tPos = isLandscape
+        ? { x: px + tw * ((i * 2 + 1) / 6), y: py + inset }
+        : { x: px + inset, y: py + th * ((i * 2 + 1) / 6) };
       ctx.strokeStyle = '#60a5fa'; ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(sx, py + inset);
+      ctx.moveTo(tPos.x, tPos.y);
       ctx.lineTo(cx, cy);
       ctx.stroke();
       ctx.fillStyle = '#60a5fa';
       ctx.beginPath();
-      ctx.arc(sx, py + inset + 2, 2, 0, TWO_PI);
+      if (isLandscape) {
+        ctx.arc(tPos.x, tPos.y + 2, 2, 0, TWO_PI);
+      } else {
+        ctx.arc(tPos.x + 2, tPos.y, 2, 0, TWO_PI);
+      }
       ctx.fill();
     }
     for (let i = 0; i < 3; i++) {
-      const sx = px + tw * ((i * 2 + 1) / 6);
+      const tPos = isLandscape
+        ? { x: px + tw * ((i * 2 + 1) / 6), y: py + th - inset }
+        : { x: px + tw - inset, y: py + th * ((i * 2 + 1) / 6) };
       ctx.strokeStyle = '#fbbf24'; ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(cx, cy);
-      ctx.lineTo(sx, py + th - inset);
+      ctx.lineTo(tPos.x, tPos.y);
       ctx.stroke();
       ctx.fillStyle = '#fbbf24';
-      const tipY = py + th - inset - 2;
-      ctx.beginPath();
-      ctx.moveTo(sx, tipY + 4); ctx.lineTo(sx - 3, tipY); ctx.lineTo(sx + 3, tipY); ctx.closePath();
-      ctx.fill();
+      if (isLandscape) {
+        const tipY = tPos.y - 2;
+        ctx.beginPath();
+        ctx.moveTo(tPos.x, tipY + 4); ctx.lineTo(tPos.x - 3, tipY); ctx.lineTo(tPos.x + 3, tipY); ctx.closePath();
+        ctx.fill();
+      } else {
+        const tipX = tPos.x - 2;
+        ctx.beginPath();
+        ctx.moveTo(tipX + 4, tPos.y); ctx.lineTo(tipX, tPos.y - 3); ctx.lineTo(tipX, tPos.y + 3); ctx.closePath();
+        ctx.fill();
+      }
     }
     ctx.fillStyle = tColor;
     ctx.beginPath(); ctx.arc(cx, cy, 3, 0, TWO_PI); ctx.fill();
