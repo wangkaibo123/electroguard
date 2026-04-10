@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Battery, Zap, Crosshair, Activity, Play, RotateCcw, Pause, Hexagon, Cable, Wrench, ChevronRight, ChevronLeft, Flame, Focus, Radio, GitMerge, Globe, LogOut, BookOpen, X, Keyboard, Menu } from 'lucide-react';
+import { Battery, Zap, Crosshair, Activity, Play, RotateCcw, Pause, Hexagon, Cable, Wrench, ChevronRight, ChevronLeft, Flame, Focus, Radio, GitMerge, Globe, LogOut, BookOpen, X, Keyboard, Menu, Eye, EyeOff } from 'lucide-react';
 import { useGameLoop } from './game/useGameLoop';
 import { TOWER_STATS, TowerType, PickOption, EnemyType } from './game/types';
 import { t, getLocale, setLocale, Locale } from './game/i18n';
@@ -109,6 +109,7 @@ export default function App() {
   const [tipIndex, setTipIndex] = useState(0);
   const [tipHidden, setTipHidden] = useState(false);
   const [controlsHidden, setControlsHidden] = useState(() => window.innerWidth < 768);
+  const [pickOverlayHidden, setPickOverlayHidden] = useState(false);
   useEffect(() => {
     const id = setInterval(() => {
       setTipIndex(prev => (prev + 1) % TIPS_CONFIG.tips.length);
@@ -126,6 +127,10 @@ export default function App() {
     startGame();
     try { if (localStorage.getItem('electroguard_tutorial_done') !== '1') setTutorialStep(0); } catch {}
   };
+
+  useEffect(() => {
+    if (gameState.status !== 'pick' && pickOverlayHidden) setPickOverlayHidden(false);
+  }, [gameState.status, pickOverlayHidden]);
 
   useEffect(() => {
     if (gameState.status === 'menu' || gameState.status === 'gameover') {
@@ -439,7 +444,20 @@ export default function App() {
 
             {/* Pick Overlay (Roguelike 3-choice) */}
             {gameState.status === 'pick' && (
-              <div className="absolute inset-0 bg-gray-950/85 backdrop-blur-sm flex flex-col items-center justify-center p-4 sm:p-8 text-center overflow-y-auto">
+              <div className={`absolute inset-0 ${pickOverlayHidden ? 'pointer-events-none' : ''}`}>
+                <div className="absolute top-3 right-3 z-20 pointer-events-auto">
+                  <button
+                    type="button"
+                    onClick={() => setPickOverlayHidden(v => !v)}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-700 bg-gray-950/80 backdrop-blur-sm text-gray-200 hover:bg-gray-900 transition-colors text-xs font-bold"
+                    title={pickOverlayHidden ? i.showPanel : i.hidePanel}
+                  >
+                    {pickOverlayHidden ? <Eye size={14} /> : <EyeOff size={14} />}
+                    <span>{pickOverlayHidden ? '显示三选一' : '查看战场'}</span>
+                  </button>
+                </div>
+                {!pickOverlayHidden && (
+                <div className="absolute inset-0 bg-gray-950/85 backdrop-blur-sm flex flex-col items-center justify-center p-4 sm:p-8 text-center overflow-y-auto">
                 {gameState.pickUiPhase === 'boss_bonus' ? (
                   <>
                     <h2 className="text-2xl sm:text-3xl font-black mb-1 text-amber-400 tracking-tight">{i.bossBonusPickTitle}</h2>
@@ -512,7 +530,9 @@ export default function App() {
                       </div>
                     );
                   })}
-                </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

@@ -2,7 +2,7 @@ import { GameState, TowerType, CELL_SIZE, CANVAS_WIDTH, CANVAS_HEIGHT, Camera } 
 import { BG_DARK, BG_MID, BG_GRID, MAP_BORDER } from './render/constants';
 import { updateAndDrawDecorations } from './render/decorations';
 import {
-  drawPorts, drawTowers, drawPlacementPreview, drawRangePreview,
+  drawOccupiedGround, drawPorts, drawTowers, drawPlacementPreview, drawRangePreview,
   drawRotationKnob, drawDraggedTowerFootprint,
 } from './render/towers';
 import { drawEnemies, drawEnemyPreview } from './render/enemies';
@@ -69,6 +69,7 @@ export const renderGame = (
   ctx.fillRect(0, 0, borderW, CANVAS_HEIGHT);
   ctx.fillRect(CANVAS_WIDTH - borderW, 0, borderW, CANVAS_HEIGHT);
 
+  drawOccupiedGround(ctx, state);
   drawWires(ctx, state);
   drawDraggedWire(ctx, state, draggedWireStart, mouseWorldPos, draggedWirePath);
   drawPulses(ctx, state, now);

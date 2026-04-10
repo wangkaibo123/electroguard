@@ -38,6 +38,93 @@ const getLinearTowerBodyRect = (
 
 const ROTATION_KNOB_SCALE = 4 / 3;
 const ROTATION_KNOB_BASE_OFFSET = 20;
+const TOWER_BAR_SHOW_MS = 1800;
+const TOWER_BAR_FADE_MS = 700;
+const ENERGY_EFFECT_SIZE = CELL_SIZE * 0.5;
+
+export const drawOccupiedGround = (ctx: CanvasRenderingContext2D, state: GameState) => {
+  for (const tower of state.towers) {
+    const px = tower.x * CELL_SIZE;
+    const py = tower.y * CELL_SIZE;
+    const tw = tower.width * CELL_SIZE;
+    const th = tower.height * CELL_SIZE;
+    const radius = tower.type === 'core' ? 18 : 12;
+
+    ctx.fillStyle = tower.type === 'core' ? 'rgba(20,30,48,0.92)' : 'rgba(14,22,36,0.9)';
+    ctx.beginPath();
+    ctx.roundRect(px + 1, py + 1, tw - 2, th - 2, radius);
+    ctx.fill();
+
+    ctx.strokeStyle = tower.type === 'core' ? 'rgba(96,165,250,0.14)' : 'rgba(148,163,184,0.08)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(px + 1.5, py + 1.5, tw - 3, th - 3, radius);
+    ctx.stroke();
+  }
+};
+
+const drawEnergyEffect = (
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  now: number,
+  powered: boolean,
+  color: string,
+) => {
+  const s = ENERGY_EFFECT_SIZE;
+
+  ctx.lineWidth = 1.5;
+  const arcCount = 3;
+  for (let i = 0; i < arcCount; i++) {
+    const baseAngle = (i / arcCount) * TWO_PI + now / 800;
+    const arcR = s * 1.2 + Math.sin(now / 400 + i * 2) * 2;
+    const arcOp = powered ? (0.2 + 0.25 * Math.sin(now / 300 + i * 1.5)) : 0.08;
+    ctx.strokeStyle = `rgba(251,191,36,${arcOp})`;
+    ctx.beginPath();
+    ctx.arc(cx, cy, arcR, baseAngle, baseAngle + Math.PI * 0.5);
+    ctx.stroke();
+  }
+
+  if (powered) {
+    const pulse = 0.08 + 0.07 * Math.sin(now / 250);
+    const glowR = s * 1.5;
+    const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, glowR);
+    grd.addColorStop(0, `rgba(251,191,36,${pulse})`);
+    grd.addColorStop(1, 'rgba(251,191,36,0)');
+    ctx.fillStyle = grd;
+    ctx.beginPath();
+    ctx.arc(cx, cy, glowR, 0, TWO_PI);
+    ctx.fill();
+  }
+
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(cx + s * 0.1, cy - s);
+  ctx.lineTo(cx - s * 0.4, cy + s * 0.1);
+  ctx.lineTo(cx + s * 0.1, cy + s * 0.1);
+  ctx.lineTo(cx - s * 0.1, cy + s);
+  ctx.stroke();
+
+  if (powered) {
+    ctx.lineWidth = 1;
+    for (let sp = 0; sp < 4; sp++) {
+      const spAngle = (sp / 4) * TWO_PI + now / 600;
+      const spDist = s * (0.6 + 0.6 * ((now / 500 + sp * 0.25) % 1));
+      const spOp = 0.6 * (1 - ((now / 500 + sp * 0.25) % 1));
+      if (spOp < 0.05) continue;
+      const spx = cx + Math.cos(spAngle) * spDist;
+      const spy = cy + Math.sin(spAngle) * spDist;
+      ctx.strokeStyle = `rgba(251,191,36,${spOp})`;
+      ctx.beginPath();
+      const jx = Math.sin(now / 100 + sp) * 2;
+      const jy = Math.cos(now / 100 + sp) * 2;
+      ctx.moveTo(spx - 2 + jx, spy - 2 + jy);
+      ctx.lineTo(spx + 2 - jx, spy + 2 - jy);
+      ctx.stroke();
+    }
+  }
+};
 
 export const getRotationKnobLayout = (tower: Tower) => {
   const tpx = tower.x * CELL_SIZE;
@@ -239,8 +326,17 @@ export const drawTowers = (ctx: CanvasRenderingContext2D, state: GameState, now:
 
     // Bars (not rotated) — shield bar removed, shield uses fade visualization
     if (tower.hp < tower.maxHp) {
-      ctx.fillStyle = HP_BG; ctx.fillRect(px, py - 5, tw, 3);
-      ctx.fillStyle = HP_FG; ctx.fillRect(px, py - 5, tw * (tower.hp / tower.maxHp), 3);
+      const elapsed = now - tower.lastDamagedAt;
+      const fadeRatio = elapsed <= TOWER_BAR_SHOW_MS
+        ? 1
+        : Math.max(0, 1 - (elapsed - TOWER_BAR_SHOW_MS) / TOWER_BAR_FADE_MS);
+      if (fadeRatio > 0) {
+        ctx.save();
+        ctx.globalAlpha = fadeRatio;
+        ctx.fillStyle = HP_BG; ctx.fillRect(px, py - 5, tw, 3);
+        ctx.fillStyle = HP_FG; ctx.fillRect(px, py - 5, tw * (tower.hp / tower.maxHp), 3);
+        ctx.restore();
+      }
     }
     if (tower.maxPower > 0 && tower.type !== 'core' && tower.type !== 'battery' && tower.type !== 'blaster' && tower.type !== 'gatling' && tower.type !== 'sniper' && tower.type !== 'tesla') {
       const pr = Math.min(tw, th) / 3;
@@ -423,6 +519,7 @@ function drawTowerDetails(
 ) {
   if (t.type === 'core') {
     const R = Math.min(tw, th);
+    drawEnergyEffect(ctx, cx, cy, now, t.powered, tColor);
     ctx.strokeStyle = tColor; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.arc(cx, cy, R / 3 - 2, 0, TWO_PI); ctx.stroke();
     ctx.beginPath(); ctx.arc(cx, cy, R / 5, 0, TWO_PI); ctx.stroke();
@@ -699,58 +796,7 @@ function drawTowerDetails(
       drawMuzzleFlash(ctx, cx, cy, 0, tFlashT / FLASH_DUR_TESLA, tColor, '232,121,249', 14, false, t.lastActionTime);
     }
   } else if (t.type === 'generator') {
-    const s = Math.min(tw, th) * 0.25;
-
-    // Rotating energy arcs
-    ctx.lineWidth = 1.5;
-    const arcCount = 3;
-    for (let i = 0; i < arcCount; i++) {
-      const baseAngle = (i / arcCount) * TWO_PI + now / 800;
-      const arcR = s * 1.2 + Math.sin(now / 400 + i * 2) * 2;
-      const arcOp = t.powered ? (0.2 + 0.25 * Math.sin(now / 300 + i * 1.5)) : 0.08;
-      ctx.strokeStyle = `rgba(251,191,36,${arcOp})`;
-      ctx.beginPath();
-      ctx.arc(cx, cy, arcR, baseAngle, baseAngle + Math.PI * 0.5);
-      ctx.stroke();
-    }
-
-    // Pulsing center glow
-    if (t.powered) {
-      const pulse = 0.08 + 0.07 * Math.sin(now / 250);
-      const glowR = s * 1.5;
-      const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, glowR);
-      grd.addColorStop(0, `rgba(251,191,36,${pulse})`);
-      grd.addColorStop(1, 'rgba(251,191,36,0)');
-      ctx.fillStyle = grd;
-      ctx.beginPath(); ctx.arc(cx, cy, glowR, 0, TWO_PI); ctx.fill();
-    }
-
-    // Lightning bolt icon
-    ctx.strokeStyle = tColor; ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(cx + s * 0.1, cy - s); ctx.lineTo(cx - s * 0.4, cy + s * 0.1);
-    ctx.lineTo(cx + s * 0.1, cy + s * 0.1); ctx.lineTo(cx - s * 0.1, cy + s);
-    ctx.stroke();
-
-    // Small electric sparks flying outward when powered
-    if (t.powered) {
-      ctx.lineWidth = 1;
-      for (let sp = 0; sp < 4; sp++) {
-        const spAngle = (sp / 4) * TWO_PI + now / 600;
-        const spDist = s * (0.6 + 0.6 * ((now / 500 + sp * 0.25) % 1));
-        const spOp = 0.6 * (1 - ((now / 500 + sp * 0.25) % 1));
-        if (spOp < 0.05) continue;
-        const spx = cx + Math.cos(spAngle) * spDist;
-        const spy = cy + Math.sin(spAngle) * spDist;
-        ctx.strokeStyle = `rgba(251,191,36,${spOp})`;
-        ctx.beginPath();
-        const jx = (Math.sin(now / 100 + sp) * 2);
-        const jy = (Math.cos(now / 100 + sp) * 2);
-        ctx.moveTo(spx - 2 + jx, spy - 2 + jy);
-        ctx.lineTo(spx + 2 - jx, spy + 2 - jy);
-        ctx.stroke();
-      }
-    }
+    drawEnergyEffect(ctx, cx, cy, now, t.powered, tColor);
   } else if (t.type === 'battery') {
     const isLandscape = tw >= th;
     const cc = t.maxPower;

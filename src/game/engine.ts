@@ -322,6 +322,7 @@ export const createInitialState = (): GameState => {
     shieldHp: TOWER_STATS.core.maxShieldHp, maxShieldHp: TOWER_STATS.core.maxShieldHp,
     shieldRadius: TOWER_STATS.core.shieldRadius,
     lastActionTime: 0,
+    lastDamagedAt: 0,
     ports: PORT_DIRS.map(d => ({ id: genId(), direction: d, portType: 'output' as PortType })),
     rotation: 0,
     barrelAngle: 0,

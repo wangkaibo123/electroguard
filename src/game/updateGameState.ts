@@ -656,6 +656,7 @@ const updateEnemyState = (state: GameState, dt: number, now: number) => {
       }
     } else {
       targetTower.hp -= enemy.damage;
+      targetTower.lastDamagedAt = now;
       state.hitEffects.push({ x: targetPos.x, y: targetPos.y, life: 0, maxLife: 0.3, color: '#ef4444', radius: 14 });
       createExplosion(state, targetPos.x, targetPos.y, '#f87171', 4);
 

@@ -67,6 +67,7 @@ export interface Tower {
   maxShieldHp: number;
   shieldRadius: number;
   lastActionTime: number;
+  lastDamagedAt: number;
   ports: Port[];
   rotation: number;
   barrelAngle: number;

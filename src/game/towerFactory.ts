@@ -64,6 +64,7 @@ export const createTowerAt = (type: TowerType, x: number, y: number): Tower => {
     maxShieldHp: stats.maxShieldHp,
     shieldRadius: stats.shieldRadius,
     lastActionTime: type === 'shield' ? performance.now() : 0,
+    lastDamagedAt: 0,
     ports: createTowerPorts(type),
     rotation: 0,
     barrelAngle: 0,
