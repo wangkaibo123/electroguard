@@ -342,7 +342,13 @@ export default function App() {
                     return (
                       <div key={opt.id} className="w-full max-w-[200px] sm:w-44 flex flex-col gap-2">
                         <button
-                          onClick={() => handlePick(opt.id)}
+                          onClick={e => {
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            handlePick(opt.id, {
+                              x: rect.left + rect.width / 2,
+                              y: rect.top + rect.height / 2,
+                            });
+                          }}
                           className="group w-full p-4 sm:p-5 rounded-xl border-2 border-gray-700 bg-gray-900/95 hover:bg-gray-800/95 transition-all flex flex-row sm:flex-col items-center text-center gap-3 hover:scale-105 hover:shadow-lg active:scale-95"
                           style={{ '--pick-color': color } as React.CSSProperties}
                           onMouseEnter={e => (e.currentTarget.style.borderColor = color)}

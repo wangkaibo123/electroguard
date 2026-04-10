@@ -280,9 +280,10 @@ export const createInitialState = (): GameState => {
     towerInventory: { ...STARTING_INVENTORY.towers },
     pickOptions: [],
     bossBonusPickQueued: false,
+    pendingBossBonusPick: false,
     pickUiPhase: 'standard' satisfies PickUiPhase,
     needsPick: true,
-    towers: [core], wires: [], pulses: [], enemies: [], projectiles: [], chainLightnings: [], particles: [], hitEffects: [], shieldBreakEffects: [],
+    towers: [core], wires: [], pulses: [], enemies: [], projectiles: [], chainLightnings: [], particles: [], hitEffects: [], shieldBreakEffects: [], incomingDrops: [],
     waveTimer: 0, enemiesToSpawn: 0, spawnTimer: 0, score: 0, towerMap,
   };
 };

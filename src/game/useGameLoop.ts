@@ -167,9 +167,17 @@ export const useGameLoop = () => {
     clampCamera(cam);
   };
 
-  const canPlaceTowerAt = (state: GameState, type: TowerType, x: number, y: number) => {
+  const canPlaceTowerAt = (state: GameState, type: TowerType, x: number, y: number, ignoreDropId?: string) => {
     const stats = TOWER_STATS[type];
     if (x < 0 || y < 0 || x + stats.width > GRID_WIDTH || y + stats.height > GRID_HEIGHT) return false;
+    for (const drop of state.incomingDrops) {
+      if (drop.id === ignoreDropId) continue;
+      const dropStats = TOWER_STATS[drop.towerType];
+      if (x < drop.targetGridX + dropStats.width && x + stats.width > drop.targetGridX
+        && y < drop.targetGridY + dropStats.height && y + stats.height > drop.targetGridY) {
+        return false;
+      }
+    }
     return !collidesWithTowers(x, y, stats.width, stats.height, state.towers)
       && !collidesWithWires(x, y, stats.width, stats.height, state.wires);
   };
@@ -242,19 +250,50 @@ export const useGameLoop = () => {
     return candidates[(Math.random() * nearCount) | 0];
   };
 
-  const autoDeployTowerNearCore = (state: GameState, type: TowerType) => {
+  const queueTowerDropNearCore = (
+    state: GameState,
+    type: TowerType,
+    sourceClientPos?: { x: number; y: number },
+  ) => {
     const placement = findAutoPlacementNearCore(state, type);
     if (!placement) return false;
 
-    const tower = createTowerAt(type, placement.x, placement.y);
-    state.towers.push(tower);
-    state.towerMap.set(tower.id, tower);
-    updatePowerGrid(state);
+    const stats = TOWER_STATS[type];
+    const sourceWorld = sourceClientPos ? clientToWorld(sourceClientPos.x, sourceClientPos.y) : null;
+    state.incomingDrops.push({
+      id: genId(),
+      towerType: type,
+      startX: sourceWorld?.wx ?? (placement.x + stats.width / 2) * CELL_SIZE,
+      startY: sourceWorld?.wy ?? -CELL_SIZE * 4,
+      targetGridX: placement.x,
+      targetGridY: placement.y,
+      targetX: (placement.x + stats.width / 2) * CELL_SIZE,
+      targetY: (placement.y + stats.height / 2) * CELL_SIZE,
+      life: 0,
+      duration: 0.55,
+    });
     return true;
+  };
+
+  const deployStartingLoadout = (state: GameState) => {
+    const starterTowers: TowerType[] = ['generator', 'blaster'];
+    let changed = false;
+
+    for (const type of starterTowers) {
+      const placement = findAutoPlacementNearCore(state, type);
+      if (!placement) continue;
+      const tower = createTowerAt(type, placement.x, placement.y);
+      state.towers.push(tower);
+      state.towerMap.set(tower.id, tower);
+      changed = true;
+    }
+
+    if (changed) updatePowerGrid(state);
   };
 
   const startGame = () => {
     const s = createInitialState();
+    deployStartingLoadout(s);
     s.status = 'pick';
     s.gameMode = 'normal';
     s.pickOptions = generatePickOptions();
@@ -265,6 +304,7 @@ export const useGameLoop = () => {
 
   const startCustomGame = () => {
     const s = createInitialState();
+    deployStartingLoadout(s);
     s.status = 'playing';
     s.gameMode = 'custom';
     s.wireInventory = Infinity;
@@ -290,14 +330,14 @@ export const useGameLoop = () => {
     sync();
   };
 
-  const handlePick = (optionId: string) => {
+  const handlePick = (optionId: string, sourceClientPos?: { x: number; y: number }) => {
     const state = stateRef.current;
     const option = state.pickOptions.find(o => o.id === optionId);
     if (!option) return;
 
     if (option.kind === 'tower' && option.towerType) {
       for (let n = 0; n < option.count; n++) {
-        if (!autoDeployTowerNearCore(state, option.towerType)) {
+        if (!queueTowerDropNearCore(state, option.towerType, sourceClientPos)) {
           showToast(t().autoDeployFailed);
           break;
         }
@@ -306,20 +346,17 @@ export const useGameLoop = () => {
       state.wireInventory += option.count;
     }
 
-    if (state.bossBonusPickQueued) {
-      state.bossBonusPickQueued = false;
-      state.pickOptions = generateBossBonusPickOptions();
-      state.pickUiPhase = 'boss_bonus';
-      state.status = 'pick';
-      sync();
-      return;
-    }
-
     state.pickOptions = [];
     state.needsPick = false;
     state.status = 'playing';
-    state.pickUiPhase = 'standard';
-    state.waveTimer = 0;
+    if (state.bossBonusPickQueued) {
+      state.bossBonusPickQueued = false;
+      state.pendingBossBonusPick = true;
+      state.pickUiPhase = 'standard';
+    } else {
+      state.pickUiPhase = 'standard';
+      state.waveTimer = 0;
+    }
     sync();
   };
 
@@ -341,6 +378,12 @@ export const useGameLoop = () => {
   const toWorld = (sx: number, sy: number) => {
     const cam = cameraRef.current;
     return { wx: sx / cam.zoom + cam.x, wy: sy / cam.zoom + cam.y };
+  };
+
+  const clientToWorld = (clientX: number, clientY: number) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return null;
+    return toWorld(clientX - rect.left, clientY - rect.top);
   };
 
   const clampCamera = (cam: Camera) => {
@@ -1030,6 +1073,41 @@ export const useGameLoop = () => {
     if (state.status === 'playing') {
       const now = performance.now();
       let changed = false;
+
+      for (let i = state.incomingDrops.length - 1; i >= 0; i--) {
+        const drop = state.incomingDrops[i];
+        drop.life += dt;
+        if (drop.life < drop.duration) {
+          changed = true;
+          continue;
+        }
+
+        let towerPlaced = false;
+        if (canPlaceTowerAt(state, drop.towerType, drop.targetGridX, drop.targetGridY, drop.id)) {
+          const tower = createTowerAt(drop.towerType, drop.targetGridX, drop.targetGridY);
+          state.towers.push(tower);
+          state.towerMap.set(tower.id, tower);
+          updatePowerGrid(state);
+          towerPlaced = true;
+        }
+
+        if (towerPlaced) {
+          const impactColor = TOWER_STATS[drop.towerType].color;
+          createExplosion(state, drop.targetX, drop.targetY, impactColor, 18);
+          state.hitEffects.push({ x: drop.targetX, y: drop.targetY, life: 0, maxLife: 0.35, color: impactColor, radius: 24 });
+        }
+
+        state.incomingDrops.splice(i, 1);
+        changed = true;
+      }
+
+      if (state.pendingBossBonusPick && state.incomingDrops.length === 0) {
+        state.pendingBossBonusPick = false;
+        state.pickOptions = generateBossBonusPickOptions();
+        state.pickUiPhase = 'boss_bonus';
+        state.status = 'pick';
+        changed = true;
+      }
 
       // ── Power dispatch (no resource generation) ─────────────────────────
       state.powerTimer += dt;

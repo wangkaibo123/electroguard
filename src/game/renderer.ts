@@ -6,7 +6,7 @@ import { drawEnemies } from './render/enemies';
 import {
   drawWires, drawDraggedWire, drawPulses, drawWireHpBars,
   drawShields, drawProjectiles, drawChainLightning,
-  drawParticles, drawHitEffects, drawShieldBreakEffects,
+  drawParticles, drawHitEffects, drawShieldBreakEffects, drawIncomingDrops,
 } from './render/effects';
 
 export const renderGame = (
@@ -77,6 +77,9 @@ export const renderGame = (
 
   // ── Rotation knob ─────────────────────────────────────────────────────────
   drawRotationKnob(ctx, state, rotatingTowerId);
+
+  // ── Incoming tower drops ─────────────────────────────────────────────────
+  drawIncomingDrops(ctx, state);
 
   // ── Enemies ───────────────────────────────────────────────────────────────
   drawEnemies(ctx, state, now);

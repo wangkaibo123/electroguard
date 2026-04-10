@@ -251,7 +251,7 @@ export const STARTING_INVENTORY = {
   /** 开局拥有的导线数量 */
   wires: 5,
   /** 开局拥有的各类建筑数量 */
-  towers: { blaster: 1, gatling: 0, sniper: 0, tesla: 0, generator: 1, shield: 0, battery: 0 } as Record<string, number>,
+  towers: { blaster: 0, gatling: 0, sniper: 0, tesla: 0, generator: 0, shield: 0, battery: 0 } as Record<string, number>,
 } as const;
 
 // ── 8. Roguelike 三选一奖励池 ───────────────────────────────────────────────

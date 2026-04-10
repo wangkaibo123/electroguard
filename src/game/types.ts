@@ -133,6 +133,19 @@ export interface ShieldBreakEffect {
   fragments: { angle: number; dist: number; size: number; speed: number }[];
 }
 
+export interface IncomingDrop {
+  id: string;
+  towerType: TowerType;
+  startX: number;
+  startY: number;
+  targetGridX: number;
+  targetGridY: number;
+  targetX: number;
+  targetY: number;
+  life: number;
+  duration: number;
+}
+
 export interface PickOption {
   id: string;
   kind: 'tower' | 'wire';
@@ -152,6 +165,7 @@ export interface GameState {
   pickOptions: PickOption[];
   /** After clearing a boss wave, show one extra fixed 3-choice after the normal pick */
   bossBonusPickQueued: boolean;
+  pendingBossBonusPick: boolean;
   pickUiPhase: PickUiPhase;
   needsPick: boolean;
   towers: Tower[];
@@ -163,6 +177,7 @@ export interface GameState {
   particles: Particle[];
   hitEffects: HitEffect[];
   shieldBreakEffects: ShieldBreakEffect[];
+  incomingDrops: IncomingDrop[];
   waveTimer: number;
   enemiesToSpawn: number;
   spawnTimer: number;

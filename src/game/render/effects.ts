@@ -1,4 +1,4 @@
-import { GameState, CELL_SIZE, HALF_CELL } from '../types';
+import { GameState, CELL_SIZE, HALF_CELL, TOWER_STATS } from '../types';
 import { getPortPos } from '../engine';
 import {
   TWO_PI, WIRE_ON, WIRE_OFF, PULSE_CLR, PROJ_CLR, HP_BG, HP_FG,
@@ -259,4 +259,62 @@ export const drawShieldBreakEffects = (ctx: CanvasRenderingContext2D, state: Gam
     }
   }
   ctx.globalAlpha = 1;
+};
+
+// ── Incoming tower drops ────────────────────────────────────────────────
+export const drawIncomingDrops = (ctx: CanvasRenderingContext2D, state: GameState) => {
+  for (const drop of state.incomingDrops) {
+    const t = Math.min(1, drop.life / drop.duration);
+    const eased = 1 - (1 - t) * (1 - t);
+    const x = drop.startX + (drop.targetX - drop.startX) * eased;
+    const y = drop.startY + (drop.targetY - drop.startY) * eased;
+    const dx = drop.targetX - drop.startX;
+    const dy = drop.targetY - drop.startY;
+    const len = Math.max(1, Math.hypot(dx, dy));
+    const nx = dx / len;
+    const ny = dy / len;
+    const tailLen = 90 + (1 - t) * 50;
+    const tailX = x - nx * tailLen;
+    const tailY = y - ny * tailLen;
+    const color = TOWER_STATS[drop.towerType].color;
+
+    const trail = ctx.createLinearGradient(tailX, tailY, x, y);
+    trail.addColorStop(0, 'rgba(255,255,255,0)');
+    trail.addColorStop(0.45, `${color}22`);
+    trail.addColorStop(1, `${color}ee`);
+    ctx.strokeStyle = trail;
+    ctx.lineWidth = 7;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(tailX, tailY);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+
+    ctx.strokeStyle = `${color}33`;
+    ctx.lineWidth = 16;
+    ctx.beginPath();
+    ctx.moveTo(tailX, tailY);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 20;
+    ctx.beginPath();
+    ctx.arc(x, y, 6, 0, TWO_PI);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    const pulse = 1 + Math.sin(t * Math.PI * 4) * 0.12;
+    ctx.strokeStyle = `${color}88`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(drop.targetX, drop.targetY, 18 * pulse, 0, TWO_PI);
+    ctx.stroke();
+
+    ctx.strokeStyle = `${color}44`;
+    ctx.beginPath();
+    ctx.arc(drop.targetX, drop.targetY, 28 * pulse, 0, TWO_PI);
+    ctx.stroke();
+  }
 };
