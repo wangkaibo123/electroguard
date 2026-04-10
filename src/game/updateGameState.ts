@@ -96,15 +96,6 @@ const hasTargetInRange = (
     }
   }
 
-  for (const target of state.towers) {
-    if (target.type !== 'target') continue;
-    const tx = (target.x + target.width / 2) * GLOBAL_CONFIG.cellSize;
-    const ty = (target.y + target.height / 2) * GLOBAL_CONFIG.cellSize;
-    if (Math.hypot(tx - baseX, ty - baseY) < range) {
-      return true;
-    }
-  }
-
   return false;
 };
 
@@ -152,34 +143,6 @@ const findNearestEnemy = (
     if (distance < bestDistance) {
       bestDistance = distance;
       best = enemy;
-    }
-  }
-
-  return best;
-};
-
-const findNearestTargetTower = (
-  towers: GameState['towers'],
-  x: number,
-  y: number,
-  range: number,
-  excludeIds?: Set<string> | string[],
-) => {
-  let best: Tower | null = null;
-  let bestDistance = range;
-
-  for (const tower of towers) {
-    if (tower.type !== 'target') continue;
-    if (excludeIds && (excludeIds instanceof Set ? excludeIds.has(tower.id) : excludeIds.includes(tower.id))) {
-      continue;
-    }
-
-    const tx = (tower.x + tower.width / 2) * GLOBAL_CONFIG.cellSize;
-    const ty = (tower.y + tower.height / 2) * GLOBAL_CONFIG.cellSize;
-    const distance = Math.hypot(tx - x, ty - y);
-    if (distance < bestDistance) {
-      bestDistance = distance;
-      best = tower;
     }
   }
 
@@ -363,7 +326,6 @@ const updateCombatTowers = (state: GameState, dt: number, now: number) => {
     let targetY = 0;
     let hasTarget = false;
     let bestEnemy: GameState['enemies'][number] | null = null;
-    let bestTarget: Tower | null = null;
 
     for (const enemy of state.enemies) {
       const distance = Math.hypot(enemy.x - baseX, enemy.y - baseY);
@@ -373,22 +335,6 @@ const updateCombatTowers = (state: GameState, dt: number, now: number) => {
         targetY = enemy.y;
         hasTarget = true;
         bestEnemy = enemy;
-        bestTarget = null;
-      }
-    }
-
-    for (const target of state.towers) {
-      if (target.type !== 'target') continue;
-      const tx = (target.x + target.width / 2) * GLOBAL_CONFIG.cellSize;
-      const ty = (target.y + target.height / 2) * GLOBAL_CONFIG.cellSize;
-      const distance = Math.hypot(tx - baseX, ty - baseY);
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        targetX = tx;
-        targetY = ty;
-        hasTarget = true;
-        bestTarget = target;
-        bestEnemy = null;
       }
     }
 
@@ -417,10 +363,9 @@ const updateCombatTowers = (state: GameState, dt: number, now: number) => {
         id: genId(),
         x: muzzleX,
         y: muzzleY,
-        targetId: bestEnemy?.id ?? bestTarget?.id ?? '',
+        targetId: bestEnemy?.id ?? '',
         speed: BLASTER_BULLET_SPEED,
         damage: BLASTER_DAMAGE,
-        isTargetTower: !!bestTarget && !bestEnemy,
       });
       tower.lastActionTime = now;
       changed = true;
@@ -440,10 +385,9 @@ const updateCombatTowers = (state: GameState, dt: number, now: number) => {
         id: genId(),
         x: muzzleX,
         y: muzzleY,
-        targetId: bestEnemy?.id ?? bestTarget?.id ?? '',
+        targetId: bestEnemy?.id ?? '',
         speed: GATLING_BULLET_SPEED,
         damage: GATLING_DAMAGE,
-        isTargetTower: !!bestTarget && !bestEnemy,
         angle: spreadAngle,
         traveled: 0,
         maxRange: GATLING_BULLET_RANGE,
@@ -474,7 +418,7 @@ const updateCombatTowers = (state: GameState, dt: number, now: number) => {
       id: genId(),
       x: muzzleX,
       y: muzzleY,
-      targetId: bestEnemy?.id ?? bestTarget?.id ?? '',
+      targetId: bestEnemy?.id ?? '',
       speed: SNIPER_SPEED,
       damage: SNIPER_DAMAGE,
       angle: tower.barrelAngle,
@@ -497,22 +441,7 @@ const updateCombatTowers = (state: GameState, dt: number, now: number) => {
     const baseX = (tower.x + tower.width / 2) * GLOBAL_CONFIG.cellSize;
     const baseY = (tower.y + tower.height / 2) * GLOBAL_CONFIG.cellSize;
     let firstEnemy = findNearestEnemy(state.enemies, baseX, baseY, TESLA_RANGE);
-    let firstTarget: Tower | null = null;
-    let firstTargetDistance = firstEnemy ? Math.hypot(firstEnemy.x - baseX, firstEnemy.y - baseY) : TESLA_RANGE;
-
-    for (const target of state.towers) {
-      if (target.type !== 'target') continue;
-      const tx = (target.x + target.width / 2) * GLOBAL_CONFIG.cellSize;
-      const ty = (target.y + target.height / 2) * GLOBAL_CONFIG.cellSize;
-      const distance = Math.hypot(tx - baseX, ty - baseY);
-      if (distance < firstTargetDistance) {
-        firstTargetDistance = distance;
-        firstTarget = target;
-        firstEnemy = null;
-      }
-    }
-
-    if (!firstEnemy && !firstTarget) continue;
+    if (!firstEnemy) continue;
 
     const power = tower.storedPower;
     tower.storedPower = 0;
@@ -522,52 +451,14 @@ const updateCombatTowers = (state: GameState, dt: number, now: number) => {
     const hitIds = new Set<string>();
     let currentX = baseX;
     let currentY = baseY;
-
-    if (firstTarget) {
-      const tx = (firstTarget.x + firstTarget.width / 2) * GLOBAL_CONFIG.cellSize;
-      const ty = (firstTarget.y + firstTarget.height / 2) * GLOBAL_CONFIG.cellSize;
-      segments.push({ x1: currentX, y1: currentY, x2: tx, y2: ty });
-      firstTarget.hp -= totalDamage;
-      createExplosion(state, tx, ty, '#e879f9', 5);
-    } else {
-      let currentEnemy: GameState['enemies'][number] | null = firstEnemy;
-      for (let bounce = 0; bounce < bounceCount && currentEnemy; bounce++) {
-        segments.push({ x1: currentX, y1: currentY, x2: currentEnemy.x, y2: currentEnemy.y });
-        applyDamageToEnemy(state, currentEnemy, totalDamage / bounceCount, currentEnemy.color, true);
-        hitIds.add(currentEnemy.id);
-        currentX = currentEnemy.x;
-        currentY = currentEnemy.y;
-        const nextEnemy = findNearestEnemy(state.enemies, currentX, currentY, TESLA_BOUNCE_RANGE, hitIds);
-        const nextTarget = findNearestTargetTower(state.towers, currentX, currentY, TESLA_BOUNCE_RANGE, hitIds);
-        if (nextEnemy && nextTarget) {
-          const nextTargetX = (nextTarget.x + nextTarget.width / 2) * GLOBAL_CONFIG.cellSize;
-          const nextTargetY = (nextTarget.y + nextTarget.height / 2) * GLOBAL_CONFIG.cellSize;
-          currentEnemy = Math.hypot(nextEnemy.x - currentX, nextEnemy.y - currentY) <= Math.hypot(nextTargetX - currentX, nextTargetY - currentY)
-            ? nextEnemy
-            : null;
-          if (!currentEnemy) {
-            segments.push({ x1: currentX, y1: currentY, x2: nextTargetX, y2: nextTargetY });
-            nextTarget.hp -= totalDamage / bounceCount;
-            createExplosion(state, nextTargetX, nextTargetY, '#e879f9', 5);
-            hitIds.add(nextTarget.id);
-            currentX = nextTargetX;
-            currentY = nextTargetY;
-            currentEnemy = findNearestEnemy(state.enemies, currentX, currentY, TESLA_BOUNCE_RANGE, hitIds);
-          }
-        } else if (nextTarget) {
-          const nextTargetX = (nextTarget.x + nextTarget.width / 2) * GLOBAL_CONFIG.cellSize;
-          const nextTargetY = (nextTarget.y + nextTarget.height / 2) * GLOBAL_CONFIG.cellSize;
-          segments.push({ x1: currentX, y1: currentY, x2: nextTargetX, y2: nextTargetY });
-          nextTarget.hp -= totalDamage / bounceCount;
-          createExplosion(state, nextTargetX, nextTargetY, '#e879f9', 5);
-          hitIds.add(nextTarget.id);
-          currentX = nextTargetX;
-          currentY = nextTargetY;
-          currentEnemy = findNearestEnemy(state.enemies, currentX, currentY, TESLA_BOUNCE_RANGE, hitIds);
-        } else {
-          currentEnemy = nextEnemy;
-        }
-      }
+    let currentEnemy: GameState['enemies'][number] | null = firstEnemy;
+    for (let bounce = 0; bounce < bounceCount && currentEnemy; bounce++) {
+      segments.push({ x1: currentX, y1: currentY, x2: currentEnemy.x, y2: currentEnemy.y });
+      applyDamageToEnemy(state, currentEnemy, totalDamage / bounceCount, currentEnemy.color, true);
+      hitIds.add(currentEnemy.id);
+      currentX = currentEnemy.x;
+      currentY = currentEnemy.y;
+      currentEnemy = findNearestEnemy(state.enemies, currentX, currentY, TESLA_BOUNCE_RANGE, hitIds);
     }
 
     if (segments.length > 0) {
@@ -650,7 +541,6 @@ const updateEnemyState = (state: GameState, dt: number, now: number) => {
     const isSaboteur = enemy.enemyType === 'saboteur';
 
     for (const tower of state.towers) {
-      if (tower.type === 'target') continue;
       const tx = Math.max(tower.x * GLOBAL_CONFIG.cellSize, Math.min(enemy.x, (tower.x + tower.width) * GLOBAL_CONFIG.cellSize));
       const ty = Math.max(tower.y * GLOBAL_CONFIG.cellSize, Math.min(enemy.y, (tower.y + tower.height) * GLOBAL_CONFIG.cellSize));
       const distance = Math.hypot(tx - enemy.x, ty - enemy.y);
@@ -861,36 +751,6 @@ const updateProjectiles = (state: GameState, dt: number) => {
         break;
       }
 
-      if (!hit) {
-        for (const target of state.towers) {
-          if (target.type !== 'target') continue;
-          if (projectile.piercedIds?.includes(target.id)) continue;
-
-          const targetX = (target.x + target.width / 2) * GLOBAL_CONFIG.cellSize;
-          const targetY = (target.y + target.height / 2) * GLOBAL_CONFIG.cellSize;
-          const targetRadius = Math.max(target.width, target.height) * GLOBAL_CONFIG.cellSize * 0.5;
-          if (Math.hypot(targetX - projectile.x, targetY - projectile.y) >= targetRadius + 4) continue;
-
-          target.hp -= projectile.damage;
-          createExplosion(state, targetX, targetY, projectile.color ?? '#fbbf24', 5);
-
-          if (!projectile.piercing) {
-            state.projectiles.splice(index, 1);
-            hit = true;
-          } else {
-            projectile.piercedIds = projectile.piercedIds ?? [];
-            projectile.piercedIds.push(target.id);
-          }
-
-          if (target.hp <= 0) {
-            destroyTower(state, target.id);
-            createExplosion(state, targetX, targetY, '#f97316', 15);
-          }
-          changed = true;
-          break;
-        }
-      }
-
       if (!hit) changed = true;
       continue;
     }
@@ -898,91 +758,47 @@ const updateProjectiles = (state: GameState, dt: number) => {
     let targetX = 0;
     let targetY = 0;
     let targetFound = false;
-
-    if (projectile.isTargetTower) {
-      const target = state.towerMap.get(projectile.targetId);
-      if (!target || target.type !== 'target') {
+    const target = findEnemyById(state, projectile.targetId);
+    if (!target) {
+      if (!projectile.piercing) {
         state.projectiles.splice(index, 1);
         changed = true;
         continue;
       }
 
-      targetX = (target.x + target.width / 2) * GLOBAL_CONFIG.cellSize;
-      targetY = (target.y + target.height / 2) * GLOBAL_CONFIG.cellSize;
+      const nextEnemy = findNearestEnemy(state.enemies, projectile.x, projectile.y, 300, projectile.piercedIds);
+      if (!nextEnemy) {
+        state.projectiles.splice(index, 1);
+        changed = true;
+        continue;
+      }
+
+      projectile.targetId = nextEnemy.id;
+      targetX = nextEnemy.x;
+      targetY = nextEnemy.y;
+      targetFound = true;
+    } else {
+      targetX = target.x;
+      targetY = target.y;
       targetFound = true;
 
       const distance = Math.hypot(targetX - projectile.x, targetY - projectile.y);
-      if (distance < 10) {
-        target.hp -= projectile.damage;
-        createExplosion(state, targetX, targetY, projectile.color ?? '#fbbf24', 5);
-        state.projectiles.splice(index, 1);
-
-        if (target.hp <= 0) {
-          destroyTower(state, target.id);
-          createExplosion(state, targetX, targetY, '#f97316', 15);
-        }
-        changed = true;
-        continue;
-      }
-    } else {
-      const target = findEnemyById(state, projectile.targetId);
-      if (!target) {
-        if (!projectile.piercing) {
-          state.projectiles.splice(index, 1);
-          changed = true;
-          continue;
-        }
-
-        const nextEnemy = findNearestEnemy(state.enemies, projectile.x, projectile.y, 300, projectile.piercedIds);
-        const nextTarget = findNearestTargetTower(state.towers, projectile.x, projectile.y, 300, projectile.piercedIds);
-        if (!nextEnemy && !nextTarget) {
-          state.projectiles.splice(index, 1);
-          changed = true;
-          continue;
-        }
-
-        if (nextEnemy && (!nextTarget || Math.hypot(nextEnemy.x - projectile.x, nextEnemy.y - projectile.y) <= Math.hypot((nextTarget.x + nextTarget.width / 2) * GLOBAL_CONFIG.cellSize - projectile.x, (nextTarget.y + nextTarget.height / 2) * GLOBAL_CONFIG.cellSize - projectile.y))) {
-          projectile.targetId = nextEnemy.id;
-          projectile.isTargetTower = false;
-          targetX = nextEnemy.x;
-          targetY = nextEnemy.y;
-        } else if (nextTarget) {
-          projectile.targetId = nextTarget.id;
-          projectile.isTargetTower = true;
-          targetX = (nextTarget.x + nextTarget.width / 2) * GLOBAL_CONFIG.cellSize;
-          targetY = (nextTarget.y + nextTarget.height / 2) * GLOBAL_CONFIG.cellSize;
-        }
-        targetFound = true;
-      } else {
-        targetX = target.x;
-        targetY = target.y;
-        targetFound = true;
-
-        const distance = Math.hypot(targetX - projectile.x, targetY - projectile.y);
-        if (distance < target.radius + 4) {
-          applyDamageToEnemy(state, target, projectile.damage, projectile.color ?? '#fbbf24', true);
-          if (projectile.piercing) {
-            projectile.piercedIds = projectile.piercedIds ?? [];
-            projectile.piercedIds.push(target.id);
-            const nextEnemy = findNearestEnemy(state.enemies, projectile.x, projectile.y, 300, projectile.piercedIds);
-            const nextTarget = findNearestTargetTower(state.towers, projectile.x, projectile.y, 300, projectile.piercedIds);
-            if (nextEnemy || nextTarget) {
-              if (nextEnemy && (!nextTarget || Math.hypot(nextEnemy.x - projectile.x, nextEnemy.y - projectile.y) <= Math.hypot((nextTarget.x + nextTarget.width / 2) * GLOBAL_CONFIG.cellSize - projectile.x, (nextTarget.y + nextTarget.height / 2) * GLOBAL_CONFIG.cellSize - projectile.y))) {
-                projectile.targetId = nextEnemy.id;
-                projectile.isTargetTower = false;
-              } else if (nextTarget) {
-                projectile.targetId = nextTarget.id;
-                projectile.isTargetTower = true;
-              }
-            } else {
-              state.projectiles.splice(index, 1);
-            }
+      if (distance < target.radius + 4) {
+        applyDamageToEnemy(state, target, projectile.damage, projectile.color ?? '#fbbf24', true);
+        if (projectile.piercing) {
+          projectile.piercedIds = projectile.piercedIds ?? [];
+          projectile.piercedIds.push(target.id);
+          const nextEnemy = findNearestEnemy(state.enemies, projectile.x, projectile.y, 300, projectile.piercedIds);
+          if (nextEnemy) {
+            projectile.targetId = nextEnemy.id;
           } else {
             state.projectiles.splice(index, 1);
           }
-          changed = true;
-          continue;
+        } else {
+          state.projectiles.splice(index, 1);
         }
+        changed = true;
+        continue;
       }
     }
 

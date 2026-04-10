@@ -27,15 +27,6 @@ const gatlingNeedsPower = (state: GameState, tower: Tower) => {
     }
   }
 
-  for (const otherTower of state.towers) {
-    if (otherTower.type !== 'target') continue;
-    const tx = (otherTower.x + otherTower.width / 2) * CELL_SIZE;
-    const ty = (otherTower.y + otherTower.height / 2) * CELL_SIZE;
-    if (Math.hypot(tx - baseX, ty - baseY) < GATLING_RANGE) {
-      return true;
-    }
-  }
-
   return false;
 };
 

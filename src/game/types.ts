@@ -1,7 +1,7 @@
 import { GLOBAL_CONFIG, TOWER_CONFIG, WEAPON_CONFIG } from './config';
 
 export type Position = { x: number; y: number };
-export type TowerType = 'core' | 'blaster' | 'gatling' | 'sniper' | 'tesla' | 'generator' | 'shield' | 'battery' | 'bus' | 'target';
+export type TowerType = 'core' | 'blaster' | 'gatling' | 'sniper' | 'tesla' | 'generator' | 'shield' | 'battery' | 'bus';
 export type GameMode = 'normal' | 'custom';
 export type PortDirection = 'top' | 'right' | 'bottom' | 'left';
 export type PortType = 'input' | 'output';
@@ -88,7 +88,6 @@ export interface Projectile {
   targetId: string;
   speed: number;
   damage: number;
-  isTargetTower?: boolean;
   angle?: number;          // fixed direction for non-homing (gatling)
   traveled?: number;       // distance traveled so far
   maxRange?: number;       // max range before despawn

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Battery, Zap, Crosshair, Activity, Play, RotateCcw, Pause, Hexagon, Cable, Target, Wrench, ChevronRight, ChevronLeft, Flame, Focus, Radio, GitMerge, Globe, LogOut, BookOpen, X, Keyboard, Menu } from 'lucide-react';
+import { Battery, Zap, Crosshair, Activity, Play, RotateCcw, Pause, Hexagon, Cable, Wrench, ChevronRight, ChevronLeft, Flame, Focus, Radio, GitMerge, Globe, LogOut, BookOpen, X, Keyboard, Menu } from 'lucide-react';
 import { useGameLoop } from './game/useGameLoop';
 import { TOWER_STATS, TowerType, PickOption } from './game/types';
 import { t, getLocale, setLocale, Locale } from './game/i18n';
@@ -8,7 +8,7 @@ import { GLOBAL_CONFIG, TIPS_CONFIG } from './game/config';
 const TowerIcon = ({ type, size = 22 }: { type: string; size?: number }) => {
   const icons: Record<string, React.ComponentType<{ size: number }>> = {
     blaster: Crosshair, gatling: Flame, sniper: Focus, tesla: Radio,
-    generator: Zap, shield: Hexagon, battery: Battery, bus: GitMerge, target: Target,
+    generator: Zap, shield: Hexagon, battery: Battery, bus: GitMerge,
   };
   const Icon = icons[type];
   return Icon ? <Icon size={size} /> : null;
@@ -641,7 +641,6 @@ export default function App() {
                   {renderTowerButton('shield')}
                   {renderTowerButton('battery')}
                   {renderTowerButton('bus')}
-                  {gameState.gameMode === 'custom' && renderTowerButton('target')}
 
                   <div className="flex items-center gap-2.5 px-3 py-3 rounded-lg border border-gray-800 bg-gray-900/50 w-full">
                     <div className="text-blue-400 shrink-0"><Cable size={22} /></div>
@@ -703,7 +702,6 @@ export default function App() {
                 {renderTowerButton('shield')}
                 {renderTowerButton('battery')}
                 {renderTowerButton('bus')}
-                {gameState.gameMode === 'custom' && renderTowerButton('target')}
 
                 <div className="flex items-center gap-2.5 px-3 py-3 rounded-lg border border-gray-800 bg-gray-900/50 w-full">
                   <div className="text-blue-400 shrink-0"><Cable size={22} /></div>

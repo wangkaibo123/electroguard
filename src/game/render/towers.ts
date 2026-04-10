@@ -602,13 +602,6 @@ function drawTowerDetails(
       ctx.strokeRect(bx, by, bw, bh);
       ctx.shadowBlur = 0;
     }
-  } else if (t.type === 'target') {
-    const r = Math.min(tw, th) / 2 - inset;
-    ctx.strokeStyle = tColor; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.arc(cx, cy, r, 0, TWO_PI); ctx.stroke();
-    ctx.beginPath(); ctx.arc(cx, cy, r * 0.5, 0, TWO_PI); ctx.stroke();
-    ctx.fillStyle = tColor;
-    ctx.beginPath(); ctx.arc(cx, cy, r * 0.15, 0, TWO_PI); ctx.fill();
   } else if (t.type === 'shield') {
     ctx.strokeStyle = tColor; ctx.lineWidth = 1.5;
     const r = Math.min(tw, th) / 3;

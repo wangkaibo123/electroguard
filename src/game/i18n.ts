@@ -159,7 +159,6 @@ const en: I18nStrings = {
     shield: 'Shield',
     battery: 'Battery',
     bus: 'Bus',
-    target: 'Target',
     core: 'Core',
   },
 
@@ -173,7 +172,6 @@ const en: I18nStrings = {
     shield: 'Projects a protective shield. Consumes power to recharge.',
     battery: 'Stores 4 units of power and discharges quickly.',
     bus: 'Merges up to 3 input wires into 3 outputs.',
-    target: 'Practice target. Treated as an enemy by turrets.',
   },
 
   codexButton: 'Codex',
@@ -194,8 +192,6 @@ const en: I18nStrings = {
       'Role: short-term energy reservoir.\n\nStores up to 4 power and releases it quickly to nearby consumers, smoothing spikes when many turrets fire at once.\n\nTips: place between your main power path and hungry turrets (Gatling, Sniper, Tesla); wire battery input from generators/core and output toward the front line.',
     bus:
       'Role: wiring hub — simplifies messy layouts.\n\nAccepts up to 3 input wires and can drive up to 3 outputs, merging and redistributing pulses.\n\nTips: use at junctions where many cables would cross; not a power source by itself—still needs energy from Core/Generators upstream.',
-    target:
-      'Role: training dummy in Custom Mode.\n\nTurrets treat it as an enemy, so you can test ranges, rotation, and damage without waves.\n\nTips: place in open space, wire your test turrets, and observe firing behavior; remove or reposition as needed.',
   },
 
   controlsGuide: [
@@ -313,7 +309,6 @@ const zh: I18nStrings = {
     shield: '护盾塔',
     battery: '蓄电池',
     bus: '插线板',
-    target: '靶标',
     core: '核心',
   },
 
@@ -327,7 +322,6 @@ const zh: I18nStrings = {
     shield: '投射防护罩，消耗能量充能。',
     battery: '存储4格电，快速放电。',
     bus: '合并最多3条输入线为3条输出。',
-    target: '练习靶标，被炮塔视为敌人。',
   },
 
   codexButton: '图鉴',
@@ -348,8 +342,6 @@ const zh: I18nStrings = {
       '定位：缓冲池，平滑用电尖峰。\n\n最多存 4 格电并快速放出，适合多炮塔同时开火的瞬间。\n\n用法建议：放在主供电路径与耗电大户（加特林、狙击塔、电磁炮等）之间；输入接发电机/核心，输出通往前线。',
     bus:
       '定位：汇流与分线，整理复杂布线。\n\n最多合并 3 条输入线，并分出最多 3 条输出，用于十字路口式走线。\n\n用法建议：线缆容易交叉纠缠时用插线板收束；它本身不产生能量，上游仍需核心或发电机供能。',
-    target:
-      '定位：自定义模式下的练习靶。\n\n炮塔会把它当作敌人攻击，可在没有波次时测试射程、旋转与伤害。\n\n用法建议：空地放置靶标，接好测试炮塔的线缆，观察开火行为；随时可挪位重测。',
   },
 
   controlsGuide: [

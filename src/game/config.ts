@@ -86,8 +86,6 @@ export const TOWER_CONFIG: Record<TowerType, {
   battery:   { hp: 150,  description: 'Stores 4 units of power and discharges quickly.',            color: '#34d399', width: 3, height: 2, maxPower: 4, maxShieldHp: 0,   shieldRadius: 0 },
   /* 汇流器：将 3 条输入线合并为 3 条输出线 */
   bus:       { hp: 120,  description: 'Merges up to 3 input wires into 3 outputs.',                color: '#38bdf8', width: 3, height: 2, maxPower: 0, maxShieldHp: 0,   shieldRadius: 0 },
-  /* 练习靶：被炮塔当作敌人射击，用于测试 */
-  target:    { hp: 200,  description: 'Practice target. Treated as an enemy by turrets.',          color: '#fb923c', width: 1, height: 1, maxPower: 0, maxShieldHp: 0,   shieldRadius: 0 },
 };
 
 // ── 3. 武器参数 ─────────────────────────────────────────────────────────────
