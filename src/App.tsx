@@ -665,6 +665,21 @@ export default function App() {
                         <span>▸</span> {step.action}
                       </div>
                     )}
+                    {/* Tutorial Step 5 Images */}
+                    {tutorialStep === 4 && (
+                      <div className="flex flex-col gap-2 mb-4">
+                        <img 
+                          src="/images/tutorial_step5_1.png" 
+                          alt="点击电力输出口" 
+                          className="w-full rounded-lg border border-gray-700"
+                        />
+                        <img 
+                          src="/images/tutorial_step5_2.png" 
+                          alt="连接到输入口" 
+                          className="w-full rounded-lg border border-gray-700"
+                        />
+                      </div>
+                    )}
                     {!isInteractive && (
                       <button
                         onClick={() => isFinal ? dismissTutorial() : setTutorialStep(tutorialStep + 1)}
