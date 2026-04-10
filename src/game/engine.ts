@@ -502,7 +502,14 @@ export const spawnBoss = (state: GameState, wave: number) => {
   pushEnemy(state, 'overlord', wave);
 };
 
-export const spawnEnemyAt = (state: GameState, type: EnemyType, wave: number, x: number, y: number) => {
+export const spawnEnemyAt = (
+  state: GameState,
+  type: EnemyType,
+  wave: number,
+  x: number,
+  y: number,
+  options?: { isStatic?: boolean },
+) => {
   const def = ENEMY_CONFIG[type];
   const sc = ENEMY_SCALING;
   const hpMul = 1 + wave * sc.hpPerWave;
@@ -510,9 +517,11 @@ export const spawnEnemyAt = (state: GameState, type: EnemyType, wave: number, x:
   const shieldHp = def.baseShield * hpMul;
   const speedBonus = 1 + wave * sc.speedPerWave;
   state.enemies.push({
-    id: genId(), enemyType: type, x, y,
+    id: genId(), enemyType: type, isStatic: options?.isStatic, x, y,
     hp, maxHp: hp,
-    speed: (def.speedMin + Math.random() * (def.speedMax - def.speedMin)) * speedBonus * ENEMY_SPEED_MUL,
+    speed: options?.isStatic
+      ? 0
+      : (def.speedMin + Math.random() * (def.speedMax - def.speedMin)) * speedBonus * ENEMY_SPEED_MUL,
     damage: def.baseDamage + Math.floor(wave * sc.damagePerWave),
     attackCooldown: def.cooldown, lastAttackTime: 0, targetId: null, heading: 0,
     radius: def.radius, color: def.color, wireDamageMul: def.wireDamageMul,

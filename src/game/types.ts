@@ -63,6 +63,7 @@ export interface Tower {
 export interface Enemy {
   id: string;
   enemyType: EnemyType;
+  isStatic?: boolean;
   x: number;
   y: number;
   hp: number;

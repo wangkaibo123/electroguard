@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Battery, Zap, Crosshair, Activity, Play, RotateCcw, Pause, Hexagon, Cable, Wrench, ChevronRight, ChevronLeft, Flame, Focus, Radio, GitMerge, Globe, LogOut, BookOpen, X, Keyboard, Menu } from 'lucide-react';
 import { useGameLoop } from './game/useGameLoop';
-import { TOWER_STATS, TowerType, PickOption } from './game/types';
+import { TOWER_STATS, TowerType, PickOption, EnemyType } from './game/types';
 import { t, getLocale, setLocale, Locale } from './game/i18n';
 import { GLOBAL_CONFIG, TIPS_CONFIG } from './game/config';
 
@@ -32,6 +32,12 @@ export default function App() {
     openCustomPick,
     selectedTower,
     setSelectedTower,
+    placeMonsterMode,
+    setPlaceMonsterMode,
+    selectedMonsterType,
+    setSelectedMonsterType,
+    staticMonster,
+    setStaticMonster,
     skipToNextWave,
     toastMessage,
     handleCanvasMouseDown,
@@ -109,7 +115,10 @@ export default function App() {
     return (
       <div key={type} className="flex w-full items-stretch min-w-0">
         <button
-          onClick={() => setSelectedTower(isSelected ? null : type)}
+          onClick={() => {
+            setPlaceMonsterMode(false);
+            setSelectedTower(isSelected ? null : type);
+          }}
           disabled={!hasStock || gameState.status !== 'playing'}
           className={`flex flex-1 min-w-0 items-center gap-2.5 px-3 py-3 rounded-lg border transition-all ${
             isSelected
@@ -126,6 +135,87 @@ export default function App() {
             <span className="text-xs text-emerald-400 font-mono leading-tight">{isCustom ? '\u221E' : `x${count}`}</span>
           </div>
         </button>
+      </div>
+    );
+  };
+
+  const renderPlaceMonsterButton = () => {
+    const isActive = placeMonsterMode;
+    const enemyTypes: EnemyType[] = ['scout', 'grunt', 'tank', 'saboteur', 'overlord'];
+
+    return (
+      <div className="flex flex-col gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            setSelectedTower(null);
+            setPlaceMonsterMode(!isActive);
+          }}
+          disabled={gameState.status !== 'playing'}
+          className={`flex items-center gap-2.5 px-3 py-3 rounded-lg border transition-all ${
+            isActive
+              ? 'border-rose-500 bg-rose-500/15 shadow-[0_0_10px_rgba(244,63,94,0.25)] text-rose-200'
+              : gameState.status === 'playing'
+                ? 'border-gray-700 bg-gray-800/80 hover:bg-gray-700 hover:border-gray-500 text-gray-200'
+                : 'border-gray-800 bg-gray-900/50 text-gray-500 cursor-not-allowed opacity-40'
+          }`}
+        >
+          <div className={`shrink-0 ${isActive ? 'text-rose-300' : 'text-gray-400'}`}><Activity size={22} /></div>
+          <div className="flex flex-col items-start min-w-0 flex-1">
+            <span className="text-sm font-bold leading-tight">{i.placeMonster}</span>
+            <span className={`text-xs font-mono leading-tight ${isActive ? 'text-rose-300' : 'text-rose-400'}`}>
+              {i.enemyName[selectedMonsterType]} · {staticMonster ? i.staticMonster : 'AI'} · {isActive ? 'ON' : 'OFF'}
+            </span>
+          </div>
+        </button>
+
+        <div className="px-1">
+          <div className="text-[11px] uppercase tracking-widest text-gray-500 mb-2">{i.monsterType}</div>
+          <div className="grid grid-cols-2 gap-1.5">
+            {enemyTypes.map((type) => {
+              const isSelected = selectedMonsterType === type;
+              return (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => {
+                    setSelectedTower(null);
+                    setSelectedMonsterType(type);
+                    setPlaceMonsterMode(true);
+                  }}
+                  disabled={gameState.status !== 'playing'}
+                  className={`px-2.5 py-2 rounded-md border text-xs font-bold transition-all ${
+                    isSelected
+                      ? 'border-rose-500 bg-rose-500/15 text-rose-200'
+                      : gameState.status === 'playing'
+                        ? 'border-gray-700 bg-gray-900/60 text-gray-300 hover:bg-gray-800 hover:border-gray-500'
+                        : 'border-gray-800 bg-gray-900/40 text-gray-500 cursor-not-allowed opacity-40'
+                  }`}
+                >
+                  {i.enemyName[type]}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <label className={`flex items-start gap-3 px-3 py-2.5 rounded-lg border transition-all ${
+          gameState.status === 'playing'
+            ? 'border-gray-700 bg-gray-900/50 text-gray-200'
+            : 'border-gray-800 bg-gray-900/40 text-gray-500 opacity-40'
+        }`}>
+          <input
+            type="checkbox"
+            checked={staticMonster}
+            onChange={(e) => setStaticMonster(e.target.checked)}
+            disabled={gameState.status !== 'playing'}
+            className="mt-0.5 h-4 w-4 rounded border-gray-600 bg-gray-800 text-rose-500 focus:ring-rose-500"
+          />
+          <div className="min-w-0">
+            <div className="text-sm font-bold leading-tight">{i.staticMonster}</div>
+            <div className="text-xs text-gray-400 leading-relaxed">{i.staticMonsterHint}</div>
+          </div>
+        </label>
       </div>
     );
   };
@@ -236,7 +326,7 @@ export default function App() {
               onTouchMove={handleCanvasTouchMove}
               onTouchEnd={handleCanvasTouchEnd}
               onTouchCancel={handleCanvasTouchEnd}
-              className={`block w-full h-full touch-none ${gameState.status === 'playing' ? (selectedTower ? 'cursor-crosshair' : 'cursor-grab active:cursor-grabbing') : ''}`}
+              className={`block w-full h-full touch-none ${gameState.status === 'playing' ? (selectedTower || placeMonsterMode ? 'cursor-crosshair' : 'cursor-grab active:cursor-grabbing') : ''}`}
             />
 
             {/* Controls Guide — top-left (desktop only) */}
@@ -641,6 +731,7 @@ export default function App() {
                   {renderTowerButton('shield')}
                   {renderTowerButton('battery')}
                   {renderTowerButton('bus')}
+                  {renderPlaceMonsterButton()}
 
                   <div className="flex items-center gap-2.5 px-3 py-3 rounded-lg border border-gray-800 bg-gray-900/50 w-full">
                     <div className="text-blue-400 shrink-0"><Cable size={22} /></div>
@@ -665,6 +756,7 @@ export default function App() {
                   </button>
 
                   <div className="mt-2 text-xs text-gray-600 px-1 py-1 leading-relaxed">
+                    <p>{i.clickToPlaceMonster}</p>
                     <p>{i.clickToRotate}</p>
                     <p>{i.dragToWire}</p>
                   </div>
@@ -702,6 +794,7 @@ export default function App() {
                 {renderTowerButton('shield')}
                 {renderTowerButton('battery')}
                 {renderTowerButton('bus')}
+                {renderPlaceMonsterButton()}
 
                 <div className="flex items-center gap-2.5 px-3 py-3 rounded-lg border border-gray-800 bg-gray-900/50 w-full">
                   <div className="text-blue-400 shrink-0"><Cable size={22} /></div>
@@ -726,6 +819,7 @@ export default function App() {
                 </button>
 
                 <div className="mt-4 text-xs text-gray-600 px-1 py-2 leading-relaxed">
+                  <p>{i.clickToPlaceMonster}</p>
                   <p>{i.clickToRotate}</p>
                   <p>{i.dragToWire}</p>
                 </div>

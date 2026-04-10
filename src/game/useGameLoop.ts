@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  GameState, TowerType, Port, Wire, CELL_SIZE, GRID_WIDTH, GRID_HEIGHT,
+  GameState, TowerType, Port, Wire, CELL_SIZE, GRID_WIDTH, GRID_HEIGHT, EnemyType,
   TOWER_STATS, CANVAS_WIDTH, CANVAS_HEIGHT, WIRE_MAX_HP,
   Camera, VIEWPORT_WIDTH, VIEWPORT_HEIGHT,
 } from './types';
 import {
   createInitialState, updatePowerGrid, getPortPos, getPortCell, findWirePath,
   snapRotation, applyTowerRotation, canPlace, collidesWithTowers,
-  collidesWithWires, repathConnectedWires, genId, generatePickOptions,
+  collidesWithWires, repathConnectedWires, genId, generatePickOptions, spawnEnemyAt,
 } from './engine';
 import { renderGame } from './renderer';
 import { GLOBAL_CONFIG } from './config';
@@ -30,6 +30,15 @@ export const useGameLoop = () => {
   const selectedTowerRef = useRef<TowerType | null>(null);
   const [selectedTower, _setSelectedTower] = useState<TowerType | null>(null);
   const setSelectedTower = (v: TowerType | null) => { selectedTowerRef.current = v; _setSelectedTower(v); };
+  const placeMonsterModeRef = useRef(false);
+  const [placeMonsterMode, _setPlaceMonsterMode] = useState(false);
+  const setPlaceMonsterMode = (v: boolean) => { placeMonsterModeRef.current = v; _setPlaceMonsterMode(v); };
+  const selectedMonsterTypeRef = useRef<EnemyType>('grunt');
+  const [selectedMonsterType, _setSelectedMonsterType] = useState<EnemyType>('grunt');
+  const setSelectedMonsterType = (v: EnemyType) => { selectedMonsterTypeRef.current = v; _setSelectedMonsterType(v); };
+  const staticMonsterRef = useRef(true);
+  const [staticMonster, _setStaticMonster] = useState(true);
+  const setStaticMonster = (v: boolean) => { staticMonsterRef.current = v; _setStaticMonster(v); };
 
   const hoverRef = useRef<{ x: number; y: number } | null>(null);
   const dragTowerRef = useRef<string | null>(null);
@@ -163,6 +172,9 @@ export const useGameLoop = () => {
     s.gameMode = 'normal';
     s.pickOptions = generatePickOptions();
     stateRef.current = s;
+    setPlaceMonsterMode(false);
+    setSelectedMonsterType('grunt');
+    setStaticMonster(true);
     centerOnCore(s);
     sync();
   };
@@ -175,6 +187,9 @@ export const useGameLoop = () => {
     s.wireInventory = Infinity;
     s.needsPick = false;
     stateRef.current = s;
+    setPlaceMonsterMode(false);
+    setSelectedMonsterType('grunt');
+    setStaticMonster(true);
     centerOnCore(s);
     sync();
   };
@@ -191,8 +206,20 @@ export const useGameLoop = () => {
     s.status = 'menu';
     stateRef.current = s;
     setSelectedTower(null);
+    setPlaceMonsterMode(false);
+    setSelectedMonsterType('grunt');
+    setStaticMonster(true);
     centerOnCore(s);
     sync();
+  };
+
+  const spawnStaticMonsterAt = (state: GameState, x: number, y: number) => {
+    if (x < 0 || y < 0 || x > CANVAS_WIDTH || y > CANVAS_HEIGHT) return false;
+    spawnEnemyAt(state, selectedMonsterTypeRef.current, Math.max(1, state.wave || 1), x, y, {
+      isStatic: staticMonsterRef.current,
+    });
+    sync();
+    return true;
   };
 
   const handlePick = (optionId: string, sourceClientPos?: { x: number; y: number }) => {
@@ -378,6 +405,14 @@ export const useGameLoop = () => {
     if (state.status !== 'playing') return;
     const { wx, wy } = toWorld(sx, sy);
     mouseDownPosRef.current = { x: wx, y: wy };
+
+    if (placeMonsterModeRef.current) {
+      if (spawnStaticMonsterAt(state, wx, wy)) {
+        updateRotating(null);
+        setSelectedTower(null);
+      }
+      return;
+    }
 
     // Rotation knob check
     if (rotatingRef.current) {
@@ -641,6 +676,14 @@ export const useGameLoop = () => {
     const { wx, wy } = toWorld(sx, sy);
     mouseDownPosRef.current = { x: wx, y: wy };
 
+    if (placeMonsterModeRef.current) {
+      if (spawnStaticMonsterAt(state, wx, wy)) {
+        updateRotating(null);
+        setSelectedTower(null);
+      }
+      return;
+    }
+
     // Rotation knob check
     if (rotatingRef.current) {
       const tower = state.towerMap.get(rotatingRef.current);
@@ -879,6 +922,14 @@ export const useGameLoop = () => {
         mousePxRef.current,
         dragWirePathRef.current,
         rotatingRef.current,
+        placeMonsterModeRef.current && mousePxRef.current
+          ? {
+              x: mousePxRef.current.x,
+              y: mousePxRef.current.y,
+              enemyType: selectedMonsterTypeRef.current,
+              isStatic: staticMonsterRef.current,
+            }
+          : null,
       );
     }
 
@@ -958,6 +1009,10 @@ export const useGameLoop = () => {
           setSelectedTower(null);
           return;
         }
+        if (placeMonsterModeRef.current) {
+          setPlaceMonsterMode(false);
+          return;
+        }
         // Deselect rotating tower
         if (rotatingRef.current) {
           updateRotating(null);
@@ -985,7 +1040,8 @@ export const useGameLoop = () => {
 
   return {
     canvasRef, cameraRef, gameState, startGame, startCustomGame, togglePause, returnToMenu, handlePick,
-    openCustomPick, selectedTower, setSelectedTower, skipToNextWave, toastMessage,
+    openCustomPick, selectedTower, setSelectedTower, placeMonsterMode, setPlaceMonsterMode, skipToNextWave, toastMessage,
+    selectedMonsterType, setSelectedMonsterType, staticMonster, setStaticMonster,
     handleCanvasMouseDown, handleCanvasMouseMove, handleCanvasMouseUp, handleCanvasMouseLeave,
     handleCanvasWheel, handleCanvasContextMenu,
     handleCanvasTouchStart, handleCanvasTouchMove, handleCanvasTouchEnd,

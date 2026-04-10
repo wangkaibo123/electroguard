@@ -2,7 +2,7 @@ import { GameState, TowerType, CELL_SIZE, CANVAS_WIDTH, CANVAS_HEIGHT, Camera } 
 import { BG_DARK, BG_MID, BG_GRID, MAP_BORDER } from './render/constants';
 import { updateAndDrawDecorations } from './render/decorations';
 import { drawPorts, drawTowers, drawPlacementPreview, drawRangePreview, drawRotationKnob } from './render/towers';
-import { drawEnemies } from './render/enemies';
+import { drawEnemies, drawEnemyPreview } from './render/enemies';
 import {
   drawWires, drawDraggedWire, drawPulses, drawWireHpBars,
   drawShields, drawProjectiles, drawChainLightning,
@@ -22,6 +22,7 @@ export const renderGame = (
   mouseWorldPos: { x: number; y: number } | null,
   draggedWirePath: { x: number; y: number }[] | null = null,
   rotatingTowerId: string | null = null,
+  enemyPreview: { x: number; y: number; enemyType: import('./types').EnemyType; isStatic: boolean } | null = null,
 ) => {
   const now = performance.now();
 
@@ -83,6 +84,7 @@ export const renderGame = (
 
   // ── Enemies ───────────────────────────────────────────────────────────────
   drawEnemies(ctx, state, now);
+  drawEnemyPreview(ctx, enemyPreview, now);
 
   // ── Projectiles & effects ─────────────────────────────────────────────────
   drawProjectiles(ctx, state);

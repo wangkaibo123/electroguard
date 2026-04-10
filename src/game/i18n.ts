@@ -41,8 +41,13 @@ export interface I18nStrings {
   inventory: string;
   hidePanel: string;
   showPanel: string;
+  placeMonster: string;
   clickToRotate: string;
   dragToWire: string;
+  clickToPlaceMonster: string;
+  monsterType: string;
+  staticMonster: string;
+  staticMonsterHint: string;
   openPick: string;
 
   // Wave
@@ -67,6 +72,7 @@ export interface I18nStrings {
 
   // Tower names
   towerName: Record<string, string>;
+  enemyName: Record<string, string>;
 
   // Tower descriptions (for tooltip & pick cards)
   towerDesc: Record<string, string>;
@@ -116,8 +122,13 @@ const en: I18nStrings = {
   inventory: 'Inventory',
   hidePanel: 'Hide panel',
   showPanel: 'Show panel',
+  placeMonster: 'Place Monster',
   clickToRotate: 'Click machine to rotate',
   dragToWire: 'Drag port to wire',
+  clickToPlaceMonster: 'Click map to place a stationary monster',
+  monsterType: 'Monster Type',
+  staticMonster: 'Stationary',
+  staticMonsterHint: 'When off, placed monsters behave normally',
   openPick: 'Open Upgrade Pick',
 
   startNextWave: 'Start Next Wave',
@@ -160,6 +171,14 @@ const en: I18nStrings = {
     battery: 'Battery',
     bus: 'Bus',
     core: 'Core',
+  },
+
+  enemyName: {
+    scout: 'Scout',
+    grunt: 'Grunt',
+    tank: 'Tank',
+    saboteur: 'Saboteur',
+    overlord: 'Overlord',
   },
 
   towerDesc: {
@@ -266,8 +285,13 @@ const zh: I18nStrings = {
   inventory: '库存',
   hidePanel: '隐藏面板',
   showPanel: '显示面板',
+  placeMonster: '放置怪物',
   clickToRotate: '点击机器旋转',
   dragToWire: '拖拽端口连线',
+  clickToPlaceMonster: '点击地图放置一个静止怪物',
+  monsterType: '怪物类型',
+  staticMonster: '是否静止',
+  staticMonsterHint: '关闭后，放置的怪物会按正常逻辑移动和攻击',
   openPick: '开启三选一',
 
   startNextWave: '提前开始下一波',
@@ -310,6 +334,14 @@ const zh: I18nStrings = {
     battery: '蓄电池',
     bus: '插线板',
     core: '核心',
+  },
+
+  enemyName: {
+    scout: '侦察兵',
+    grunt: '步兵',
+    tank: '坦克',
+    saboteur: '破坏者',
+    overlord: '霸主',
   },
 
   towerDesc: {

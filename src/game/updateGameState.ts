@@ -533,6 +533,8 @@ const updateEnemyState = (state: GameState, dt: number, now: number) => {
   let changed = false;
 
   for (const enemy of state.enemies) {
+    if (enemy.isStatic) continue;
+
     let minDistance = Infinity;
     let targetPos = { x: 0, y: 0 };
     let isShieldTarget = false;
