@@ -38,8 +38,9 @@ const getLinearTowerBodyRect = (
 
 // ── Ports (drawn under tower bodies) ─────────────────────────────────────
 export const drawPorts = (ctx: CanvasRenderingContext2D, state: GameState) => {
-  const OUT_TRI = 7.5;
-  const IN_HALF = 6;
+  const PORT_SCALE = 4 / 3;
+  const OUT_TRI = 7.5 * PORT_SCALE;
+  const IN_HALF = 6 * PORT_SCALE;
   const portStrokeW = 1.35;
   for (const tower of state.towers) {
     const ppx = tower.x * CELL_SIZE, ppy = tower.y * CELL_SIZE;
