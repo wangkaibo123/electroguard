@@ -112,20 +112,14 @@ export const WEAPON_CONFIG = {
     damage: 8,
     /** 子弹最大飞行距离（px），超出后消失 */
     bulletRange: 290,
-    /** 最大热量时的射击间隔（ms），即最快射速 */
-    minInterval: 200,
-    /** 冷却状态的射击间隔（ms），即最慢射速 */
-    maxInterval: 500,
-    /** 每发子弹增加的热量（0~1） */
-    heatPerShot: 0.12,
-    /** 热量每秒自然衰减量 */
-    heatDecay: 0.15,
+    /** 每次供电脉冲增加的热量（0~1） */
+    heatPerPulse: 0.22,
+    /** 每秒按当前热量百分比散热（0~1） */
+    heatDecayPct: 0.6,
     /** 冷却时的最小散射角（rad，约 2°） */
     minSpread: 0.04,
     /** 最大热量时的最大散射角（rad，约 20°） */
     maxSpread: 0.35,
-    /** 每次开火消耗电力 */
-    powerCost: 1,
     /** 子弹飞行速度（px/s） */
     bulletSpeed: 280,
   },

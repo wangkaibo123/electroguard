@@ -425,8 +425,9 @@ function drawTowerDetails(
     }
 
     // Ring heat indicator
-    if (t.heat > 0.01) {
+    if (t.heat > 0.01 || t.overloaded) {
       const ringR = Math.min(tw, th) / 2 - inset;
+      const heat = t.overloaded ? 1 : t.heat;
       const hStartA = -Math.PI / 2;
       ctx.strokeStyle = 'rgba(30,41,59,0.6)';
       ctx.lineWidth = 2.5;
@@ -444,13 +445,20 @@ function drawTowerDetails(
       ctx.shadowColor = `rgb(${hR},${hG},${hB})`; ctx.shadowBlur = 6;
       ctx.beginPath(); ctx.arc(htipX, htipY, 3, 0, TWO_PI); ctx.fill();
       ctx.shadowBlur = 0;
-      if (heat > 0.8) {
+      if (heat > 0.8 || t.overloaded) {
         const wPulse = 0.1 + 0.08 * Math.sin(now / 200);
         const wGrd = ctx.createRadialGradient(cx, cy, ringR - 3, cx, cy, ringR + 8);
         wGrd.addColorStop(0, `rgba(255,50,0,${wPulse})`);
         wGrd.addColorStop(1, 'rgba(255,50,0,0)');
         ctx.fillStyle = wGrd;
         ctx.beginPath(); ctx.arc(cx, cy, ringR + 8, 0, TWO_PI); ctx.fill();
+      }
+
+      if (t.overloaded) {
+        ctx.fillStyle = 'rgba(255,80,40,0.9)';
+        ctx.font = 'bold 10px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('HOT', cx, cy + 4);
       }
     }
   } else if (t.type === 'sniper') {

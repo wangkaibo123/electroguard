@@ -18,6 +18,8 @@ const NEIGHBOR_OFFSETS = [[0, 1], [1, 0], [0, -1], [-1, 0]] as const;
 const GATLING_RANGE = WEAPON_CONFIG.gatling.range;
 
 const gatlingNeedsPower = (state: GameState, tower: Tower) => {
+  if (tower.overloaded) return false;
+
   const baseX = (tower.x + tower.width / 2) * CELL_SIZE;
   const baseY = (tower.y + tower.height / 2) * CELL_SIZE;
 
@@ -293,6 +295,7 @@ export const createInitialState = (): GameState => {
     rotation: 0,
     barrelAngle: 0,
     heat: 0,
+    overloaded: false,
   };
   const towerMap = new Map<string, Tower>([[core.id, core]]);
   return {
@@ -351,7 +354,7 @@ export const dispatchPulse = (state: GameState, src: Tower, isBattery = false): 
 
     const canReceivePulse = tower.id !== src.id && (
       tower.type === 'gatling'
-        ? tower.incomingPower < 1 && gatlingNeedsPower(state, tower)
+        ? gatlingNeedsPower(state, tower)
         : (tower.storedPower + tower.incomingPower) < tower.maxPower
     );
 

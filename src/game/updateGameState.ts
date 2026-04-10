@@ -57,12 +57,11 @@ const {
   bulletRange: GATLING_BULLET_RANGE,
   bulletSpeed: GATLING_BULLET_SPEED,
   damage: GATLING_DAMAGE,
-  maxInterval: GATLING_MAX_INTERVAL,
   maxSpread: GATLING_MAX_SPREAD,
-  minInterval: GATLING_MIN_INTERVAL,
   minSpread: GATLING_MIN_SPREAD,
   range: GATLING_RANGE,
-  heatDecay: GATLING_HEAT_DECAY,
+  heatDecayPct: GATLING_HEAT_DECAY_PCT,
+  heatPerPulse: GATLING_HEAT_PER_PULSE,
 } = WEAPON_CONFIG.gatling;
 const {
   bounceRange: TESLA_BOUNCE_RANGE,
@@ -79,25 +78,7 @@ const {
   powerCost: SNIPER_POWER_COST,
   range: SNIPER_RANGE,
 } = WEAPON_CONFIG.sniper;
-const GATLING_HEAT_PER_POWER = 0.35;
 const SNIPER_AIM_THRESHOLD = 0.05;
-
-const hasTargetInRange = (
-  state: GameState,
-  tower: Tower,
-  range: number,
-) => {
-  const baseX = (tower.x + tower.width / 2) * GLOBAL_CONFIG.cellSize;
-  const baseY = (tower.y + tower.height / 2) * GLOBAL_CONFIG.cellSize;
-
-  for (const enemy of state.enemies) {
-    if (Math.hypot(enemy.x - baseX, enemy.y - baseY) < range) {
-      return true;
-    }
-  }
-
-  return false;
-};
 
 const applyDamageToEnemy = (
   state: GameState,
@@ -147,6 +128,34 @@ const findNearestEnemy = (
   }
 
   return best;
+};
+
+const fireGatlingBurst = (
+  state: GameState,
+  tower: Tower,
+  originX: number,
+  originY: number,
+  target: GameState['enemies'][number],
+) => {
+  const baseAngle = Math.atan2(target.y - originY, target.x - originX);
+  const spread = GATLING_MIN_SPREAD + (GATLING_MAX_SPREAD - GATLING_MIN_SPREAD) * tower.heat;
+
+  for (let shot = 0; shot < 2; shot++) {
+    const spreadAngle = baseAngle + (Math.random() - 0.5) * spread * 2;
+    state.projectiles.push({
+      id: genId(),
+      x: originX,
+      y: originY,
+      targetId: target.id,
+      speed: GATLING_BULLET_SPEED,
+      damage: GATLING_DAMAGE,
+      angle: spreadAngle,
+      traveled: 0,
+      maxRange: GATLING_BULLET_RANGE,
+      color: '#f59e0b',
+      size: 2,
+    });
+  }
 };
 
 const destroyTower = (state: GameState, towerId: string) => {
@@ -261,7 +270,7 @@ const updatePowerSystems = (state: GameState, dt: number, now: number) => {
   return changed;
 };
 
-const updatePulses = (state: GameState, dt: number) => {
+const updatePulses = (state: GameState, dt: number, now: number) => {
   let changed = false;
 
   for (let index = state.pulses.length - 1; index >= 0; index--) {
@@ -285,8 +294,21 @@ const updatePulses = (state: GameState, dt: number) => {
       if (target) {
         target.incomingPower = Math.max(0, target.incomingPower - 1);
         if (target.type === 'gatling') {
-          if (target.powered && hasTargetInRange(state, target, GATLING_RANGE)) {
-            target.heat = Math.min(1, target.heat + GATLING_HEAT_PER_POWER);
+          if (target.powered && !target.overloaded) {
+            const baseX = (target.x + target.width / 2) * GLOBAL_CONFIG.cellSize;
+            const baseY = (target.y + target.height / 2) * GLOBAL_CONFIG.cellSize;
+            const barrelLength = Math.min(target.width, target.height) * GLOBAL_CONFIG.cellSize / 2 - 4 + 6;
+            const muzzleX = baseX + Math.cos(target.barrelAngle) * barrelLength;
+            const muzzleY = baseY + Math.sin(target.barrelAngle) * barrelLength;
+            const enemy = findNearestEnemy(state.enemies, baseX, baseY, GATLING_RANGE);
+
+            if (enemy) {
+              fireGatlingBurst(state, target, muzzleX, muzzleY, enemy);
+              target.lastActionTime = now;
+            }
+
+            target.heat = Math.min(1, target.heat + GATLING_HEAT_PER_PULSE);
+            if (target.heat >= 1) target.overloaded = true;
           }
         } else {
           target.storedPower = Math.min(target.maxPower, target.storedPower + 1);
@@ -306,7 +328,11 @@ const updateCombatTowers = (state: GameState, dt: number, now: number) => {
 
   for (const tower of state.towers) {
     if (tower.type === 'gatling' && tower.heat > 0) {
-      tower.heat = Math.max(0, tower.heat - GATLING_HEAT_DECAY * 0.5 * dt);
+      tower.heat = Math.max(0, tower.heat * Math.pow(1 - GATLING_HEAT_DECAY_PCT, dt));
+      if (tower.overloaded && tower.heat <= 0.001) {
+        tower.heat = 0;
+        tower.overloaded = false;
+      }
       changed = true;
     }
   }
@@ -373,29 +399,6 @@ const updateCombatTowers = (state: GameState, dt: number, now: number) => {
     }
 
     if (tower.type === 'gatling') {
-      const heat = tower.heat;
-      if (heat < 0.05) continue;
-
-      const interval = (GATLING_MAX_INTERVAL - (GATLING_MAX_INTERVAL - GATLING_MIN_INTERVAL) * heat) / 2;
-      if (now - tower.lastActionTime <= interval) continue;
-
-      const spread = GATLING_MIN_SPREAD + (GATLING_MAX_SPREAD - GATLING_MIN_SPREAD) * tower.heat;
-      const spreadAngle = tower.barrelAngle + (Math.random() - 0.5) * spread * 2;
-      state.projectiles.push({
-        id: genId(),
-        x: muzzleX,
-        y: muzzleY,
-        targetId: bestEnemy?.id ?? '',
-        speed: GATLING_BULLET_SPEED,
-        damage: GATLING_DAMAGE,
-        angle: spreadAngle,
-        traveled: 0,
-        maxRange: GATLING_BULLET_RANGE,
-        color: '#f59e0b',
-        size: 2,
-      });
-      tower.lastActionTime = now;
-      changed = true;
       continue;
     }
 
@@ -862,7 +865,7 @@ export const updateGameState = (state: GameState, dt: number) => {
 
   changed = updateIncomingDrops(state, dt) || changed;
   changed = updatePowerSystems(state, dt, now) || changed;
-  changed = updatePulses(state, dt) || changed;
+  changed = updatePulses(state, dt, now) || changed;
   changed = updateCombatTowers(state, dt, now) || changed;
   changed = updateWaveState(state, dt) || changed;
   changed = updateEnemyState(state, dt, now) || changed;
