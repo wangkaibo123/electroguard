@@ -68,6 +68,7 @@ export const createTowerAt = (type: TowerType, x: number, y: number): Tower => {
     barrelAngle: 0,
     heat: 0,
     overloaded: false,
+    gatlingAmmo: 0,
   };
 };
 

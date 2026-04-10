@@ -72,8 +72,8 @@ export const TOWER_CONFIG: Record<TowerType, {
   core:      { hp: 1000, description: 'The heart of your defense. Generates power.',                color: '#93c5fd', width: 5, height: 5, maxPower: 0, maxShieldHp: 0,   shieldRadius: 0 },
   /* 爆破炮：每次消耗 2 电力发射追踪弹 */
   blaster:   { hp: 100,  description: 'Fires a bullet per 2 power. Reliable turret.',              color: '#f87171', width: 3, height: 3, maxPower: 2, maxShieldHp: 0,   shieldRadius: 0 },
-  /* 加特林：热量驱动的连射炮塔，越打越快 */
-  gatling:   { hp: 100,  description: 'Heat-based rapid fire. Spins up with power.',               color: '#f59e0b', width: 3, height: 3, maxPower: 0, maxShieldHp: 0,   shieldRadius: 0 },
+  /* 加特林：每格电转成 4 发子弹，按固定射速连射 */
+  gatling:   { hp: 100,  description: 'Each power becomes 4 bullets. Fires up to 10 shots/sec.',  color: '#f59e0b', width: 3, height: 3, maxPower: 0, maxShieldHp: 0,   shieldRadius: 0 },
   /* 狙击塔：高伤害穿透弹，冷却长 */
   sniper:    { hp: 80,   description: 'High-damage piercing shot. Costs 4 power.',                 color: '#a78bfa', width: 3, height: 3, maxPower: 4, maxShieldHp: 0,   shieldRadius: 0 },
   /* 电磁炮（tesla）：链式闪电，在敌人之间弹跳 */
@@ -110,6 +110,10 @@ export const WEAPON_CONFIG = {
     range: 195,
     /** 单发伤害 */
     damage: 8,
+    /** 每格电转换出的子弹数 */
+    bulletsPerPower: 4,
+    /** 最大射速（发/秒） */
+    shotsPerSecond: 10,
     /** 子弹最大飞行距离（px），超出后消失 */
     bulletRange: 290,
     /** 每次供电脉冲增加的热量（0~1） */

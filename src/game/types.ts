@@ -58,6 +58,7 @@ export interface Tower {
   barrelAngle: number;
   heat: number;           // gatling heat 0–1
   overloaded: boolean;   // gatling overload lockout until fully cooled
+  gatlingAmmo: number;   // queued bullets converted from incoming power
   sniperAimSince?: number; // sniper: time (performance.now) when barrel locked on target
 }
 

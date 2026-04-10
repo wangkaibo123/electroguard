@@ -296,6 +296,7 @@ export const createInitialState = (): GameState => {
     barrelAngle: 0,
     heat: 0,
     overloaded: false,
+    gatlingAmmo: 0,
   };
   const towerMap = new Map<string, Tower>([[core.id, core]]);
   return {

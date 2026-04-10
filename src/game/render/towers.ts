@@ -382,6 +382,7 @@ function drawTowerDetails(
     ctx.beginPath(); ctx.arc(cx, cy, r, 0, TWO_PI); ctx.stroke();
     const localAngle = t.barrelAngle - t.rotation;
     const barrelLen = Math.min(tw, th) / 2 - inset + 4;
+    const firingRecently = t.lastActionTime > 0 && now - t.lastActionTime < 140;
     // Heat glow on barrels
     const heat = t.heat;
     if (heat > 0.1) {
@@ -393,8 +394,8 @@ function drawTowerDetails(
       ctx.fillStyle = hGrd;
       ctx.beginPath(); ctx.arc(cx, cy, glowR, 0, TWO_PI); ctx.fill();
     }
-    const spinSpeed = 2 + heat * 8;
-    const spinOffset = now / 1000 * spinSpeed * TWO_PI;
+    const spinSpeed = firingRecently ? 2 + heat * 8 : 0;
+    const spinOffset = firingRecently ? now / 1000 * spinSpeed * TWO_PI : 0;
     const barrelCount = 5;
     const maxSpread = 8;
     for (let b = 0; b < barrelCount; b++) {
@@ -455,10 +456,99 @@ function drawTowerDetails(
       }
 
       if (t.overloaded) {
-        ctx.fillStyle = 'rgba(255,80,40,0.9)';
-        ctx.font = 'bold 10px monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText('HOT', cx, cy + 4);
+        const smokeBaseY = cy - r - 6;
+        for (let i = 0; i < 6; i++) {
+          const smokePhase = now / 820 + i * 0.72;
+          const drift = (smokePhase % 1);
+          const smokeX = cx + Math.sin(smokePhase * 1.25) * (8 + i * 3.5) + (i % 2 === 0 ? -1 : 1) * drift * 10;
+          const smokeY = smokeBaseY - i * 11 - drift * (20 + i * 4);
+          const smokeR = 7 + i * 2.8 + Math.sin(smokePhase * 2.2) * 1.4;
+          ctx.fillStyle = `rgba(160,170,180,${0.2 - i * 0.024})`;
+          ctx.beginPath(); ctx.arc(smokeX, smokeY, smokeR, 0, TWO_PI); ctx.fill();
+        }
+
+        ctx.shadowBlur = 0;
+        for (let spark = 0; spark < 4; spark++) {
+          const jitterSeed = Math.sin(now / 170 + spark * 12.37);
+          const barrelPos = 0.25 + (((jitterSeed + 1) * 0.5 + spark * 0.17) % 0.55);
+          const lateralSide = spark % 2 === 0 ? 1 : -1;
+          const lateralOffset = (2 + ((jitterSeed + 1) * 0.5) * 4) * lateralSide;
+          const sx =
+            cx +
+            Math.cos(localAngle) * (r * 0.2 + barrelLen * barrelPos) +
+            -Math.sin(localAngle) * lateralOffset;
+          const sy =
+            cy +
+            Math.sin(localAngle) * (r * 0.2 + barrelLen * barrelPos) +
+            Math.cos(localAngle) * lateralOffset;
+          const sparkLen = 5 + spark * 1.4 + ((jitterSeed + 1) * 0.5) * 2;
+          const sparkDir = localAngle + lateralSide * (0.9 + ((jitterSeed + 1) * 0.5) * 0.45);
+          const sparkSpread = 0.12 + spark * 0.02;
+
+          ctx.strokeStyle = 'rgba(255,200,90,0.85)';
+          ctx.lineWidth = 1.6;
+          ctx.beginPath();
+          ctx.moveTo(sx, sy);
+          ctx.lineTo(
+            sx + Math.cos(sparkDir - sparkSpread) * sparkLen,
+            sy + Math.sin(sparkDir - sparkSpread) * sparkLen,
+          );
+          ctx.stroke();
+
+          ctx.strokeStyle = 'rgba(255,120,40,0.95)';
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.moveTo(sx, sy);
+          ctx.lineTo(
+            sx + Math.cos(sparkDir + sparkSpread) * (sparkLen * 0.9),
+            sy + Math.sin(sparkDir + sparkSpread) * (sparkLen * 0.9),
+          );
+          ctx.stroke();
+
+          ctx.fillStyle = 'rgba(255,245,220,0.9)';
+          ctx.beginPath();
+          ctx.arc(sx, sy, 1.4, 0, TWO_PI);
+          ctx.fill();
+        }
+
+        const flamePulse = 0.85 + 0.15 * Math.sin(now / 120);
+        for (let flame = 0; flame < 3; flame++) {
+          const flameHeight = (10 + flame * 5) * flamePulse;
+          const flameWidth = 5 + flame * 2.5;
+          const flameYOffset = 2 + flame * 2.2;
+          const flicker = Math.sin(now / 90 + flame * 1.7) * 1.4;
+          ctx.fillStyle =
+            flame === 0 ? 'rgba(255,245,210,0.92)' :
+            flame === 1 ? 'rgba(255,170,55,0.82)' :
+            'rgba(255,90,20,0.72)';
+          ctx.beginPath();
+          ctx.moveTo(cx + flicker, cy + 8 - flameYOffset);
+          ctx.quadraticCurveTo(
+            cx - flameWidth + flicker,
+            cy + 4 - flameYOffset,
+            cx - flameWidth * 0.55 + flicker,
+            cy - flameHeight * 0.25,
+          );
+          ctx.quadraticCurveTo(
+            cx - flameWidth * 0.18 + flicker,
+            cy - flameHeight,
+            cx + flicker,
+            cy - flameHeight - 4,
+          );
+          ctx.quadraticCurveTo(
+            cx + flameWidth * 0.2 + flicker,
+            cy - flameHeight * 0.95,
+            cx + flameWidth * 0.65 + flicker,
+            cy - flameHeight * 0.2,
+          );
+          ctx.quadraticCurveTo(
+            cx + flameWidth + flicker,
+            cy + 3 - flameYOffset,
+            cx + flicker,
+            cy + 8 - flameYOffset,
+          );
+          ctx.fill();
+        }
       }
     }
   } else if (t.type === 'sniper') {

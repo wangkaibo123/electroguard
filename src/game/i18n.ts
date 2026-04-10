@@ -184,7 +184,7 @@ const en: I18nStrings = {
   towerDesc: {
     core: 'The heart of your defense. Generates power.',
     blaster: 'Fires a bullet per 2 power. Reliable turret.',
-    gatling: 'Heat-based rapid fire. Spins up with power.',
+    gatling: 'Each power becomes 4 bullets. Fires up to 10 shots/sec.',
     sniper: 'High-damage piercing shot. Costs 4 power.',
     tesla: 'Chain lightning bounces between enemies.',
     generator: 'Power source for the network. Dispatches energy.',
@@ -198,7 +198,7 @@ const en: I18nStrings = {
     blaster:
       'Role: steady single-target damage.\n\nEach shot costs 2 power. Power pulses travel along wires from the Core or Generators; the turret must be connected and receiving energy to fire.\n\nTips: place with a clear line of sight to spawn lanes; click the placed turret to rotate the barrel toward threats. Good as a backbone turret when power is stable.',
     gatling:
-      'Role: sustained DPS that ramps up over time.\n\nFiring speed increases as the turret stays powered and keeps shooting (heat/spin-up mechanic). Uses more power when firing fast—balance with Generators and Batteries.\n\nTips: best against waves and clusters; pair with reliable wiring so it does not stall mid-fight.',
+      'Role: sustained DPS with capped fire rate.\n\nEach incoming power becomes 4 bullets. The turret fires those bullets at up to 10 shots per second while heat still affects spread and overload risk.\n\nTips: best against waves and clusters; pair with reliable wiring so it keeps a healthy ammo queue during fights.',
     sniper:
       'Role: burst damage on a line.\n\nEach shot costs 4 power and pierces all enemies along its firing line, with a longer cooldown between shots.\n\nTips: align the turret so enemies walk in a straight line through the beam; excellent for choke points. Rotate after placement to maximize pierce value.',
     tesla:
@@ -241,7 +241,7 @@ const en: I18nStrings = {
   pickDesc: {
     'blaster_1': 'Fires a bullet per 2 power',
     'blaster_2': 'Two standard turrets',
-    'gatling_1': 'Heat-based rapid fire, spins up',
+    'gatling_1': '4 bullets per power, max 10 shots/sec',
     'sniper_1': 'Piercing line shot, long cooldown',
     'tesla_1': 'Chain lightning between enemies',
     'generator_1': 'Power source for the network',
@@ -347,7 +347,7 @@ const zh: I18nStrings = {
   towerDesc: {
     core: '防御核心，生成能量。',
     blaster: '消耗2格电发射子弹，可靠炮塔。',
-    gatling: '热力驱动连射，随能量加速。',
+    gatling: '每格电转化为4发子弹，最多每秒10发。',
     sniper: '高伤穿透射击，消耗4格电。',
     tesla: '闪电在敌人间连锁弹射。',
     generator: '为网络供电，分配能量。',
@@ -361,7 +361,7 @@ const zh: I18nStrings = {
     blaster:
       '定位：加农炮——稳定单体输出，性价比高。\n\n每次开火消耗 2 格电力。能量沿线缆从核心或发电机传来，必须连通电网且正在受电才能射击。\n\n用法建议：放在能俯视刷怪方向的位置；放置后点击旋转炮口。电力稳定时适合作为主力炮塔。',
     gatling:
-      '定位：持续火力，越久射得越快。\n\n通电连射时会“升温”加速，射速提高后耗电也会增加，注意与发电机、蓄电池搭配。\n\n用法建议：适合应对密集波次；务必保证线缆可靠，避免打一半断供。',
+      '定位：持续火力，稳定限速输出。\n\n每接收 1 格电就转化为 4 发子弹，并以最多每秒 10 发的速度持续射击。热量仍会影响散布，并在过热时暂时停火。\n\n用法建议：适合应对密集波次；务必保证线缆可靠，让它在交战时保持足够弹药储备。',
     sniper:
       '定位：狙击塔——直线高爆发、穿透杀伤。\n\n每发消耗 4 格电，冷却较长，但一发可穿透路径上所有敌人。\n\n用法建议：把敌人走位收成一条线时收益最大，适合隘口；放置后旋转找好穿透角度。',
     tesla:
@@ -404,7 +404,7 @@ const zh: I18nStrings = {
   pickDesc: {
     'blaster_1': '每2格电发射一发子弹',
     'blaster_2': '两座标准炮塔',
-    'gatling_1': '热力连射，持续加速',
+    'gatling_1': '1电4发，最多每秒10发',
     'sniper_1': '穿透直线射击，长冷却',
     'tesla_1': '闪电在敌人间弹射',
     'generator_1': '为网络提供能量',
