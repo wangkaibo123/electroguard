@@ -43,24 +43,62 @@ const TOWER_BAR_FADE_MS = 700;
 const ENERGY_EFFECT_SIZE = CELL_SIZE * 0.5;
 
 export const drawOccupiedGround = (ctx: CanvasRenderingContext2D, state: GameState) => {
+  const occupied = new Set<string>();
+  let hasCore = false;
+
   for (const tower of state.towers) {
-    const px = tower.x * CELL_SIZE;
-    const py = tower.y * CELL_SIZE;
-    const tw = tower.width * CELL_SIZE;
-    const th = tower.height * CELL_SIZE;
-    const radius = tower.type === 'core' ? 18 : 12;
-
-    ctx.fillStyle = tower.type === 'core' ? 'rgba(20,30,48,0.92)' : 'rgba(14,22,36,0.9)';
-    ctx.beginPath();
-    ctx.roundRect(px + 1, py + 1, tw - 2, th - 2, radius);
-    ctx.fill();
-
-    ctx.strokeStyle = tower.type === 'core' ? 'rgba(96,165,250,0.14)' : 'rgba(148,163,184,0.08)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.roundRect(px + 1.5, py + 1.5, tw - 3, th - 3, radius);
-    ctx.stroke();
+    if (tower.type === 'core') hasCore = true;
+    for (let gx = tower.x; gx < tower.x + tower.width; gx++) {
+      for (let gy = tower.y; gy < tower.y + tower.height; gy++) {
+        occupied.add(`${gx},${gy}`);
+      }
+    }
   }
+
+  if (!occupied.size) return;
+
+  const hasCell = (x: number, y: number) => occupied.has(`${x},${y}`);
+  const baseInset = 1;
+  const cellSize = CELL_SIZE - baseInset * 2;
+
+  ctx.fillStyle = hasCore ? 'rgba(16,26,42,0.92)' : 'rgba(14,22,36,0.9)';
+  for (const cell of occupied) {
+    const [gx, gy] = cell.split(',').map(Number);
+    const px = gx * CELL_SIZE + baseInset;
+    const py = gy * CELL_SIZE + baseInset;
+    ctx.fillRect(px, py, cellSize, cellSize);
+  }
+
+  ctx.strokeStyle = hasCore ? 'rgba(96,165,250,0.14)' : 'rgba(148,163,184,0.08)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+
+  for (const cell of occupied) {
+    const [gx, gy] = cell.split(',').map(Number);
+    const left = gx * CELL_SIZE + baseInset;
+    const right = (gx + 1) * CELL_SIZE - baseInset;
+    const top = gy * CELL_SIZE + baseInset;
+    const bottom = (gy + 1) * CELL_SIZE - baseInset;
+
+    if (!hasCell(gx, gy - 1)) {
+      ctx.moveTo(left, top);
+      ctx.lineTo(right, top);
+    }
+    if (!hasCell(gx + 1, gy)) {
+      ctx.moveTo(right, top);
+      ctx.lineTo(right, bottom);
+    }
+    if (!hasCell(gx, gy + 1)) {
+      ctx.moveTo(right, bottom);
+      ctx.lineTo(left, bottom);
+    }
+    if (!hasCell(gx - 1, gy)) {
+      ctx.moveTo(left, bottom);
+      ctx.lineTo(left, top);
+    }
+  }
+
+  ctx.stroke();
 };
 
 const drawEnergyEffect = (
