@@ -4,7 +4,7 @@ import {
   GRID_WIDTH, GRID_HEIGHT, CELL_SIZE, HALF_CELL, TOWER_STATS, CANVAS_WIDTH, CANVAS_HEIGHT, WIRE_MAX_HP,
 } from './types';
 import { t, pickKey } from './i18n';
-import { GLOBAL_CONFIG, ENEMY_CONFIG, ENEMY_SCALING, STARTING_INVENTORY, PICK_POOL_CONFIG } from './config';
+import { GLOBAL_CONFIG, ENEMY_CONFIG, ENEMY_SCALING, STARTING_INVENTORY, PICK_POOL_CONFIG, WEAPON_CONFIG } from './config';
 
 const ENEMY_SPEED_MUL = GLOBAL_CONFIG.enemyBaseSpeedMul;
 
@@ -15,6 +15,29 @@ export const genId = () => (++_idCounter).toString(36);
 
 const PORT_DIRS: PortDirection[] = ['top', 'right', 'bottom', 'left'];
 const NEIGHBOR_OFFSETS = [[0, 1], [1, 0], [0, -1], [-1, 0]] as const;
+const GATLING_RANGE = WEAPON_CONFIG.gatling.range;
+
+const gatlingNeedsPower = (state: GameState, tower: Tower) => {
+  const baseX = (tower.x + tower.width / 2) * CELL_SIZE;
+  const baseY = (tower.y + tower.height / 2) * CELL_SIZE;
+
+  for (const enemy of state.enemies) {
+    if (Math.hypot(enemy.x - baseX, enemy.y - baseY) < GATLING_RANGE) {
+      return true;
+    }
+  }
+
+  for (const otherTower of state.towers) {
+    if (otherTower.type !== 'target') continue;
+    const tx = (otherTower.x + otherTower.width / 2) * CELL_SIZE;
+    const ty = (otherTower.y + otherTower.height / 2) * CELL_SIZE;
+    if (Math.hypot(tx - baseX, ty - baseY) < GATLING_RANGE) {
+      return true;
+    }
+  }
+
+  return false;
+};
 
 // ── Rotation helpers ─────────────────────────────────────────────────────────
 
@@ -325,7 +348,13 @@ export const dispatchPulse = (state: GameState, src: Tower, isBattery = false): 
   while (queue.length > 0) {
     const { tower, path } = queue.shift()!;
 
-    if (tower.id !== src.id && (tower.storedPower + tower.incomingPower) < tower.maxPower) {
+    const canReceivePulse = tower.id !== src.id && (
+      tower.type === 'gatling'
+        ? tower.incomingPower < 1 && gatlingNeedsPower(state, tower)
+        : (tower.storedPower + tower.incomingPower) < tower.maxPower
+    );
+
+    if (canReceivePulse) {
       if (!isBattery || tower.type !== 'battery') {
         const pixels: Position[] = [{ x: (src.x + src.width / 2) * CELL_SIZE, y: (src.y + src.height / 2) * CELL_SIZE }];
         let curId = src.id;

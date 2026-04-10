@@ -33,7 +33,23 @@ export const canPlaceTowerAt = (
   );
 };
 
-export const findAutoPlacementNearCore = (state: GameState, type: TowerType) => {
+const getTowerGapFromCore = (
+  core: GameState['towers'][number],
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+) => {
+  const gapX = Math.max(core.x - (x + width), x - (core.x + core.width), 0);
+  const gapY = Math.max(core.y - (y + height), y - (core.y + core.height), 0);
+  return Math.max(gapX, gapY);
+};
+
+export const findAutoPlacementNearCore = (
+  state: GameState,
+  type: TowerType,
+  minGapFromCore = 0,
+) => {
   const core = state.towers.find((tower) => tower.type === 'core');
   if (!core) return null;
 
@@ -45,6 +61,7 @@ export const findAutoPlacementNearCore = (state: GameState, type: TowerType) => 
   for (let y = 0; y <= GRID_HEIGHT - stats.height; y++) {
     for (let x = 0; x <= GRID_WIDTH - stats.width; x++) {
       if (!canPlaceTowerAt(state, type, x, y)) continue;
+      if (getTowerGapFromCore(core, x, y, stats.width, stats.height) < minGapFromCore) continue;
       const towerCx = x + stats.width / 2;
       const towerCy = y + stats.height / 2;
       candidates.push({

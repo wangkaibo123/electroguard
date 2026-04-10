@@ -73,7 +73,7 @@ export const TOWER_CONFIG: Record<TowerType, {
   /* 爆破炮：每次消耗 2 电力发射追踪弹 */
   blaster:   { hp: 100,  description: 'Fires a bullet per 2 power. Reliable turret.',              color: '#f87171', width: 3, height: 3, maxPower: 2, maxShieldHp: 0,   shieldRadius: 0 },
   /* 加特林：热量驱动的连射炮塔，越打越快 */
-  gatling:   { hp: 100,  description: 'Heat-based rapid fire. Spins up with power.',               color: '#f59e0b', width: 3, height: 3, maxPower: 5, maxShieldHp: 0,   shieldRadius: 0 },
+  gatling:   { hp: 100,  description: 'Heat-based rapid fire. Spins up with power.',               color: '#f59e0b', width: 3, height: 3, maxPower: 0, maxShieldHp: 0,   shieldRadius: 0 },
   /* 狙击塔：高伤害穿透弹，冷却长 */
   sniper:    { hp: 80,   description: 'High-damage piercing shot. Costs 4 power.',                 color: '#a78bfa', width: 3, height: 3, maxPower: 4, maxShieldHp: 0,   shieldRadius: 0 },
   /* 电磁炮（tesla）：链式闪电，在敌人之间弹跳 */

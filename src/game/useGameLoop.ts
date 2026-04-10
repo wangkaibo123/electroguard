@@ -126,7 +126,7 @@ export const useGameLoop = () => {
     type: TowerType,
     sourceClientPos?: { x: number; y: number },
   ) => {
-    const placement = findAutoPlacementNearCore(state, type);
+    const placement = findAutoPlacementNearCore(state, type, 2);
     if (!placement) return false;
 
     const stats = TOWER_STATS[type];
@@ -150,7 +150,7 @@ export const useGameLoop = () => {
     const starterTowers: TowerType[] = ['generator', 'blaster'];
 
     for (const type of starterTowers) {
-      const placement = findAutoPlacementNearCore(state, type);
+      const placement = findAutoPlacementNearCore(state, type, 2);
       if (!placement) continue;
       addTowerToState(state, createTowerAt(type, placement.x, placement.y));
     }
@@ -222,6 +222,19 @@ export const useGameLoop = () => {
       state.pickUiPhase = 'standard';
       state.waveTimer = 0;
     }
+    sync();
+  };
+
+  const openCustomPick = () => {
+    const state = stateRef.current;
+    if (state.gameMode !== 'custom') return;
+    if (state.status !== 'playing' && state.status !== 'paused') return;
+
+    state.pickOptions = generatePickOptions();
+    state.pickUiPhase = 'standard';
+    state.pendingBossBonusPick = false;
+    state.bossBonusPickQueued = false;
+    state.status = 'pick';
     sync();
   };
 
@@ -972,7 +985,7 @@ export const useGameLoop = () => {
 
   return {
     canvasRef, cameraRef, gameState, startGame, startCustomGame, togglePause, returnToMenu, handlePick,
-    selectedTower, setSelectedTower, skipToNextWave, toastMessage,
+    openCustomPick, selectedTower, setSelectedTower, skipToNextWave, toastMessage,
     handleCanvasMouseDown, handleCanvasMouseMove, handleCanvasMouseUp, handleCanvasMouseLeave,
     handleCanvasWheel, handleCanvasContextMenu,
     handleCanvasTouchStart, handleCanvasTouchMove, handleCanvasTouchEnd,

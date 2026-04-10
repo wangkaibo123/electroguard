@@ -29,6 +29,7 @@ export default function App() {
     togglePause,
     returnToMenu,
     handlePick,
+    openCustomPick,
     selectedTower,
     setSelectedTower,
     skipToNextWave,
@@ -650,6 +651,20 @@ export default function App() {
                     </div>
                   </div>
 
+                  <button
+                    type="button"
+                    onClick={openCustomPick}
+                    disabled={gameState.status !== 'playing' && gameState.status !== 'paused'}
+                    className={`flex items-center gap-2.5 px-3 py-3 rounded-lg border transition-all ${
+                      gameState.status === 'playing' || gameState.status === 'paused'
+                        ? 'border-amber-700/70 bg-amber-500/10 text-amber-200 hover:bg-amber-500/15 hover:border-amber-500/70'
+                        : 'border-gray-800 bg-gray-900/50 text-gray-500 cursor-not-allowed opacity-50'
+                    }`}
+                  >
+                    <div className="shrink-0"><Play size={18} /></div>
+                    <span className="text-sm font-bold leading-tight">{i.openPick}</span>
+                  </button>
+
                   <div className="mt-2 text-xs text-gray-600 px-1 py-1 leading-relaxed">
                     <p>{i.clickToRotate}</p>
                     <p>{i.dragToWire}</p>
@@ -697,6 +712,20 @@ export default function App() {
                     <span className="text-xs text-blue-400 font-mono leading-tight">{gameState.gameMode === 'custom' ? '\u221E' : `x${gameState.wireInventory}`}</span>
                   </div>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={openCustomPick}
+                  disabled={gameState.status !== 'playing' && gameState.status !== 'paused'}
+                  className={`flex items-center gap-2.5 px-3 py-3 rounded-lg border transition-all ${
+                    gameState.status === 'playing' || gameState.status === 'paused'
+                      ? 'border-amber-700/70 bg-amber-500/10 text-amber-200 hover:bg-amber-500/15 hover:border-amber-500/70'
+                      : 'border-gray-800 bg-gray-900/50 text-gray-500 cursor-not-allowed opacity-50'
+                  }`}
+                >
+                  <div className="shrink-0"><Play size={18} /></div>
+                  <span className="text-sm font-bold leading-tight">{i.openPick}</span>
+                </button>
 
                 <div className="mt-4 text-xs text-gray-600 px-1 py-2 leading-relaxed">
                   <p>{i.clickToRotate}</p>

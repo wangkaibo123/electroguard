@@ -43,6 +43,7 @@ export interface I18nStrings {
   showPanel: string;
   clickToRotate: string;
   dragToWire: string;
+  openPick: string;
 
   // Wave
   startNextWave: string;
@@ -117,6 +118,7 @@ const en: I18nStrings = {
   showPanel: 'Show panel',
   clickToRotate: 'Click machine to rotate',
   dragToWire: 'Drag port to wire',
+  openPick: 'Open Upgrade Pick',
 
   startNextWave: 'Start Next Wave',
   noWires: 'No wires available!',
@@ -270,6 +272,7 @@ const zh: I18nStrings = {
   showPanel: '显示面板',
   clickToRotate: '点击机器旋转',
   dragToWire: '拖拽端口连线',
+  openPick: '开启三选一',
 
   startNextWave: '提前开始下一波',
   noWires: '没有可用的线缆！',
