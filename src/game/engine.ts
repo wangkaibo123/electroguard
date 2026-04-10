@@ -86,6 +86,36 @@ export const getPortCell = (t: Tower, p: Port): Position => {
   }
 };
 
+export const isPortAccessible = (
+  state: GameState,
+  tower: Tower,
+  port: Port,
+  ignoreWireId?: string,
+): boolean => {
+  const cell = getPortCell(tower, port);
+  if (cell.x < 0 || cell.x >= GRID_WIDTH || cell.y < 0 || cell.y >= GRID_HEIGHT) return false;
+
+  for (const other of state.towers) {
+    if (
+      cell.x >= other.x &&
+      cell.x < other.x + other.width &&
+      cell.y >= other.y &&
+      cell.y < other.y + other.height
+    ) {
+      return false;
+    }
+  }
+
+  for (const wire of state.wires) {
+    if (wire.id === ignoreWireId) continue;
+    if (wire.path.some((point) => point.x === cell.x && point.y === cell.y)) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
 // ── Collision helpers ────────────────────────────────────────────────────────
 
 export const collidesWithTowers = (

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+﻿import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   GameState, TowerType, Port, Wire, CELL_SIZE, GRID_WIDTH, GRID_HEIGHT, EnemyType,
   TOWER_STATS, CANVAS_WIDTH, CANVAS_HEIGHT, WIRE_MAX_HP,
@@ -8,6 +8,7 @@ import {
   createInitialState, updatePowerGrid, getPortPos, getPortCell, findWirePath,
   snapRotation, applyTowerRotation, canPlace, collidesWithTowers,
   collidesWithWires, repathConnectedWires, genId, generatePickOptions, spawnEnemyAt,
+  isPortAccessible,
 } from './engine';
 import { renderGame } from './renderer';
 import { GLOBAL_CONFIG } from './config';
@@ -15,6 +16,7 @@ import { t } from './i18n';
 import { addTowerToState, createTowerAt } from './towerFactory';
 import { findAutoPlacementNearCore } from './placement';
 import { updateGameState } from './updateGameState';
+import { getRotationKnobLayout } from './render/towers';
 
 const { maxZoom: MAX_ZOOM, waveDelay: WAVE_DELAY } = GLOBAL_CONFIG;
 
@@ -110,7 +112,7 @@ export const useGameLoop = () => {
   const [rotatingTowerId, setRotatingTowerId] = useState<string | null>(null);
   const updateRotating = (id: string | null) => { rotatingRef.current = id; setRotatingTowerId(id); };
 
-  // ── Actions ─────────────────────────────────────────────────────────────
+  // 鈹€鈹€ Actions 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
   /** Center camera on the core tower using the actual viewport size */
   const centerOnCore = (state: GameState) => {
@@ -323,13 +325,14 @@ export const useGameLoop = () => {
 
     if (dropPort && dropTowerId && dropTowerId !== dragStart.towerId) {
       const isUsed = state.wires.some((wire) => wire.startPortId === dropPort!.id || wire.endPortId === dropPort!.id);
-      if (!isUsed) {
+      const targetTower = state.towerMap.get(dropTowerId)!;
+      if (!isUsed && isPortAccessible(state, targetTower, dropPort)) {
         const sourceTower = state.towerMap.get(dragStart.towerId);
         const sourcePort = sourceTower?.ports.find((port) => port.id === dragStart.portId);
-        if (sourceTower && sourcePort) {
+        if (sourceTower && sourcePort && isPortAccessible(state, sourceTower, sourcePort)) {
           let startTower = sourceTower;
           let startPort = sourcePort;
-          let endTower = state.towerMap.get(dropTowerId)!;
+          let endTower = targetTower;
           let endPort = dropPort;
 
           if (sourcePort.portType === 'input' && dropPort.portType === 'output') {
@@ -362,7 +365,7 @@ export const useGameLoop = () => {
     clearWireDragState();
   };
 
-  // ── Canvas mouse helpers ────────────────────────────────────────────────
+  // 鈹€鈹€ Canvas mouse helpers 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
   const canvasScreenXY = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const r = canvasRef.current?.getBoundingClientRect();
     return r ? { sx: e.clientX - r.left, sy: e.clientY - r.top } : null;
@@ -418,12 +421,8 @@ export const useGameLoop = () => {
     if (rotatingRef.current) {
       const tower = state.towerMap.get(rotatingRef.current);
       if (tower) {
-        const cx = (tower.x + tower.width / 2) * CELL_SIZE;
-        const cy = (tower.y + tower.height / 2) * CELL_SIZE;
-        const kd = Math.max(tower.width, tower.height) * CELL_SIZE / 2 + 20;
-        const kx = cx + Math.cos(tower.rotation - Math.PI / 2) * kd;
-        const ky = cy + Math.sin(tower.rotation - Math.PI / 2) * kd;
-        if (Math.hypot(wx - kx, wy - ky) < 14) {
+        const { kx, ky } = getRotationKnobLayout(tower);
+        if (Math.hypot(wx - kx, wy - ky) < 19) {
           rotStartAngleRef.current = 0;
           isRotKnobRef.current = true;
           return;
@@ -444,6 +443,8 @@ export const useGameLoop = () => {
           sync();
         } else if (state.gameMode !== 'custom' && state.wireInventory <= 0) {
           showToast(t().noWires);
+          return;
+        } else if (!isPortAccessible(state, tower, port)) {
           return;
         }
         dragWireStartRef.current = { towerId: tower.id, portId: port.id };
@@ -529,8 +530,10 @@ export const useGameLoop = () => {
           for (const port of tower.ports) {
             const pp = getPortPos(tower, port);
             if (Math.hypot(pp.x - wx, pp.y - wy) < 15 && tower.id !== st.id) {
-              endCell = getPortCell(tower, port);
-              break;
+              if (isPortAccessible(state, tower, port)) {
+                endCell = getPortCell(tower, port);
+                break;
+              }
             }
           }
         }
@@ -641,7 +644,7 @@ export const useGameLoop = () => {
     e.preventDefault();
   };
 
-  // ── Touch support ────────────────────────────────────────────────────────
+  // 鈹€鈹€ Touch support 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
   const lastPinchDistRef = useRef<number | null>(null);
 
   const touchScreenXY = (touch: React.Touch) => {
@@ -687,12 +690,8 @@ export const useGameLoop = () => {
     if (rotatingRef.current) {
       const tower = state.towerMap.get(rotatingRef.current);
       if (tower) {
-        const cx = (tower.x + tower.width / 2) * CELL_SIZE;
-        const cy = (tower.y + tower.height / 2) * CELL_SIZE;
-        const kd = Math.max(tower.width, tower.height) * CELL_SIZE / 2 + 20;
-        const kx = cx + Math.cos(tower.rotation - Math.PI / 2) * kd;
-        const ky = cy + Math.sin(tower.rotation - Math.PI / 2) * kd;
-        if (Math.hypot(wx - kx, wy - ky) < 20) {
+        const { kx, ky } = getRotationKnobLayout(tower);
+        if (Math.hypot(wx - kx, wy - ky) < 27) {
           rotStartAngleRef.current = 0;
           isRotKnobRef.current = true;
           return;
@@ -713,6 +712,8 @@ export const useGameLoop = () => {
           sync();
         } else if (state.gameMode !== 'custom' && state.wireInventory <= 0) {
           showToast(t().noWires);
+          return;
+        } else if (!isPortAccessible(state, tower, port)) {
           return;
         }
         dragWireStartRef.current = { towerId: tower.id, portId: port.id };
@@ -823,8 +824,10 @@ export const useGameLoop = () => {
           for (const port of tower.ports) {
             const pp = getPortPos(tower, port);
             if (Math.hypot(pp.x - wx, pp.y - wy) < 20 && tower.id !== st.id) {
-              endCell = getPortCell(tower, port);
-              break;
+              if (isPortAccessible(state, tower, port)) {
+                endCell = getPortCell(tower, port);
+                break;
+              }
             }
           }
         }
@@ -894,7 +897,7 @@ export const useGameLoop = () => {
     }
   };
 
-  // ── Game loop ──────────────────────────────────────────────────────────
+  // 鈹€鈹€ Game loop 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
   const gameLoop = useCallback((time: number) => {
     if (!lastTimeRef.current) lastTimeRef.current = time;
     const dt = (time - lastTimeRef.current) / 1000;
@@ -905,7 +908,7 @@ export const useGameLoop = () => {
       sync();
     }
 
-    // ── Render ────────────────────────────────────────────────────────────
+    // 鈹€鈹€ Render 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
     const ctx = canvasRef.current?.getContext('2d');
     if (ctx) {
       const dpr = window.devicePixelRatio || 1;
@@ -920,6 +923,7 @@ export const useGameLoop = () => {
         dragWireStartRef.current,
         mousePxRef.current,
         dragWirePathRef.current,
+        dragTowerRef.current,
         rotatingRef.current,
         placeMonsterModeRef.current && mousePxRef.current
           ? {
@@ -940,7 +944,7 @@ export const useGameLoop = () => {
     return () => cancelAnimationFrame(id);
   }, [gameLoop]);
 
-  // ── Adaptive canvas resolution (CSS size + DPR backing store) ─────────────
+  // 鈹€鈹€ Adaptive canvas resolution (CSS size + DPR backing store) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -975,14 +979,14 @@ export const useGameLoop = () => {
     };
   }, []);
 
-  // ── Keyboard shortcuts ──────────────────────────────────────────────
+  // 鈹€鈹€ Keyboard shortcuts 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       const state = stateRef.current;
       if (state.status !== 'playing') return;
 
       if (e.key === 'Escape') {
-        // Cancel tower drag — restore original position and wires
+        // Cancel tower drag 鈥?restore original position and wires
         if (dragTowerRef.current && dragOrigPosRef.current) {
           cancelTowerDrag();
           return;
@@ -1020,7 +1024,7 @@ export const useGameLoop = () => {
       }
 
       if (e.key === 'q' || e.key === 'Q') {
-        // Quick rotate the currently selected (rotating) tower 90° right
+        // Quick rotate the currently selected (rotating) tower 90掳 right
         if (rotatingRef.current) {
           const tower = state.towerMap.get(rotatingRef.current);
           if (tower) {
@@ -1046,3 +1050,6 @@ export const useGameLoop = () => {
     handleCanvasTouchStart, handleCanvasTouchMove, handleCanvasTouchEnd,
   };
 };
+
+
+

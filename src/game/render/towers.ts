@@ -1,5 +1,5 @@
 import { GameState, Tower, TowerType, CELL_SIZE, HALF_CELL, TOWER_STATS, TURRET_RANGE } from '../types';
-import { getPortPos } from '../engine';
+import { getPortPos, isPortAccessible } from '../engine';
 import {
   TWO_PI, BG_DARK, UNPOWERED, PULSE_CLR, HP_BG, HP_FG,
   PORT_OUT, PORT_OUT_USED, PORT_IN, PORT_IN_USED, KNOB_CLR, POWER_ON,
@@ -36,12 +36,30 @@ const getLinearTowerBodyRect = (
   };
 };
 
+const ROTATION_KNOB_SCALE = 4 / 3;
+const ROTATION_KNOB_BASE_OFFSET = 20;
+
+export const getRotationKnobLayout = (tower: Tower) => {
+  const tpx = tower.x * CELL_SIZE;
+  const tpy = tower.y * CELL_SIZE;
+  const ttw = tower.width * CELL_SIZE;
+  const tth = tower.height * CELL_SIZE;
+  const tcx = tpx + ttw / 2;
+  const tcy = tpy + tth / 2;
+  const kd = Math.max(tower.width, tower.height) * CELL_SIZE / 2 + ROTATION_KNOB_BASE_OFFSET * 2;
+  const kx = tcx + Math.cos(tower.rotation - Math.PI / 2) * kd;
+  const ky = tcy + Math.sin(tower.rotation - Math.PI / 2) * kd;
+
+  return { tpx, tpy, ttw, tth, tcx, tcy, kd, kx, ky };
+};
+
 // ── Ports (drawn under tower bodies) ─────────────────────────────────────
 export const drawPorts = (ctx: CanvasRenderingContext2D, state: GameState) => {
   const PORT_SCALE = 4 / 3;
   const OUT_TRI = 7.5 * PORT_SCALE;
   const IN_HALF = 6 * PORT_SCALE;
   const portStrokeW = 1.35;
+  const now = performance.now();
   for (const tower of state.towers) {
     const ppx = tower.x * CELL_SIZE, ppy = tower.y * CELL_SIZE;
     const ptw = tower.width * CELL_SIZE, pth = tower.height * CELL_SIZE;
@@ -57,19 +75,35 @@ export const drawPorts = (ctx: CanvasRenderingContext2D, state: GameState) => {
       const off = portOutward(port.direction);
       const drawX = pos.x + off.x, drawY = pos.y + off.y;
       const used = state.wires.some(w => w.startPortId === port.id || w.endPortId === port.id);
+      const accessible = isPortAccessible(state, tower, port);
       const portColor = port.portType === 'output'
         ? (used ? PORT_OUT_USED : PORT_OUT)
         : (used ? PORT_IN_USED : PORT_IN);
+      const displayColor = !used && !accessible ? 'rgba(107,114,128,0.7)' : portColor;
+      const pulse = 0.55 + 0.45 * (Math.sin(now / 260) * 0.5 + 0.5);
 
-      ctx.strokeStyle = portColor;
+      ctx.strokeStyle = displayColor;
       ctx.lineWidth = 2.5;
       ctx.beginPath();
       ctx.moveTo(pos.x, pos.y);
       ctx.lineTo(drawX, drawY);
       ctx.stroke();
 
+      if (used) {
+        ctx.save();
+        ctx.shadowColor = portColor;
+        ctx.shadowBlur = 8 + 8 * pulse;
+        ctx.strokeStyle = `rgba(255,255,255,${0.18 + pulse * 0.18})`;
+        ctx.lineWidth = 1.5 + pulse;
+        ctx.beginPath();
+        ctx.moveTo(pos.x, pos.y);
+        ctx.lineTo(drawX, drawY);
+        ctx.stroke();
+        ctx.restore();
+      }
+
       if (port.portType === 'output') {
-        ctx.fillStyle = portColor;
+        ctx.fillStyle = displayColor;
         const s = OUT_TRI;
         ctx.beginPath();
         switch (port.direction) {
@@ -80,16 +114,32 @@ export const drawPorts = (ctx: CanvasRenderingContext2D, state: GameState) => {
         }
         ctx.closePath();
         ctx.fill();
+        if (used) {
+          ctx.save();
+          ctx.fillStyle = `rgba(255,255,255,${0.12 + pulse * 0.18})`;
+          ctx.shadowColor = portColor;
+          ctx.shadowBlur = 10 + 10 * pulse;
+          ctx.fill();
+          ctx.restore();
+        }
         ctx.strokeStyle = BG_DARK;
         ctx.lineWidth = portStrokeW;
         ctx.stroke();
       } else {
-        ctx.fillStyle = portColor;
+        ctx.fillStyle = displayColor;
         const h = IN_HALF;
         const r = 2.25;
         ctx.beginPath();
         ctx.roundRect(drawX - h, drawY - h, h * 2, h * 2, r);
         ctx.fill();
+        if (used) {
+          ctx.save();
+          ctx.fillStyle = `rgba(255,255,255,${0.1 + pulse * 0.16})`;
+          ctx.shadowColor = portColor;
+          ctx.shadowBlur = 10 + 10 * pulse;
+          ctx.fill();
+          ctx.restore();
+        }
         ctx.strokeStyle = BG_DARK;
         ctx.lineWidth = portStrokeW;
         ctx.stroke();
@@ -240,6 +290,31 @@ export const drawPlacementPreview = (
   ctx.globalAlpha = 1;
 };
 
+export const drawDraggedTowerFootprint = (
+  ctx: CanvasRenderingContext2D,
+  state: GameState,
+  draggedTowerId: string | null,
+) => {
+  if (!draggedTowerId || state.status !== 'playing') return;
+  const tower = state.towerMap.get(draggedTowerId);
+  if (!tower) return;
+
+  const px = tower.x * CELL_SIZE;
+  const py = tower.y * CELL_SIZE;
+  const tw = tower.width * CELL_SIZE;
+  const th = tower.height * CELL_SIZE;
+
+  ctx.save();
+  ctx.strokeStyle = '#facc15';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([10, 6]);
+  ctx.strokeRect(px, py, tw, th);
+  ctx.setLineDash([4, 8]);
+  ctx.fillStyle = 'rgba(250,204,21,0.08)';
+  ctx.fillRect(px, py, tw, th);
+  ctx.restore();
+};
+
 // ── Range preview ─────────────────────────────────────────────────────────
 export const drawRangePreview = (
   ctx: CanvasRenderingContext2D, state: GameState,
@@ -275,12 +350,12 @@ export const drawRotationKnob = (ctx: CanvasRenderingContext2D, state: GameState
   const tower = state.towerMap.get(rotatingTowerId);
   if (!tower) return;
 
-  const tpx = tower.x * CELL_SIZE, tpy = tower.y * CELL_SIZE;
-  const ttw = tower.width * CELL_SIZE, tth = tower.height * CELL_SIZE;
-  const tcx = tpx + ttw / 2, tcy = tpy + tth / 2;
-  const kd = Math.max(tower.width, tower.height) * CELL_SIZE / 2 + 20;
-  const kx = tcx + Math.cos(tower.rotation - Math.PI / 2) * kd;
-  const ky = tcy + Math.sin(tower.rotation - Math.PI / 2) * kd;
+  const { tpx, tpy, ttw, tth, tcx, tcy, kd, kx, ky } = getRotationKnobLayout(tower);
+  const knobR = 7 * ROTATION_KNOB_SCALE;
+  const innerR = 3 * ROTATION_KNOB_SCALE;
+  const markerR = 3 * ROTATION_KNOB_SCALE;
+  const arcR = 14 * ROTATION_KNOB_SCALE;
+  const arrowLen = 5 * ROTATION_KNOB_SCALE;
 
   ctx.strokeStyle = KNOB_CLR; ctx.lineWidth = 1.5;
   ctx.setLineDash([4, 4]);
@@ -291,7 +366,7 @@ export const drawRotationKnob = (ctx: CanvasRenderingContext2D, state: GameState
   for (let i = 0; i < 4; i++) {
     const sa = i * Math.PI / 2 - Math.PI / 2;
     ctx.beginPath();
-    ctx.arc(tcx + Math.cos(sa) * kd, tcy + Math.sin(sa) * kd, 3, 0, TWO_PI);
+    ctx.arc(tcx + Math.cos(sa) * kd, tcy + Math.sin(sa) * kd, markerR, 0, TWO_PI);
     ctx.fill();
   }
 
@@ -299,13 +374,12 @@ export const drawRotationKnob = (ctx: CanvasRenderingContext2D, state: GameState
   ctx.beginPath(); ctx.moveTo(tcx, tcy); ctx.lineTo(kx, ky); ctx.stroke();
 
   ctx.fillStyle = KNOB_CLR; ctx.shadowColor = KNOB_CLR; ctx.shadowBlur = 8;
-  ctx.beginPath(); ctx.arc(kx, ky, 7, 0, TWO_PI); ctx.fill();
+  ctx.beginPath(); ctx.arc(kx, ky, knobR, 0, TWO_PI); ctx.fill();
   ctx.shadowBlur = 0;
   ctx.fillStyle = BG_DARK;
-  ctx.beginPath(); ctx.arc(kx, ky, 3, 0, TWO_PI); ctx.fill();
+  ctx.beginPath(); ctx.arc(kx, ky, innerR, 0, TWO_PI); ctx.fill();
 
   // Arc arrow wrapping around the knob
-  const arcR = 14;
   const arcStart = Math.PI * 0.8;
   const arcEnd = Math.PI * 0.2;
   ctx.strokeStyle = 'rgba(255,255,255,0.7)';
@@ -313,7 +387,6 @@ export const drawRotationKnob = (ctx: CanvasRenderingContext2D, state: GameState
   ctx.beginPath();
   ctx.arc(kx, ky, arcR, arcStart, arcEnd, false);
   ctx.stroke();
-  const arrowLen = 5;
   // Left arrowhead
   const la = arcStart;
   const lx = kx + arcR * Math.cos(la), ly = ky + arcR * Math.sin(la);
