@@ -11,6 +11,31 @@ import {
   SNIPER_COOLDOWN_MS,
 } from './helpers';
 
+const getLinearTowerBodyRect = (
+  px: number, py: number, tw: number, th: number,
+) => {
+  const isLandscape = tw >= th;
+  if (isLandscape) {
+    const bodyH = tw / 2;
+    return {
+      isLandscape,
+      x: px,
+      y: py + (th - bodyH) / 2,
+      width: tw,
+      height: bodyH,
+    };
+  }
+
+  const bodyW = th / 2;
+  return {
+    isLandscape,
+    x: px + (tw - bodyW) / 2,
+    y: py,
+    width: bodyW,
+    height: th,
+  };
+};
+
 // ── Ports (drawn under tower bodies) ─────────────────────────────────────
 export const drawPorts = (ctx: CanvasRenderingContext2D, state: GameState) => {
   const OUT_TRI = 7.5;
@@ -142,18 +167,22 @@ export const drawTowers = (ctx: CanvasRenderingContext2D, state: GameState, now:
       ctx.fill();
       ctx.stroke();
     } else if (tower.type === 'battery' || tower.type === 'bus') {
-      const vth = tw / 2;
-      const vpy = py + (th - vth) / 2;
-      ctx.fillRect(px + inset, vpy + inset, tw - inset * 2, vth - inset * 2);
-      ctx.strokeRect(px + inset, vpy + inset, tw - inset * 2, vth - inset * 2);
+      const body = getLinearTowerBodyRect(px, py, tw, th);
+      ctx.fillRect(body.x + inset, body.y + inset, body.width - inset * 2, body.height - inset * 2);
+      ctx.strokeRect(body.x + inset, body.y + inset, body.width - inset * 2, body.height - inset * 2);
     } else {
       ctx.fillRect(px + inset, py + inset, tw - inset * 2, th - inset * 2);
       ctx.strokeRect(px + inset, py + inset, tw - inset * 2, th - inset * 2);
     }
 
-    const detailPy = (tower.type === 'battery' || tower.type === 'bus') ? py + (th - tw / 2) / 2 : py;
-    const detailTh = (tower.type === 'battery' || tower.type === 'bus') ? tw / 2 : th;
-    drawTowerDetails(ctx, tower, px, detailPy, tw, detailTh, cx, cy, tColor, inset, now);
+    if (tower.type === 'battery' || tower.type === 'bus') {
+      const body = getLinearTowerBodyRect(px, py, tw, th);
+      drawTowerDetails(
+        ctx, tower, body.x, body.y, body.width, body.height, cx, cy, tColor, inset, now,
+      );
+    } else {
+      drawTowerDetails(ctx, tower, px, py, tw, th, cx, cy, tColor, inset, now);
+    }
 
     ctx.restore();
 
@@ -195,17 +224,17 @@ export const drawPlacementPreview = (
   const prevPy = hoverPos.y * CELL_SIZE;
   const prevTw = stats.width * CELL_SIZE;
   const prevTh = stats.height * CELL_SIZE;
-  const isVisual21 = selectedTower === 'battery' || selectedTower === 'bus';
-  const prevVth = isVisual21 ? prevTw / 2 : prevTh;
-  const prevVpy = isVisual21 ? prevPy + (prevTh - prevVth) / 2 : prevPy;
+  const previewBody = (selectedTower === 'battery' || selectedTower === 'bus')
+    ? getLinearTowerBodyRect(prevPx, prevPy, prevTw, prevTh)
+    : { x: prevPx, y: prevPy, width: prevTw, height: prevTh };
   ctx.strokeStyle = canPlaceFlag ? stats.color : '#ef4444';
   ctx.lineWidth = 2;
   ctx.globalAlpha = 0.6;
-  ctx.strokeRect(prevPx + pi, prevVpy + pi, prevTw - pi * 2, prevVth - pi * 2);
+  ctx.strokeRect(previewBody.x + pi, previewBody.y + pi, previewBody.width - pi * 2, previewBody.height - pi * 2);
   if (canPlaceFlag) {
     ctx.fillStyle = stats.color;
     ctx.globalAlpha = 0.15;
-    ctx.fillRect(prevPx + pi, prevVpy + pi, prevTw - pi * 2, prevVth - pi * 2);
+    ctx.fillRect(previewBody.x + pi, previewBody.y + pi, previewBody.width - pi * 2, previewBody.height - pi * 2);
   }
   ctx.globalAlpha = 1;
 };
@@ -551,13 +580,18 @@ function drawTowerDetails(
       }
     }
   } else if (t.type === 'battery') {
+    const isLandscape = tw >= th;
     const cc = t.maxPower;
     const cg = 2;
-    const bw = (tw - inset * 2 - 2 - (cc - 1) * cg) / cc;
-    const bh = th - inset * 2 - 4;
     for (let i = 0; i < cc; i++) {
-      const bx = px + inset + 1 + i * (bw + cg);
-      const by = py + inset + 2;
+      const bw = isLandscape
+        ? (tw - inset * 2 - 2 - (cc - 1) * cg) / cc
+        : tw - inset * 2 - 4;
+      const bh = isLandscape
+        ? th - inset * 2 - 4
+        : (th - inset * 2 - 2 - (cc - 1) * cg) / cc;
+      const bx = isLandscape ? px + inset + 1 + i * (bw + cg) : px + inset + 2;
+      const by = isLandscape ? py + inset + 2 : py + inset + 1 + i * (bh + cg);
       if (i < t.storedPower) {
         ctx.fillStyle = POWER_ON; ctx.shadowColor = POWER_ON; ctx.shadowBlur = 3;
         ctx.globalAlpha = 0.6;
