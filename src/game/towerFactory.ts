@@ -7,6 +7,7 @@ import {
   TOWER_STATS,
 } from './types';
 import { genId, generatePorts, updatePowerGrid } from './engine';
+import { makeTowerCollider } from './collider';
 
 const createTowerPorts = (type: TowerType): Port[] => {
   if (type === 'battery') {
@@ -69,6 +70,7 @@ export const createTowerAt = (type: TowerType, x: number, y: number): Tower => {
     heat: 0,
     overloaded: false,
     gatlingAmmo: 0,
+    collider: makeTowerCollider(type, stats.width, stats.height),
   };
 };
 

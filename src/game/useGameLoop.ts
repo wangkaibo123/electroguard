@@ -451,13 +451,12 @@ export const useGameLoop = () => {
       }
     }
 
-    // Tower drag check (core cannot be dragged, but still clickable for selection)
+    // Tower drag check (core cannot be dragged or rotated)
     for (const tower of state.towers) {
       if (wx >= tower.x * CELL_SIZE && wx <= (tower.x + tower.width) * CELL_SIZE &&
           wy >= tower.y * CELL_SIZE && wy <= (tower.y + tower.height) * CELL_SIZE) {
         if (tower.type === 'core') {
-          // Core: toggle rotation selection on click, no drag
-          updateRotating(rotatingRef.current === tower.id ? null : tower.id);
+          showToast(t().coreCannotMove);
           return;
         }
         dragTowerRef.current = tower.id;
@@ -721,12 +720,12 @@ export const useGameLoop = () => {
       }
     }
 
-    // Tower drag check
+    // Tower drag check (core cannot be dragged or rotated)
     for (const tower of state.towers) {
       if (wx >= tower.x * CELL_SIZE && wx <= (tower.x + tower.width) * CELL_SIZE &&
           wy >= tower.y * CELL_SIZE && wy <= (tower.y + tower.height) * CELL_SIZE) {
         if (tower.type === 'core') {
-          updateRotating(rotatingRef.current === tower.id ? null : tower.id);
+          showToast(t().coreCannotMove);
           return;
         }
         dragTowerRef.current = tower.id;

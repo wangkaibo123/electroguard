@@ -18,6 +18,17 @@ export interface Port {
   sideOffset?: number; // 0–1 fraction along the side (default 0.5 = center)
 }
 
+/**
+ * Collider component — describes an entity's collision shape in *local* space,
+ * always centered on the owner's reference point (tower geometric center,
+ * enemy position). Used uniformly by towers and enemies so the physics queries
+ * don't need to switch on entity type.
+ */
+export type Collider =
+  | { shape: 'rect';    halfW: number; halfH: number }
+  | { shape: 'circle';  radius: number }
+  | { shape: 'diamond'; halfW: number; halfH: number };
+
 export interface Wire {
   id: string;
   startTowerId: string;
@@ -63,6 +74,7 @@ export interface Tower {
   overloaded: boolean;   // gatling overload lockout until fully cooled
   gatlingAmmo: number;   // queued bullets converted from incoming power
   sniperAimSince?: number; // sniper: time (performance.now) when barrel locked on target
+  collider: Collider;     // collision shape (regenerated on rotation)
 }
 
 export interface Enemy {
@@ -85,6 +97,7 @@ export interface Enemy {
   shieldAbsorb: number;    // overlord shield HP
   maxShieldAbsorb: number;
   lastSpawnTime: number;   // overlord: last time it spawned minions
+  collider: Collider;      // collision shape (circle of `radius`)
 }
 
 export interface Projectile {

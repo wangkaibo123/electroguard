@@ -56,6 +56,13 @@ export interface I18nStrings {
   // Toast
   noWires: string;
   autoDeployFailed: string;
+  coreCannotMove: string;
+
+  // Pick stats bar
+  statHp: string;
+  statRange: string;
+  statAtk: string;
+  statPow: string;
 
   // Tutorial
   tutorialSkip: string;
@@ -134,6 +141,11 @@ const en: I18nStrings = {
   startNextWave: 'Start Next Wave',
   noWires: 'No wires available!',
   autoDeployFailed: 'No open space near the Core for this tower.',
+  coreCannotMove: 'Core cannot be moved or rotated!',
+  statHp: 'HP',
+  statRange: 'Range',
+  statAtk: 'Atk',
+  statPow: 'Pow/Shot',
 
   tutorialSkip: 'Skip',
   tutorialNext: 'Next',
@@ -297,6 +309,11 @@ const zh: I18nStrings = {
   startNextWave: '提前开始下一波',
   noWires: '没有可用的线缆！',
   autoDeployFailed: '主基地附近没有可部署这座防御塔的空地。',
+  coreCannotMove: '主基地无法拖动和旋转！',
+  statHp: '血量',
+  statRange: '射程',
+  statAtk: '攻击',
+  statPow: '耗电/发',
 
   tutorialSkip: '跳过',
   tutorialNext: '下一步',

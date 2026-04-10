@@ -3,7 +3,7 @@ import { Battery, Zap, Crosshair, Activity, Play, RotateCcw, Pause, Hexagon, Cab
 import { useGameLoop } from './game/useGameLoop';
 import { TOWER_STATS, TowerType, PickOption, EnemyType } from './game/types';
 import { t, getLocale, setLocale, Locale } from './game/i18n';
-import { GLOBAL_CONFIG, TIPS_CONFIG } from './game/config';
+import { GLOBAL_CONFIG, TIPS_CONFIG, TOWER_CONFIG, WEAPON_CONFIG } from './game/config';
 
 const TowerIcon = ({ type, size = 22 }: { type: string; size?: number }) => {
   const icons: Record<string, React.ComponentType<{ size: number }>> = {
@@ -17,6 +17,37 @@ const TowerIcon = ({ type, size = 22 }: { type: string; size?: number }) => {
 const getPickColor = (opt: PickOption) => {
   if (opt.kind === 'wire') return '#60a5fa';
   return TOWER_STATS[opt.towerType!]?.color ?? '#6b7280';
+};
+
+const getTowerPickStats = (towerType: TowerType) => {
+  const cfg = TOWER_CONFIG[towerType];
+  const wpn = (WEAPON_CONFIG as Record<string, {
+    range?: number;
+    damage?: number;
+    damagePerPower?: number;
+    powerCost?: number;
+    bulletsPerPower?: number;
+  }>)[towerType];
+
+  let pow: number | null = null;
+  if (wpn) {
+    if (wpn.powerCost != null) pow = wpn.powerCost;
+    else if (wpn.bulletsPerPower != null) pow = 1 / wpn.bulletsPerPower;
+    else if (cfg.maxPower > 0) pow = cfg.maxPower; // tesla discharges all stored power
+  }
+
+  const formatPow = (v: number | null) => {
+    if (v == null) return '—';
+    return Number.isInteger(v) ? String(v) : v.toFixed(2);
+  };
+
+  return {
+    hp: cfg.hp,
+    range: wpn?.range ?? null,
+    atk: wpn?.damage ?? wpn?.damagePerPower ?? null,
+    pow,
+    powLabel: formatPow(pow),
+  };
 };
 
 export default function App() {
@@ -432,6 +463,18 @@ export default function App() {
                     const codexType = opt.kind === 'tower' ? opt.towerType : null;
                     return (
                       <div key={opt.id} className="w-full max-w-[200px] sm:w-44 flex flex-col gap-2">
+                        {opt.kind === 'tower' && opt.towerType && (() => {
+                          const stats = getTowerPickStats(opt.towerType);
+                          const color = getPickColor(opt);
+                          return (
+                            <div className="w-full rounded-lg px-3 py-1.5 grid grid-cols-2 gap-x-2 gap-y-0.5 text-[10px] font-mono border" style={{ borderColor: color + '44', backgroundColor: color + '11', color: color }}>
+                              <span title={i.statHp}>{i.statHp} {stats.hp}</span>
+                              <span title={i.statRange}>{i.statRange} {stats.range != null ? stats.range : '—'}</span>
+                              <span title={i.statAtk}>{i.statAtk} {stats.atk != null ? stats.atk : '—'}</span>
+                              <span title={i.statPow}>{i.statPow} {stats.powLabel}</span>
+                            </div>
+                          );
+                        })()}
                         <button
                           onClick={e => {
                             const rect = e.currentTarget.getBoundingClientRect();

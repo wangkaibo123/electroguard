@@ -17,6 +17,7 @@ import {
   spawnEnemyAt,
   updatePowerGrid,
 } from './engine';
+import { closestPointOnTower } from './collider';
 import {
   ENEMY_AI_CONFIG,
   ENEMY_SCALING,
@@ -554,8 +555,10 @@ const updateEnemyState = (state: GameState, dt: number, now: number) => {
     const isSaboteur = enemy.enemyType === 'saboteur';
 
     for (const tower of state.towers) {
-      const tx = Math.max(tower.x * GLOBAL_CONFIG.cellSize, Math.min(enemy.x, (tower.x + tower.width) * GLOBAL_CONFIG.cellSize));
-      const ty = Math.max(tower.y * GLOBAL_CONFIG.cellSize, Math.min(enemy.y, (tower.y + tower.height) * GLOBAL_CONFIG.cellSize));
+      // Query the tower's collider component so enemies must visually touch the body
+      const closest = closestPointOnTower(tower, enemy.x, enemy.y);
+      const tx = closest.x;
+      const ty = closest.y;
       const distance = Math.hypot(tx - enemy.x, ty - enemy.y);
       const weightedDistance = isSaboteur ? distance * ENEMY_AI_CONFIG.saboteurTowerDistMul : distance;
 

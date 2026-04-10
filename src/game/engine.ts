@@ -5,6 +5,7 @@ import {
 } from './types';
 import { t, pickKey } from './i18n';
 import { GLOBAL_CONFIG, ENEMY_CONFIG, ENEMY_SCALING, STARTING_INVENTORY, PICK_POOL_CONFIG, WEAPON_CONFIG } from './config';
+import { makeTowerCollider, makeEnemyCollider } from './collider';
 
 const ENEMY_SPEED_MUL = GLOBAL_CONFIG.enemyBaseSpeedMul;
 
@@ -297,6 +298,7 @@ export const createInitialState = (): GameState => {
     heat: 0,
     overloaded: false,
     gatlingAmmo: 0,
+    collider: makeTowerCollider('core', cw, ch),
   };
   const towerMap = new Map<string, Tower>([[core.id, core]]);
   return {
@@ -459,6 +461,7 @@ export const applyTowerRotation = (
   tower.rotation = 0;
   tower.width = nw;
   tower.height = nh;
+  tower.collider = makeTowerCollider(tower.type, nw, nh);
   for (const port of tower.ports) port.direction = rotatePortDir(port.direction, steps);
 
   repathConnectedWires(state, tower.id);
@@ -504,6 +507,7 @@ const pushEnemy = (state: GameState, type: EnemyType, wave: number) => {
     radius: def.radius, color: def.color, wireDamageMul: def.wireDamageMul,
     shieldAbsorb: shieldHp, maxShieldAbsorb: shieldHp,
     lastSpawnTime: 0,
+    collider: makeEnemyCollider(def.radius),
   });
 };
 
@@ -540,6 +544,7 @@ export const spawnEnemyAt = (
     radius: def.radius, color: def.color, wireDamageMul: def.wireDamageMul,
     shieldAbsorb: shieldHp, maxShieldAbsorb: shieldHp,
     lastSpawnTime: 0,
+    collider: makeEnemyCollider(def.radius),
   });
 };
 
