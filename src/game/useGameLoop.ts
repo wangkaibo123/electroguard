@@ -405,7 +405,13 @@ export const useGameLoop = () => {
       return;
     }
 
-    if (state.status !== 'playing') return;
+    if (state.status !== 'playing') {
+      if (state.status === 'pick') {
+        isPanningRef.current = true;
+        panLastRef.current = { x: sx, y: sy };
+      }
+      return;
+    }
     const { wx, wy } = toWorld(sx, sy);
     mouseDownPosRef.current = { x: wx, y: wy };
 

@@ -445,14 +445,14 @@ export default function App() {
             {/* Pick Overlay (Roguelike 3-choice) */}
             {gameState.status === 'pick' && (
               <div className={`absolute inset-0 ${pickOverlayHidden ? 'pointer-events-none' : ''}`}>
-                <div className="absolute top-3 right-3 z-20 pointer-events-auto">
+                <div className="absolute left-1/2 bottom-14 -translate-x-1/2 z-20 pointer-events-auto">
                   <button
                     type="button"
                     onClick={() => setPickOverlayHidden(v => !v)}
-                    className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-700 bg-gray-950/80 backdrop-blur-sm text-gray-200 hover:bg-gray-900 transition-colors text-xs font-bold"
+                    className="flex items-center gap-2.5 px-5 py-3.5 rounded-xl border border-gray-700 bg-gray-950/88 backdrop-blur-sm text-gray-100 hover:bg-gray-900 transition-colors text-sm font-bold shadow-[0_8px_28px_rgba(0,0,0,0.35)]"
                     title={pickOverlayHidden ? i.showPanel : i.hidePanel}
                   >
-                    {pickOverlayHidden ? <Eye size={14} /> : <EyeOff size={14} />}
+                    {pickOverlayHidden ? <Eye size={18} /> : <EyeOff size={18} />}
                     <span>{pickOverlayHidden ? '显示三选一' : '查看战场'}</span>
                   </button>
                 </div>
