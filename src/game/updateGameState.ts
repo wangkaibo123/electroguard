@@ -276,6 +276,11 @@ const updatePulses = (state: GameState, dt: number, now: number) => {
 
   for (let index = state.pulses.length - 1; index >= 0; index--) {
     const pulse = state.pulses[index];
+    if (pulse.launchDelay > 0) {
+      pulse.launchDelay = Math.max(0, pulse.launchDelay - dt);
+      changed = true;
+      continue;
+    }
     pulse.progress += PULSE_SPEED * dt;
 
     let remaining = pulse.progress;

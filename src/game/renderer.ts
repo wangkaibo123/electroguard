@@ -60,7 +60,7 @@ export const renderGame = (
   // ── Wires & pulses ────────────────────────────────────────────────────────
   drawWires(ctx, state);
   drawDraggedWire(ctx, state, draggedWireStart, mouseWorldPos, draggedWirePath);
-  drawPulses(ctx, state);
+  drawPulses(ctx, state, now);
   drawWireHpBars(ctx, state);
 
   // ── Shields ───────────────────────────────────────────────────────────────

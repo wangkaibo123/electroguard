@@ -62,11 +62,97 @@ export const drawDraggedWire = (
 };
 
 // ── Pulses ────────────────────────────────────────────────────────────────
-export const drawPulses = (ctx: CanvasRenderingContext2D, state: GameState) => {
-  ctx.fillStyle = PULSE_CLR;
-  ctx.shadowColor = PULSE_CLR;
-  ctx.shadowBlur = 12;
+export const drawPulses = (ctx: CanvasRenderingContext2D, state: GameState, now: number) => {
   for (const p of state.pulses) {
+    if (p.launchDelay > 0 && p.launchDuration > 0) {
+      const source = state.towerMap.get(p.sourceTowerId);
+      if (source) {
+        const cx = (source.x + source.width / 2) * CELL_SIZE;
+        const cy = (source.y + source.height / 2) * CELL_SIZE;
+        const sourceRadius = Math.min(source.width, source.height) * CELL_SIZE * 0.48;
+        const t = 1 - p.launchDelay / p.launchDuration;
+        const shrink = 1 - t;
+        const outerRadius = Math.max(8, sourceRadius * (0.98 - 0.7 * t));
+        const innerRadius = Math.max(0, outerRadius - (8 + 10 * shrink));
+        const pulseRadius = 4 + 8 * t;
+        const haloRadius = pulseRadius + 12 + 8 * t;
+        const alpha = 0.35 + 0.6 * t;
+
+        ctx.save();
+        ctx.shadowColor = PULSE_CLR;
+        ctx.shadowBlur = 18;
+
+        // Filled energy ring that collapses inward to clearly telegraph the dispatch rhythm.
+        const ringFill = ctx.createRadialGradient(cx, cy, innerRadius, cx, cy, outerRadius);
+        ringFill.addColorStop(0, `rgba(255,245,180,${0.15 + 0.3 * shrink})`);
+        ringFill.addColorStop(0.45, `rgba(251,191,36,${0.55 + 0.25 * shrink})`);
+        ringFill.addColorStop(1, `rgba(251,191,36,${0.1 + 0.5 * shrink})`);
+        ctx.fillStyle = ringFill;
+        ctx.beginPath();
+        ctx.arc(cx, cy, outerRadius, 0, TWO_PI);
+        ctx.arc(cx, cy, innerRadius, 0, TWO_PI, true);
+        ctx.fill();
+
+        ctx.strokeStyle = `rgba(255,240,160,${0.35 + 0.45 * shrink})`;
+        ctx.lineWidth = 1.5 + 2 * shrink;
+        ctx.beginPath();
+        ctx.arc(cx, cy, outerRadius, 0, TWO_PI);
+        ctx.stroke();
+
+        const halo = ctx.createRadialGradient(cx, cy, 0, cx, cy, haloRadius);
+        halo.addColorStop(0, `rgba(251,191,36,${alpha})`);
+        halo.addColorStop(0.55, `rgba(251,191,36,${alpha * 0.45})`);
+        halo.addColorStop(1, 'rgba(251,191,36,0)');
+        ctx.fillStyle = halo;
+        ctx.beginPath();
+        ctx.arc(cx, cy, haloRadius, 0, TWO_PI);
+        ctx.fill();
+
+        ctx.fillStyle = PULSE_CLR;
+        ctx.beginPath();
+        ctx.arc(cx, cy, pulseRadius, 0, TWO_PI);
+        ctx.fill();
+
+        const coreFlash = ctx.createRadialGradient(cx, cy, 0, cx, cy, pulseRadius * 1.8);
+        coreFlash.addColorStop(0, `rgba(255,252,220,${0.75 + 0.2 * t})`);
+        coreFlash.addColorStop(0.6, `rgba(255,224,120,${0.3 + 0.25 * t})`);
+        coreFlash.addColorStop(1, 'rgba(255,224,120,0)');
+        ctx.fillStyle = coreFlash;
+        ctx.beginPath();
+        ctx.arc(cx, cy, pulseRadius * 1.8, 0, TWO_PI);
+        ctx.fill();
+
+        if (p.path.length > 1) {
+          const lead = p.path[1];
+          const dx = lead.x - cx;
+          const dy = lead.y - cy;
+          const len = Math.hypot(dx, dy) || 1;
+          const ux = dx / len;
+          const uy = dy / len;
+          const streamLen = Math.min(len, 8 + 24 * Math.max(0, (t - 0.55) / 0.45));
+          if (streamLen > 1) {
+            const gx = cx + ux * streamLen;
+            const gy = cy + uy * streamLen;
+            const beam = ctx.createLinearGradient(cx, cy, gx, gy);
+            beam.addColorStop(0, `rgba(251,191,36,${0.85 * t})`);
+            beam.addColorStop(1, 'rgba(251,191,36,0)');
+            ctx.strokeStyle = beam;
+            ctx.lineWidth = 2 + 2 * t;
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(gx, gy);
+            ctx.stroke();
+          }
+        }
+        ctx.restore();
+      }
+    }
+
+    if (p.launchDelay > 0) continue;
+
+    ctx.fillStyle = PULSE_CLR;
+    ctx.shadowColor = PULSE_CLR;
+    ctx.shadowBlur = 12;
     const pos = posOnPath(p.path, p.progress);
     ctx.beginPath();
     ctx.arc(pos.x, pos.y, 6.5, 0, TWO_PI);

@@ -34,6 +34,9 @@ export interface Pulse {
   path: Position[];
   progress: number;
   targetTowerId: string;
+  sourceTowerId: string;
+  launchDelay: number;
+  launchDuration: number;
 }
 
 export interface Tower {

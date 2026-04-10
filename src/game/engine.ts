@@ -349,6 +349,7 @@ export const updatePowerGrid = (state: GameState) => {
 export const dispatchPulse = (state: GameState, src: Tower, isBattery = false): boolean => {
   const queue = [{ tower: src, path: [] as Wire[] }];
   const visited = new Set([src.id]);
+  const launchDuration = src.type === 'generator' ? 0.28 : 0;
 
   while (queue.length > 0) {
     const { tower, path } = queue.shift()!;
@@ -379,7 +380,15 @@ export const dispatchPulse = (state: GameState, src: Tower, isBattery = false): 
         pixels.push({ x: (tower.x + tower.width / 2) * CELL_SIZE, y: (tower.y + tower.height / 2) * CELL_SIZE });
 
         tower.incomingPower++;
-        state.pulses.push({ id: genId(), path: pixels, progress: 0, targetTowerId: tower.id });
+        state.pulses.push({
+          id: genId(),
+          path: pixels,
+          progress: 0,
+          targetTowerId: tower.id,
+          sourceTowerId: src.id,
+          launchDelay: launchDuration,
+          launchDuration,
+        });
         return true;
       }
     }
