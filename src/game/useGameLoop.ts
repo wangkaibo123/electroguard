@@ -167,6 +167,92 @@ export const useGameLoop = () => {
     clampCamera(cam);
   };
 
+  const canPlaceTowerAt = (state: GameState, type: TowerType, x: number, y: number) => {
+    const stats = TOWER_STATS[type];
+    if (x < 0 || y < 0 || x + stats.width > GRID_WIDTH || y + stats.height > GRID_HEIGHT) return false;
+    return !collidesWithTowers(x, y, stats.width, stats.height, state.towers)
+      && !collidesWithWires(x, y, stats.width, stats.height, state.wires);
+  };
+
+  const createTowerAt = (type: TowerType, x: number, y: number): Tower => {
+    const stats = TOWER_STATS[type];
+
+    let ports: Port[];
+    if (type === 'battery') {
+      ports = [
+        { id: genId(), direction: 'left', portType: 'input' },
+        { id: genId(), direction: 'right', portType: 'output' },
+      ];
+    } else if (type === 'generator') {
+      ports = generatePorts('output');
+    } else if (type === 'shield') {
+      const dirs: PortDirection[] = ['top', 'right', 'bottom', 'left'];
+      ports = [{ id: genId(), direction: dirs[(Math.random() * 4) | 0], portType: 'input' }];
+    } else if (type === 'bus') {
+      ports = [
+        { id: genId(), direction: 'top',    portType: 'input',  sideOffset: 1 / 6 },
+        { id: genId(), direction: 'top',    portType: 'input',  sideOffset: 3 / 6 },
+        { id: genId(), direction: 'top',    portType: 'input',  sideOffset: 5 / 6 },
+        { id: genId(), direction: 'bottom', portType: 'output', sideOffset: 1 / 6 },
+        { id: genId(), direction: 'bottom', portType: 'output', sideOffset: 3 / 6 },
+        { id: genId(), direction: 'bottom', portType: 'output', sideOffset: 5 / 6 },
+      ];
+    } else if (type === 'blaster' || type === 'gatling' || type === 'sniper' || type === 'tesla') {
+      ports = generatePorts('input');
+    } else {
+      ports = [];
+    }
+
+    return {
+      id: genId(), type, x, y,
+      width: stats.width, height: stats.height,
+      hp: stats.hp, maxHp: stats.hp,
+      powered: false, storedPower: 0, maxPower: stats.maxPower, incomingPower: 0,
+      shieldHp: stats.maxShieldHp, maxShieldHp: stats.maxShieldHp, shieldRadius: stats.shieldRadius,
+      lastActionTime: type === 'shield' ? performance.now() : 0, ports, rotation: 0, barrelAngle: 0, heat: 0,
+    };
+  };
+
+  const findAutoPlacementNearCore = (state: GameState, type: TowerType) => {
+    const core = state.towers.find(tw => tw.type === 'core');
+    if (!core) return null;
+
+    const stats = TOWER_STATS[type];
+    const coreCx = core.x + core.width / 2;
+    const coreCy = core.y + core.height / 2;
+    const candidates: { x: number; y: number; distance: number }[] = [];
+
+    for (let y = 0; y <= GRID_HEIGHT - stats.height; y++) {
+      for (let x = 0; x <= GRID_WIDTH - stats.width; x++) {
+        if (!canPlaceTowerAt(state, type, x, y)) continue;
+        const towerCx = x + stats.width / 2;
+        const towerCy = y + stats.height / 2;
+        candidates.push({
+          x,
+          y,
+          distance: Math.hypot(towerCx - coreCx, towerCy - coreCy),
+        });
+      }
+    }
+
+    if (candidates.length === 0) return null;
+
+    candidates.sort((a, b) => a.distance - b.distance);
+    const nearCount = Math.min(12, candidates.length);
+    return candidates[(Math.random() * nearCount) | 0];
+  };
+
+  const autoDeployTowerNearCore = (state: GameState, type: TowerType) => {
+    const placement = findAutoPlacementNearCore(state, type);
+    if (!placement) return false;
+
+    const tower = createTowerAt(type, placement.x, placement.y);
+    state.towers.push(tower);
+    state.towerMap.set(tower.id, tower);
+    updatePowerGrid(state);
+    return true;
+  };
+
   const startGame = () => {
     const s = createInitialState();
     s.status = 'pick';
@@ -210,7 +296,12 @@ export const useGameLoop = () => {
     if (!option) return;
 
     if (option.kind === 'tower' && option.towerType) {
-      state.towerInventory[option.towerType] = (state.towerInventory[option.towerType] ?? 0) + option.count;
+      for (let n = 0; n < option.count; n++) {
+        if (!autoDeployTowerNearCore(state, option.towerType)) {
+          showToast(t().autoDeployFailed);
+          break;
+        }
+      }
     } else if (option.kind === 'wire') {
       state.wireInventory += option.count;
     }

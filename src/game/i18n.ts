@@ -49,6 +49,7 @@ export interface I18nStrings {
 
   // Toast
   noWires: string;
+  autoDeployFailed: string;
 
   // Tutorial
   tutorialSkip: string;
@@ -119,16 +120,16 @@ const en: I18nStrings = {
 
   startNextWave: 'Start Next Wave',
   noWires: 'No wires available!',
+  autoDeployFailed: 'No open space near the Core for this tower.',
 
   tutorialSkip: 'Skip',
   tutorialNext: 'Next',
   tutorialDone: 'Start Playing!',
   tutorialSteps: [
     { title: 'Welcome, Commander!', text: 'Welcome to ElectroGuard! Let me guide you through building your defense network.' },
-    { title: 'Choose an Upgrade', text: 'Before each wave, pick one upgrade from three options. This adds towers or wires to your inventory. Choose one now!', action: 'Select one of the cards below' },
+    { title: 'Choose an Upgrade', text: 'Before each wave, pick one upgrade from three options. Chosen towers are deployed automatically near the Core, while wires are added to your stock. Choose one now!', action: 'Select one of the cards below' },
     { title: 'Your Core', text: 'The glowing structure in the center is your Core. It generates power and has a protective shield. If enemies destroy it, the game is over!' },
-    { title: 'Your Inventory', text: 'Your equipment is shown in the right sidebar. Click a tower button to select it for placement on the grid.' },
-    { title: 'Place a Tower', text: 'With a tower selected (highlighted in the sidebar), click on an empty area near the Core to place it.', action: 'Select a tower and click on the grid' },
+    { title: 'Auto Deployment', text: 'When you pick a tower card, it is placed automatically onto a random open tile near the Core. You can still drag and rotate placed machines afterward.' },
     { title: 'Connect with Wires', text: 'Towers need power! Drag from a port (small circle) on the Core to a port on your tower to create a wire.', action: 'Drag between ports to create a wire' },
     { title: 'Power System', text: 'Energy pulses travel from the Core through wires. Connected towers glow when powered. Use Generators to extend your network!' },
     { title: 'Ready for Battle!', text: 'Enemies attack from the edges. Powered turrets fire automatically. Click towers to rotate them, press Q for quick rotation. After each wave, pick a new upgrade. Good luck!' },
@@ -272,16 +273,16 @@ const zh: I18nStrings = {
 
   startNextWave: '提前开始下一波',
   noWires: '没有可用的线缆！',
+  autoDeployFailed: '主基地附近没有可部署这座防御塔的空地。',
 
   tutorialSkip: '跳过',
   tutorialNext: '下一步',
   tutorialDone: '开始游戏！',
   tutorialSteps: [
     { title: '欢迎，指挥官！', text: '欢迎来到 ElectroGuard！让我来引导你了解防御网络的基本构建方法。' },
-    { title: '选择升级', text: '每波战斗前，你可以从三个选项中选择一项升级，将设备或线缆加入库存。现在选择一项吧！', action: '选择下方的一张卡片' },
+    { title: '选择升级', text: '每波战斗前，你可以从三个选项中选择一项升级。选中的防御塔会自动部署到核心附近，线缆则会加入库存。现在选择一项吧！', action: '选择下方的一张卡片' },
     { title: '你的核心', text: '中央发光的建筑就是你的核心。它能生成电力并拥有防护盾。如果核心被敌人摧毁，游戏就结束了！' },
-    { title: '你的库存', text: '你的装备显示在右侧栏中。点击设备按钮即可选中它，准备放置到网格上。' },
-    { title: '放置设备', text: '选中设备后（侧栏中高亮显示），点击核心附近的空地来放置它。', action: '从侧栏选择设备并点击网格放置' },
+    { title: '自动部署', text: '当你选择防御塔卡片时，它会自动放到核心附近的一块随机空地上。放置后的设备仍然可以拖动和旋转。' },
     { title: '连接线缆', text: '设备需要电力！从核心边缘的端口（小圆圈）拖拽到设备端口，创建线缆连接。', action: '在端口之间拖拽以创建线缆' },
     { title: '电力系统', text: '能量脉冲从核心通过线缆传输。已连接的设备会发光表示通电，才能正常运作。使用发电机来扩展电网！' },
     { title: '准备战斗！', text: '敌人会从边缘进攻。通电的炮塔会自动开火。点击设备可以旋转，按 Q 键快速旋转。每波结束后选择新升级。祝你好运！' },

@@ -58,8 +58,8 @@ export default function App() {
 
   // On mobile, sidebar starts closed; on mobile the sidebar is an overlay
   useEffect(() => {
-    if (isMobile) setSidebarOpen(false);
-  }, [isMobile]);
+    if (isMobile && gameState.gameMode === 'custom') setSidebarOpen(false);
+  }, [isMobile, gameState.gameMode]);
 
   const toggleLocale = () => {
     const next: Locale = locale === 'en' ? 'zh' : 'en';
@@ -95,8 +95,7 @@ export default function App() {
       return;
     }
     if (tutorialStep === 1 && gameState.status === 'playing') setTutorialStep(2);
-    else if (tutorialStep === 4 && gameState.towers.length > 1) setTutorialStep(5);
-    else if (tutorialStep === 5 && gameState.wires.length > 0) setTutorialStep(6);
+    else if (tutorialStep === 4 && gameState.wires.length > 0) setTutorialStep(5);
   }, [tutorialStep, gameState]);
 
   const renderTowerButton = (type: TowerType) => {
@@ -107,7 +106,7 @@ export default function App() {
     const label = i.towerName[type] ?? type;
 
     return (
-      <div key={type} className="flex gap-2 w-full items-stretch min-w-0">
+      <div key={type} className="flex w-full items-stretch min-w-0">
         <button
           onClick={() => setSelectedTower(isSelected ? null : type)}
           disabled={!hasStock || gameState.status !== 'playing'}
@@ -125,14 +124,6 @@ export default function App() {
             <span className="text-sm font-bold text-gray-200 leading-tight truncate w-full text-left">{label}</span>
             <span className="text-xs text-emerald-400 font-mono leading-tight">{isCustom ? '\u221E' : `x${count}`}</span>
           </div>
-        </button>
-        <button
-          type="button"
-          title={i.codexButton}
-          onClick={() => setCodexTower(type)}
-          className="shrink-0 min-w-[3rem] max-w-[3.25rem] px-1.5 py-2 rounded-lg border text-center text-[11px] font-bold leading-snug transition-all border-amber-700/50 bg-amber-950/35 text-amber-100 hover:bg-amber-900/45 hover:border-amber-500/60"
-        >
-          {i.codexButton}
         </button>
       </div>
     );
@@ -347,26 +338,38 @@ export default function App() {
                 <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full sm:w-auto items-center">
                   {gameState.pickOptions.map(opt => {
                     const color = getPickColor(opt);
+                    const codexType = opt.kind === 'tower' ? opt.towerType : null;
                     return (
-                      <button
-                        key={opt.id}
-                        onClick={() => handlePick(opt.id)}
-                        className="group w-full max-w-[200px] sm:w-44 p-4 sm:p-5 rounded-xl border-2 border-gray-700 bg-gray-900/95 hover:bg-gray-800/95 transition-all flex flex-row sm:flex-col items-center text-center gap-3 hover:scale-105 hover:shadow-lg active:scale-95"
-                        style={{ '--pick-color': color } as React.CSSProperties}
-                        onMouseEnter={e => (e.currentTarget.style.borderColor = color)}
-                        onMouseLeave={e => (e.currentTarget.style.borderColor = '')}
-                      >
-                        <div
-                          className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center text-white shrink-0"
-                          style={{ backgroundColor: color + '22', color }}
+                      <div key={opt.id} className="w-full max-w-[200px] sm:w-44 flex flex-col gap-2">
+                        <button
+                          onClick={() => handlePick(opt.id)}
+                          className="group w-full p-4 sm:p-5 rounded-xl border-2 border-gray-700 bg-gray-900/95 hover:bg-gray-800/95 transition-all flex flex-row sm:flex-col items-center text-center gap-3 hover:scale-105 hover:shadow-lg active:scale-95"
+                          style={{ '--pick-color': color } as React.CSSProperties}
+                          onMouseEnter={e => (e.currentTarget.style.borderColor = color)}
+                          onMouseLeave={e => (e.currentTarget.style.borderColor = '')}
                         >
-                          {opt.kind === 'wire' ? <Cable size={20} /> : <TowerIcon type={opt.towerType!} size={20} />}
-                        </div>
-                        <div className="flex flex-col items-start sm:items-center min-w-0">
-                          <div className="text-sm font-bold text-white">{opt.label}</div>
-                          <div className="text-[11px] text-gray-400 leading-snug">{opt.description}</div>
-                        </div>
-                      </button>
+                          <div
+                            className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center text-white shrink-0"
+                            style={{ backgroundColor: color + '22', color }}
+                          >
+                            {opt.kind === 'wire' ? <Cable size={20} /> : <TowerIcon type={opt.towerType!} size={20} />}
+                          </div>
+                          <div className="flex flex-col items-start sm:items-center min-w-0">
+                            <div className="text-sm font-bold text-white">{opt.label}</div>
+                            <div className="text-[11px] text-gray-400 leading-snug">{opt.description}</div>
+                          </div>
+                        </button>
+                        {codexType && (
+                          <button
+                            type="button"
+                            title={i.codexButton}
+                            onClick={() => setCodexTower(codexType)}
+                            className="w-full px-3 py-2 rounded-lg border text-center text-xs font-bold leading-snug transition-all border-amber-700/50 bg-amber-950/35 text-amber-100 hover:bg-amber-900/45 hover:border-amber-500/60"
+                          >
+                            {i.codexButton}
+                          </button>
+                        )}
+                      </div>
                     );
                   })}
                 </div>
@@ -422,15 +425,13 @@ export default function App() {
             {/* Tutorial Overlay */}
             {tutorialStep !== null && tutorialStep < i.tutorialSteps.length && (() => {
               const step = i.tutorialSteps[tutorialStep];
-              const isInteractive = tutorialStep === 1 || tutorialStep === 4 || tutorialStep === 5;
+              const isInteractive = tutorialStep === 1 || tutorialStep === 4;
               const isFinal = tutorialStep === i.tutorialSteps.length - 1;
 
               const hlType: Record<number, string> = {
                 1: 'arrowDown',
                 2: 'spotlight',
-                3: 'bigArrowRight',
-                4: 'worldTarget',
-                5: 'worldPort',
+                4: 'worldPort',
               };
               const ht = hlType[tutorialStep] ?? '';
 
@@ -598,9 +599,8 @@ export default function App() {
           </div>
         </div>
 
-        {/* Sidebar toggle + panel */}
-        {/* Mobile: floating toggle button + overlay sidebar */}
-        {isMobile ? (
+        {/* Sidebar toggle + panel (custom mode only) */}
+        {gameState.gameMode === 'custom' && (isMobile ? (
           <>
             {/* Mobile sidebar toggle FAB */}
             {(gameState.status === 'playing' || gameState.status === 'paused') && !sidebarOpen && (
@@ -700,7 +700,7 @@ export default function App() {
               </div>
             </div>
           </div>
-        )}
+        ))}
       </div>
 
       {/* Machine codex modal */}
