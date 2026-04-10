@@ -87,23 +87,33 @@ export const getPortCell = (t: Tower, p: Port): Position => {
 
 export const collidesWithTowers = (
   x: number, y: number, w: number, h: number,
-  towers: Tower[], excludeId?: string
+  towers: Tower[], excludeId?: string, clearance = 0
 ): boolean => {
   for (const t of towers) {
     if (t.id === excludeId) continue;
-    if (x < t.x + t.width && x + w > t.x && y < t.y + t.height && y + h > t.y) return true;
+    if (
+      x < t.x + t.width + clearance &&
+      x + w > t.x - clearance &&
+      y < t.y + t.height + clearance &&
+      y + h > t.y - clearance
+    ) return true;
   }
   return false;
 };
 
 export const collidesWithWires = (
   x: number, y: number, w: number, h: number,
-  wires: Wire[], excludeTowerId?: string
+  wires: Wire[], excludeTowerId?: string, clearance = 0
 ): boolean => {
   for (const wire of wires) {
     if (excludeTowerId && (wire.startTowerId === excludeTowerId || wire.endTowerId === excludeTowerId)) continue;
     for (const p of wire.path) {
-      if (p.x >= x && p.x < x + w && p.y >= y && p.y < y + h) return true;
+      if (
+        p.x >= x - clearance &&
+        p.x < x + w + clearance &&
+        p.y >= y - clearance &&
+        p.y < y + h + clearance
+      ) return true;
     }
   }
   return false;

@@ -126,7 +126,7 @@ export const useGameLoop = () => {
     type: TowerType,
     sourceClientPos?: { x: number; y: number },
   ) => {
-    const placement = findAutoPlacementNearCore(state, type, 2);
+    const placement = findAutoPlacementNearCore(state, type, 2, 1);
     if (!placement) return false;
 
     const stats = TOWER_STATS[type];
@@ -150,7 +150,7 @@ export const useGameLoop = () => {
     const starterTowers: TowerType[] = ['generator', 'blaster'];
 
     for (const type of starterTowers) {
-      const placement = findAutoPlacementNearCore(state, type, 2);
+      const placement = findAutoPlacementNearCore(state, type, 2, 1);
       if (!placement) continue;
       addTowerToState(state, createTowerAt(type, placement.x, placement.y));
     }

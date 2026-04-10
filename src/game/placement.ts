@@ -7,6 +7,7 @@ export const canPlaceTowerAt = (
   x: number,
   y: number,
   ignoreDropId?: string,
+  clearance = 0,
 ) => {
   const stats = TOWER_STATS[type];
 
@@ -18,18 +19,18 @@ export const canPlaceTowerAt = (
     if (drop.id === ignoreDropId) continue;
     const dropStats = TOWER_STATS[drop.towerType];
     if (
-      x < drop.targetGridX + dropStats.width &&
-      x + stats.width > drop.targetGridX &&
-      y < drop.targetGridY + dropStats.height &&
-      y + stats.height > drop.targetGridY
+      x < drop.targetGridX + dropStats.width + clearance &&
+      x + stats.width > drop.targetGridX - clearance &&
+      y < drop.targetGridY + dropStats.height + clearance &&
+      y + stats.height > drop.targetGridY - clearance
     ) {
       return false;
     }
   }
 
   return (
-    !collidesWithTowers(x, y, stats.width, stats.height, state.towers) &&
-    !collidesWithWires(x, y, stats.width, stats.height, state.wires)
+    !collidesWithTowers(x, y, stats.width, stats.height, state.towers, undefined, clearance) &&
+    !collidesWithWires(x, y, stats.width, stats.height, state.wires, undefined, clearance)
   );
 };
 
@@ -49,6 +50,7 @@ export const findAutoPlacementNearCore = (
   state: GameState,
   type: TowerType,
   minGapFromCore = 0,
+  clearance = 0,
 ) => {
   const core = state.towers.find((tower) => tower.type === 'core');
   if (!core) return null;
@@ -60,7 +62,7 @@ export const findAutoPlacementNearCore = (
 
   for (let y = 0; y <= GRID_HEIGHT - stats.height; y++) {
     for (let x = 0; x <= GRID_WIDTH - stats.width; x++) {
-      if (!canPlaceTowerAt(state, type, x, y)) continue;
+      if (!canPlaceTowerAt(state, type, x, y, undefined, clearance)) continue;
       if (getTowerGapFromCore(core, x, y, stats.width, stats.height) < minGapFromCore) continue;
       const towerCx = x + stats.width / 2;
       const towerCy = y + stats.height / 2;
