@@ -1,68 +1,22 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  GameState, Tower, TowerType, Port, PortDirection, Wire, CELL_SIZE, GRID_WIDTH, GRID_HEIGHT,
-  TOWER_STATS, CANVAS_WIDTH, CANVAS_HEIGHT, WIRE_MAX_HP, ChainLightning,
-  Camera, VIEWPORT_WIDTH, VIEWPORT_HEIGHT, HitEffect, ShieldBreakEffect,
+  GameState, TowerType, Port, Wire, CELL_SIZE, GRID_WIDTH, GRID_HEIGHT,
+  TOWER_STATS, CANVAS_WIDTH, CANVAS_HEIGHT, WIRE_MAX_HP,
+  Camera, VIEWPORT_WIDTH, VIEWPORT_HEIGHT,
 } from './types';
 import {
-  createInitialState, updatePowerGrid, spawnEnemy, spawnBoss, spawnEnemyAt, createExplosion,
-  getPortPos, generatePorts, getPortCell, findWirePath, dispatchPulse,
+  createInitialState, updatePowerGrid, getPortPos, getPortCell, findWirePath,
   snapRotation, applyTowerRotation, canPlace, collidesWithTowers,
-  collidesWithWires, repathConnectedWires, genId, rebuildTowerMap,
-  generatePickOptions, generateBossBonusPickOptions,
+  collidesWithWires, repathConnectedWires, genId, generatePickOptions,
 } from './engine';
 import { renderGame } from './renderer';
-import { GLOBAL_CONFIG, WEAPON_CONFIG, SHIELD_CONFIG, SCORE_CONFIG, ENEMY_SCALING, ENEMY_AI_CONFIG } from './config';
+import { GLOBAL_CONFIG } from './config';
 import { t } from './i18n';
+import { addTowerToState, createTowerAt } from './towerFactory';
+import { findAutoPlacementNearCore } from './placement';
+import { updateGameState } from './updateGameState';
 
-// ── Constants (derived from config) ──────────────────────────────────────────
-const TWO_PI = Math.PI * 2;
-const { pulseSpeed: PULSE_SPEED, powerInterval: POWER_INTERVAL, attackRange: ATTACK_RANGE, waveDelay: WAVE_DELAY, barrelSpeed: BARREL_SPEED, maxZoom: MAX_ZOOM, spawnInterval: SPAWN_INTERVAL, bossWaveInterval: BOSS_WAVE_INTERVAL, waveClearScoreMul: WAVE_CLEAR_SCORE_MUL, bossSpawnInterval: BOSS_SPAWN_INTERVAL, bossSpawnCount: BOSS_SPAWN_COUNT } = GLOBAL_CONFIG;
-const { cooldown: SHIELD_COOLDOWN, shieldTowerCooldown: SHIELD_TOWER_COOLDOWN, batteryInterval: BATTERY_INTERVAL } = SHIELD_CONFIG;
-const SNIPER_AIM_THRESHOLD = 0.05;
-const { cooldown: BLASTER_COOLDOWN, range: BLASTER_RANGE, damage: BLASTER_DAMAGE, powerCost: BLASTER_POWER_COST, bulletSpeed: BLASTER_BULLET_SPEED } = WEAPON_CONFIG.blaster;
-const { range: GATLING_RANGE, damage: GATLING_DAMAGE, bulletRange: GATLING_BULLET_RANGE, minInterval: GATLING_MIN_INTERVAL, maxInterval: GATLING_MAX_INTERVAL, heatDecay: GATLING_HEAT_DECAY, minSpread: GATLING_MIN_SPREAD, maxSpread: GATLING_MAX_SPREAD, bulletSpeed: GATLING_BULLET_SPEED } = WEAPON_CONFIG.gatling;
-const GATLING_HEAT_PER_POWER = 0.35;
-const { cooldown: SNIPER_COOLDOWN, range: SNIPER_RANGE, damage: SNIPER_DAMAGE, powerCost: SNIPER_POWER_COST, bulletSpeed: SNIPER_SPEED, maxRange: SNIPER_MAX_RANGE, minAimMs: SNIPER_MIN_AIM_MS } = WEAPON_CONFIG.sniper;
-const { cooldown: TESLA_COOLDOWN, range: TESLA_RANGE, bounceRange: TESLA_BOUNCE_RANGE, damagePerPower: TESLA_DAMAGE_PER_POWER } = WEAPON_CONFIG.tesla;
-
-// ── Shared helpers ──────────────────────────────────────────────────────────
-
-const applyDamageToEnemy = (state: GameState, enemy: typeof state.enemies[0], damage: number, color: string, bigExplosion = false): boolean => {
-  let dmg = damage;
-  if (enemy.shieldAbsorb > 0) {
-    const absorbed = Math.min(enemy.shieldAbsorb, dmg);
-    enemy.shieldAbsorb -= absorbed;
-    dmg -= absorbed;
-  }
-  enemy.hp -= dmg;
-  createExplosion(state, enemy.x, enemy.y, color, bigExplosion ? 10 : 3);
-  if (enemy.hp <= 0) {
-    state.enemies = state.enemies.filter(e => e.id !== enemy.id);
-    state.score += (SCORE_CONFIG[enemy.enemyType] ?? SCORE_CONFIG.default);
-    createExplosion(state, enemy.x, enemy.y, enemy.color, bigExplosion ? 15 : 10);
-    return true; // enemy died
-  }
-  return false;
-};
-
-const findNearestEnemy = (enemies: GameState['enemies'], x: number, y: number, range: number, excludeIds?: Set<string> | string[]): typeof enemies[0] | null => {
-  let best: typeof enemies[0] | null = null;
-  let bestD = range;
-  for (const e of enemies) {
-    if (excludeIds && (excludeIds instanceof Set ? excludeIds.has(e.id) : excludeIds.includes(e.id))) continue;
-    const d = Math.hypot(e.x - x, e.y - y);
-    if (d < bestD) { bestD = d; best = e; }
-  }
-  return best;
-};
-
-const destroyTower = (state: GameState, towerId: string) => {
-  state.towers = state.towers.filter(t => t.id !== towerId);
-  state.wires = state.wires.filter(w => w.startTowerId !== towerId && w.endTowerId !== towerId);
-  rebuildTowerMap(state);
-  updatePowerGrid(state);
-};
+const { maxZoom: MAX_ZOOM, waveDelay: WAVE_DELAY } = GLOBAL_CONFIG;
 
 export const useGameLoop = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -167,89 +121,6 @@ export const useGameLoop = () => {
     clampCamera(cam);
   };
 
-  const canPlaceTowerAt = (state: GameState, type: TowerType, x: number, y: number, ignoreDropId?: string) => {
-    const stats = TOWER_STATS[type];
-    if (x < 0 || y < 0 || x + stats.width > GRID_WIDTH || y + stats.height > GRID_HEIGHT) return false;
-    for (const drop of state.incomingDrops) {
-      if (drop.id === ignoreDropId) continue;
-      const dropStats = TOWER_STATS[drop.towerType];
-      if (x < drop.targetGridX + dropStats.width && x + stats.width > drop.targetGridX
-        && y < drop.targetGridY + dropStats.height && y + stats.height > drop.targetGridY) {
-        return false;
-      }
-    }
-    return !collidesWithTowers(x, y, stats.width, stats.height, state.towers)
-      && !collidesWithWires(x, y, stats.width, stats.height, state.wires);
-  };
-
-  const createTowerAt = (type: TowerType, x: number, y: number): Tower => {
-    const stats = TOWER_STATS[type];
-
-    let ports: Port[];
-    if (type === 'battery') {
-      ports = [
-        { id: genId(), direction: 'left', portType: 'input' },
-        { id: genId(), direction: 'right', portType: 'output' },
-      ];
-    } else if (type === 'generator') {
-      ports = generatePorts('output');
-    } else if (type === 'shield') {
-      const dirs: PortDirection[] = ['top', 'right', 'bottom', 'left'];
-      ports = [{ id: genId(), direction: dirs[(Math.random() * 4) | 0], portType: 'input' }];
-    } else if (type === 'bus') {
-      ports = [
-        { id: genId(), direction: 'top',    portType: 'input',  sideOffset: 1 / 6 },
-        { id: genId(), direction: 'top',    portType: 'input',  sideOffset: 3 / 6 },
-        { id: genId(), direction: 'top',    portType: 'input',  sideOffset: 5 / 6 },
-        { id: genId(), direction: 'bottom', portType: 'output', sideOffset: 1 / 6 },
-        { id: genId(), direction: 'bottom', portType: 'output', sideOffset: 3 / 6 },
-        { id: genId(), direction: 'bottom', portType: 'output', sideOffset: 5 / 6 },
-      ];
-    } else if (type === 'blaster' || type === 'gatling' || type === 'sniper' || type === 'tesla') {
-      ports = generatePorts('input');
-    } else {
-      ports = [];
-    }
-
-    return {
-      id: genId(), type, x, y,
-      width: stats.width, height: stats.height,
-      hp: stats.hp, maxHp: stats.hp,
-      powered: false, storedPower: 0, maxPower: stats.maxPower, incomingPower: 0,
-      shieldHp: stats.maxShieldHp, maxShieldHp: stats.maxShieldHp, shieldRadius: stats.shieldRadius,
-      lastActionTime: type === 'shield' ? performance.now() : 0, ports, rotation: 0, barrelAngle: 0, heat: 0,
-    };
-  };
-
-  const findAutoPlacementNearCore = (state: GameState, type: TowerType) => {
-    const core = state.towers.find(tw => tw.type === 'core');
-    if (!core) return null;
-
-    const stats = TOWER_STATS[type];
-    const coreCx = core.x + core.width / 2;
-    const coreCy = core.y + core.height / 2;
-    const candidates: { x: number; y: number; distance: number }[] = [];
-
-    for (let y = 0; y <= GRID_HEIGHT - stats.height; y++) {
-      for (let x = 0; x <= GRID_WIDTH - stats.width; x++) {
-        if (!canPlaceTowerAt(state, type, x, y)) continue;
-        const towerCx = x + stats.width / 2;
-        const towerCy = y + stats.height / 2;
-        candidates.push({
-          x,
-          y,
-          distance: Math.hypot(towerCx - coreCx, towerCy - coreCy),
-        });
-      }
-    }
-
-    if (candidates.length === 0) return null;
-
-    candidates.sort((a, b) => a.distance - b.distance);
-    const nearCount = Math.min(12, candidates.length);
-    return candidates[(Math.random() * nearCount) | 0];
-  };
-
   const queueTowerDropNearCore = (
     state: GameState,
     type: TowerType,
@@ -277,18 +148,12 @@ export const useGameLoop = () => {
 
   const deployStartingLoadout = (state: GameState) => {
     const starterTowers: TowerType[] = ['generator', 'blaster'];
-    let changed = false;
 
     for (const type of starterTowers) {
       const placement = findAutoPlacementNearCore(state, type);
       if (!placement) continue;
-      const tower = createTowerAt(type, placement.x, placement.y);
-      state.towers.push(tower);
-      state.towerMap.set(tower.id, tower);
-      changed = true;
+      addTowerToState(state, createTowerAt(type, placement.x, placement.y));
     }
-
-    if (changed) updatePowerGrid(state);
   };
 
   const startGame = () => {
@@ -367,6 +232,94 @@ export const useGameLoop = () => {
     if (state.needsPick) return;
     state.waveTimer = WAVE_DELAY + 1;
     sync();
+  };
+
+  const placeTowerFromSelection = (state: GameState, towerType: TowerType, x: number, y: number) => {
+    if (!canPlace(x, y, towerType, state)) return false;
+
+    if (state.gameMode !== 'custom') {
+      state.towerInventory[towerType]--;
+    }
+
+    addTowerToState(state, createTowerAt(towerType, x, y));
+    sync();
+
+    if (state.gameMode !== 'custom' && (state.towerInventory[towerType] ?? 0) <= 0) {
+      setSelectedTower(null);
+    }
+
+    return true;
+  };
+
+  const clearTowerDragState = () => {
+    dragTowerRef.current = null;
+    dragOrigPosRef.current = null;
+    dragOrigWiresRef.current = null;
+  };
+
+  const clearWireDragState = () => {
+    dragWireStartRef.current = null;
+    dragWirePathRef.current = null;
+  };
+
+  const commitWireDrag = (state: GameState, pointer: { x: number; y: number }, hitRadius: number) => {
+    const dragStart = dragWireStartRef.current;
+    if (!dragStart) return;
+
+    let dropPort: Port | null = null;
+    let dropTowerId: string | null = null;
+
+    for (const tower of state.towers) {
+      for (const port of tower.ports) {
+        const portPos = getPortPos(tower, port);
+        if (Math.hypot(portPos.x - pointer.x, portPos.y - pointer.y) < hitRadius) {
+          dropPort = port;
+          dropTowerId = tower.id;
+          break;
+        }
+      }
+      if (dropPort) break;
+    }
+
+    if (dropPort && dropTowerId && dropTowerId !== dragStart.towerId) {
+      const isUsed = state.wires.some((wire) => wire.startPortId === dropPort!.id || wire.endPortId === dropPort!.id);
+      if (!isUsed) {
+        const sourceTower = state.towerMap.get(dragStart.towerId);
+        const sourcePort = sourceTower?.ports.find((port) => port.id === dragStart.portId);
+        if (sourceTower && sourcePort) {
+          let startTower = sourceTower;
+          let startPort = sourcePort;
+          let endTower = state.towerMap.get(dropTowerId)!;
+          let endPort = dropPort;
+
+          if (sourcePort.portType === 'input' && dropPort.portType === 'output') {
+            [startTower, startPort, endTower, endPort] = [endTower, endPort, startTower, startPort];
+          } else if (sourcePort.portType === dropPort.portType) {
+            clearWireDragState();
+            return;
+          }
+
+          const path = findWirePath(getPortCell(startTower, startPort), getPortCell(endTower, endPort), state);
+          if (path) {
+            if (state.gameMode !== 'custom') state.wireInventory--;
+            state.wires.push({
+              id: genId(),
+              startTowerId: startTower.id,
+              startPortId: startPort.id,
+              endTowerId: endTower.id,
+              endPortId: endPort.id,
+              path,
+              hp: WIRE_MAX_HP,
+              maxHp: WIRE_MAX_HP,
+            });
+            updatePowerGrid(state);
+            sync();
+          }
+        }
+      }
+    }
+
+    clearWireDragState();
   };
 
   // ── Canvas mouse helpers ────────────────────────────────────────────────
@@ -472,51 +425,7 @@ export const useGameLoop = () => {
     // Place tower from inventory
     const gx = (wx / CELL_SIZE) | 0, gy = (wy / CELL_SIZE) | 0;
     const sel = selectedTowerRef.current;
-    if (sel && canPlace(gx, gy, sel, state)) {
-      const stats = TOWER_STATS[sel];
-      if (state.gameMode !== 'custom') state.towerInventory[sel]--;
-
-      let ports: Port[];
-      if (sel === 'battery') {
-        ports = [
-          { id: genId(), direction: 'left', portType: 'input' },
-          { id: genId(), direction: 'right', portType: 'output' },
-        ];
-      } else if (sel === 'generator') {
-        ports = generatePorts('output');
-      } else if (sel === 'shield') {
-        // Shield: single input port in a random direction
-        const dirs: PortDirection[] = ['top', 'right', 'bottom', 'left'];
-        ports = [{ id: genId(), direction: dirs[(Math.random() * 4) | 0], portType: 'input' }];
-      } else if (sel === 'bus') {
-        // Bus 3×2: long edge = width 3 — inputs on top, outputs on bottom (sideOffset along width)
-        ports = [
-          { id: genId(), direction: 'top',    portType: 'input',  sideOffset: 1 / 6 },
-          { id: genId(), direction: 'top',    portType: 'input',  sideOffset: 3 / 6 },
-          { id: genId(), direction: 'top',    portType: 'input',  sideOffset: 5 / 6 },
-          { id: genId(), direction: 'bottom', portType: 'output', sideOffset: 1 / 6 },
-          { id: genId(), direction: 'bottom', portType: 'output', sideOffset: 3 / 6 },
-          { id: genId(), direction: 'bottom', portType: 'output', sideOffset: 5 / 6 },
-        ];
-      } else if (sel === 'blaster' || sel === 'gatling' || sel === 'sniper' || sel === 'tesla') {
-        ports = generatePorts('input');
-      } else {
-        ports = []; // target
-      }
-
-      const t = {
-        id: genId(), type: sel, x: gx, y: gy,
-        width: stats.width, height: stats.height,
-        hp: stats.hp, maxHp: stats.hp,
-        powered: false, storedPower: 0, maxPower: stats.maxPower, incomingPower: 0,
-        shieldHp: stats.maxShieldHp, maxShieldHp: stats.maxShieldHp, shieldRadius: stats.shieldRadius,
-        lastActionTime: sel === 'shield' ? performance.now() : 0, ports, rotation: 0, barrelAngle: 0, heat: 0,
-      };
-      state.towers.push(t);
-      state.towerMap.set(t.id, t);
-      updatePowerGrid(state);
-      sync();
-      if (state.gameMode !== 'custom' && (state.towerInventory[sel] ?? 0) <= 0) setSelectedTower(null);
+    if (sel && placeTowerFromSelection(state, sel, gx, gy)) {
       return;
     }
 
@@ -645,51 +554,7 @@ export const useGameLoop = () => {
     }
 
     if (dragWireStartRef.current && mousePxRef.current) {
-      const dw = dragWireStartRef.current;
-      const mx = mousePxRef.current;
-      let dropPort: Port | null = null, dropTowerId: string | null = null;
-
-      for (const tower of state.towers) {
-        for (const port of tower.ports) {
-          const pp = getPortPos(tower, port);
-          if (Math.hypot(pp.x - mx.x, pp.y - mx.y) < 15) {
-            dropPort = port; dropTowerId = tower.id; break;
-          }
-        }
-        if (dropPort) break;
-      }
-
-      if (dropPort && dropTowerId && dropTowerId !== dw.towerId) {
-        const isUsed = state.wires.some(w => w.startPortId === dropPort!.id || w.endPortId === dropPort!.id);
-        if (!isUsed) {
-          const srcT = state.towerMap.get(dw.towerId);
-          const srcP = srcT?.ports.find(p => p.id === dw.portId);
-          if (srcT && srcP) {
-            let sT = srcT, sP = srcP, dT = state.towerMap.get(dropTowerId)!, dP = dropPort;
-
-            if (srcP.portType === 'input' && dropPort.portType === 'output') {
-              [sT, sP, dT, dP] = [dT, dP, sT, sP];
-            } else if (srcP.portType === dropPort.portType) {
-              dragWireStartRef.current = null;
-              dragWirePathRef.current = null;
-              return;
-            }
-
-            const path = findWirePath(getPortCell(sT, sP), getPortCell(dT, dP), state);
-            if (path) {
-              if (state.gameMode !== 'custom') state.wireInventory--;
-              state.wires.push({
-                id: genId(), startTowerId: sT.id, startPortId: sP.id,
-                endTowerId: dT.id, endPortId: dP.id, path, hp: WIRE_MAX_HP, maxHp: WIRE_MAX_HP,
-              });
-              updatePowerGrid(state);
-              sync();
-            }
-          }
-        }
-      }
-      dragWireStartRef.current = null;
-      dragWirePathRef.current = null;
+      commitWireDrag(state, mousePxRef.current, 15);
     }
   };
 
@@ -697,8 +562,7 @@ export const useGameLoop = () => {
     hoverRef.current = null;
     // Restore tower + wires if dragging
     cancelTowerDrag();
-    dragWireStartRef.current = null;
-    dragWirePathRef.current = null;
+    clearWireDragState();
     isRotKnobRef.current = false;
     isPanningRef.current = false;
     panLastRef.current = null;
@@ -821,49 +685,7 @@ export const useGameLoop = () => {
     // Place tower from inventory
     const gx = (wx / CELL_SIZE) | 0, gy = (wy / CELL_SIZE) | 0;
     const sel = selectedTowerRef.current;
-    if (sel && canPlace(gx, gy, sel, state)) {
-      const stats = TOWER_STATS[sel];
-      if (state.gameMode !== 'custom') state.towerInventory[sel]--;
-
-      let ports: Port[];
-      if (sel === 'battery') {
-        ports = [
-          { id: genId(), direction: 'left', portType: 'input' },
-          { id: genId(), direction: 'right', portType: 'output' },
-        ];
-      } else if (sel === 'generator') {
-        ports = generatePorts('output');
-      } else if (sel === 'shield') {
-        const dirs: PortDirection[] = ['top', 'right', 'bottom', 'left'];
-        ports = [{ id: genId(), direction: dirs[(Math.random() * 4) | 0], portType: 'input' }];
-      } else if (sel === 'bus') {
-        ports = [
-          { id: genId(), direction: 'top',    portType: 'input',  sideOffset: 1 / 6 },
-          { id: genId(), direction: 'top',    portType: 'input',  sideOffset: 3 / 6 },
-          { id: genId(), direction: 'top',    portType: 'input',  sideOffset: 5 / 6 },
-          { id: genId(), direction: 'bottom', portType: 'output', sideOffset: 1 / 6 },
-          { id: genId(), direction: 'bottom', portType: 'output', sideOffset: 3 / 6 },
-          { id: genId(), direction: 'bottom', portType: 'output', sideOffset: 5 / 6 },
-        ];
-      } else if (sel === 'blaster' || sel === 'gatling' || sel === 'sniper' || sel === 'tesla') {
-        ports = generatePorts('input');
-      } else {
-        ports = [];
-      }
-
-      const t = {
-        id: genId(), type: sel, x: gx, y: gy,
-        width: stats.width, height: stats.height,
-        hp: stats.hp, maxHp: stats.hp,
-        powered: false, storedPower: 0, maxPower: stats.maxPower, incomingPower: 0,
-        shieldHp: stats.maxShieldHp, maxShieldHp: stats.maxShieldHp, shieldRadius: stats.shieldRadius,
-        lastActionTime: sel === 'shield' ? performance.now() : 0, ports, rotation: 0, barrelAngle: 0, heat: 0,
-      };
-      state.towers.push(t);
-      state.towerMap.set(t.id, t);
-      updatePowerGrid(state);
-      sync();
-      if (state.gameMode !== 'custom' && (state.towerInventory[sel] ?? 0) <= 0) setSelectedTower(null);
+    if (sel && placeTowerFromSelection(state, sel, gx, gy)) {
       return;
     }
 
@@ -1004,62 +826,16 @@ export const useGameLoop = () => {
     }
 
     if (dragTowerRef.current) {
-      const dp = mouseDownPosRef.current;
-      const mpx = mousePxRef.current;
-      if (dp && mpx && Math.hypot(mpx.x - dp.x, mpx.y - dp.y) < 5) {
+      const dragStart = mouseDownPosRef.current;
+      const pointer = mousePxRef.current;
+      if (dragStart && pointer && Math.hypot(pointer.x - dragStart.x, pointer.y - dragStart.y) < 5) {
         updateRotating(rotatingRef.current === dragTowerRef.current ? null : dragTowerRef.current);
       }
-      dragTowerRef.current = null;
-      dragOrigPosRef.current = null;
-      dragOrigWiresRef.current = null;
-    } else if (!dragWireStartRef.current) {
-      // no-op
+      clearTowerDragState();
     }
 
     if (dragWireStartRef.current && mousePxRef.current) {
-      const dw = dragWireStartRef.current;
-      const mx = mousePxRef.current;
-      let dropPort: Port | null = null, dropTowerId: string | null = null;
-
-      for (const tower of state.towers) {
-        for (const port of tower.ports) {
-          const pp = getPortPos(tower, port);
-          if (Math.hypot(pp.x - mx.x, pp.y - mx.y) < 20) {
-            dropPort = port; dropTowerId = tower.id; break;
-          }
-        }
-        if (dropPort) break;
-      }
-
-      if (dropPort && dropTowerId && dropTowerId !== dw.towerId) {
-        const isUsed = state.wires.some(w => w.startPortId === dropPort!.id || w.endPortId === dropPort!.id);
-        if (!isUsed) {
-          const srcT = state.towerMap.get(dw.towerId);
-          const srcP = srcT?.ports.find(p => p.id === dw.portId);
-          if (srcT && srcP) {
-            let sT = srcT, sP = srcP, dT = state.towerMap.get(dropTowerId)!, dP = dropPort;
-            if (srcP.portType === 'input' && dropPort.portType === 'output') {
-              [sT, sP, dT, dP] = [dT, dP, sT, sP];
-            } else if (srcP.portType === dropPort.portType) {
-              dragWireStartRef.current = null;
-              dragWirePathRef.current = null;
-              return;
-            }
-            const path = findWirePath(getPortCell(sT, sP), getPortCell(dT, dP), state);
-            if (path) {
-              if (state.gameMode !== 'custom') state.wireInventory--;
-              state.wires.push({
-                id: genId(), startTowerId: sT.id, startPortId: sP.id,
-                endTowerId: dT.id, endPortId: dP.id, path, hp: WIRE_MAX_HP, maxHp: WIRE_MAX_HP,
-              });
-              updatePowerGrid(state);
-              sync();
-            }
-          }
-        }
-      }
-      dragWireStartRef.current = null;
-      dragWirePathRef.current = null;
+      commitWireDrag(state, mousePxRef.current, 20);
     }
   };
 
@@ -1070,568 +846,8 @@ export const useGameLoop = () => {
     lastTimeRef.current = time;
     const state = stateRef.current;
 
-    if (state.status === 'playing') {
-      const now = performance.now();
-      let changed = false;
-
-      for (let i = state.incomingDrops.length - 1; i >= 0; i--) {
-        const drop = state.incomingDrops[i];
-        drop.life += dt;
-        if (drop.life < drop.duration) {
-          changed = true;
-          continue;
-        }
-
-        let towerPlaced = false;
-        if (canPlaceTowerAt(state, drop.towerType, drop.targetGridX, drop.targetGridY, drop.id)) {
-          const tower = createTowerAt(drop.towerType, drop.targetGridX, drop.targetGridY);
-          state.towers.push(tower);
-          state.towerMap.set(tower.id, tower);
-          updatePowerGrid(state);
-          towerPlaced = true;
-        }
-
-        if (towerPlaced) {
-          const impactColor = TOWER_STATS[drop.towerType].color;
-          createExplosion(state, drop.targetX, drop.targetY, impactColor, 18);
-          state.hitEffects.push({ x: drop.targetX, y: drop.targetY, life: 0, maxLife: 0.35, color: impactColor, radius: 24 });
-        }
-
-        state.incomingDrops.splice(i, 1);
-        changed = true;
-      }
-
-      if (state.pendingBossBonusPick && state.incomingDrops.length === 0) {
-        state.pendingBossBonusPick = false;
-        state.pickOptions = generateBossBonusPickOptions();
-        state.pickUiPhase = 'boss_bonus';
-        state.status = 'pick';
-        changed = true;
-      }
-
-      // ── Power dispatch (no resource generation) ─────────────────────────
-      state.powerTimer += dt;
-      if (state.powerTimer >= POWER_INTERVAL) {
-        state.powerTimer -= POWER_INTERVAL;
-        for (const t of state.towers) {
-          if (t.type === 'core' || (t.type === 'generator' && t.powered)) {
-            dispatchPulse(state, t);
-            changed = true;
-          }
-        }
-      }
-
-      // ── Shield recharge ─────────────────────────────────────────────────
-      for (const t of state.towers) {
-        if (t.maxShieldHp <= 0 || t.shieldHp >= t.maxShieldHp) continue;
-        if ((t.type !== 'core' && t.type !== 'shield') || !t.powered) continue;
-        const shieldCd = t.type === 'shield' ? SHIELD_TOWER_COOLDOWN : SHIELD_COOLDOWN;
-        if (t.type === 'shield' && t.lastActionTime === 0) {
-          t.lastActionTime = now;
-          changed = true;
-          continue;
-        }
-        if (now - t.lastActionTime <= shieldCd) continue;
-        if (t.shieldHp <= 0) {
-          if (t.storedPower >= SHIELD_CONFIG.rebootCost) { t.storedPower -= SHIELD_CONFIG.rebootCost; t.shieldHp = SHIELD_CONFIG.rebootHp; t.lastActionTime = now; changed = true; }
-        } else {
-          if (t.storedPower >= SHIELD_CONFIG.rechargeCost) { t.storedPower -= SHIELD_CONFIG.rechargeCost; t.shieldHp = Math.min(t.maxShieldHp, t.shieldHp + SHIELD_CONFIG.rechargeAmount); t.lastActionTime = now; changed = true; }
-        }
-      }
-
-      // ── Battery & Core rapid discharge ────────────────────────────────
-      for (const t of state.towers) {
-        if (t.type === 'battery') {
-          if (!t.powered || t.storedPower <= 0) continue;
-          if (now - t.lastActionTime <= BATTERY_INTERVAL) continue;
-          if (dispatchPulse(state, t, true)) { t.storedPower--; t.lastActionTime = now; changed = true; }
-        }
-      }
-
-      // ── Pulse movement ──────────────────────────────────────────────────
-      for (let i = state.pulses.length - 1; i >= 0; i--) {
-        const p = state.pulses[i];
-        p.progress += PULSE_SPEED * dt;
-        let rem = p.progress, reached = false;
-        for (let j = 0; j < p.path.length - 1; j++) {
-          const dx = p.path[j + 1].x - p.path[j].x, dy = p.path[j + 1].y - p.path[j].y;
-          const seg = Math.sqrt(dx * dx + dy * dy);
-          if (rem <= seg) break;
-          rem -= seg;
-          if (j === p.path.length - 2) reached = true;
-        }
-        if (reached) {
-          const tgt = state.towerMap.get(p.targetTowerId);
-          if (tgt) {
-            tgt.incomingPower = Math.max(0, tgt.incomingPower - 1);
-            if (tgt.type === 'gatling') {
-              tgt.heat = Math.min(1, tgt.heat + GATLING_HEAT_PER_POWER);
-            } else {
-              tgt.storedPower = Math.min(tgt.maxPower, tgt.storedPower + 1);
-            }
-          }
-          state.pulses.splice(i, 1);
-        }
-        changed = true;
-      }
-
-      // ── Gatling heat decay ──────────────────────────────────────────
-      for (const t of state.towers) {
-        if (t.type === 'gatling' && t.heat > 0) {
-          t.heat = Math.max(0, t.heat - GATLING_HEAT_DECAY * 0.5 * dt);
-          changed = true;
-        }
-      }
-
-      // ── Turret barrel tracking + shooting (blaster, gatling, sniper) ───
-      const TURRET_TYPES = new Set(['blaster', 'gatling', 'sniper']);
-      for (const t of state.towers) {
-        if (!TURRET_TYPES.has(t.type)) continue;
-        const bx = (t.x + t.width / 2) * CELL_SIZE, by = (t.y + t.height / 2) * CELL_SIZE;
-        const range = t.type === 'sniper' ? SNIPER_RANGE : t.type === 'gatling' ? GATLING_RANGE : BLASTER_RANGE;
-
-        // Find nearest target for barrel aiming
-        let bestD: number = range;
-        let tgtX = 0, tgtY = 0, hasTarget = false;
-        let bestEnemy: typeof state.enemies[0] | null = null;
-        let bestTarget: typeof state.towers[0] | null = null;
-
-        for (const e of state.enemies) {
-          const d = Math.hypot(e.x - bx, e.y - by);
-          if (d < bestD) { bestD = d; tgtX = e.x; tgtY = e.y; hasTarget = true; bestEnemy = e; bestTarget = null; }
-        }
-        for (const tgt of state.towers) {
-          if (tgt.type !== 'target') continue;
-          const tx = (tgt.x + tgt.width / 2) * CELL_SIZE, ty = (tgt.y + tgt.height / 2) * CELL_SIZE;
-          const d = Math.hypot(tx - bx, ty - by);
-          if (d < bestD) { bestD = d; tgtX = tx; tgtY = ty; hasTarget = true; bestTarget = tgt; bestEnemy = null; }
-        }
-
-        // Smooth barrel rotation toward target
-        if (hasTarget) {
-          const desired = Math.atan2(tgtY - by, tgtX - bx);
-          let diff = desired - t.barrelAngle;
-          while (diff > Math.PI) diff -= TWO_PI;
-          while (diff < -Math.PI) diff += TWO_PI;
-          const maxRot = BARREL_SPEED * dt;
-          t.barrelAngle += Math.abs(diff) < maxRot ? diff : Math.sign(diff) * maxRot;
-          changed = true;
-        }
-
-        if (t.type === 'sniper' && (!t.powered || !hasTarget)) t.sniperAimSince = undefined;
-        if (!t.powered || !hasTarget) continue;
-
-        const barrelLen = Math.min(t.width, t.height) * CELL_SIZE / 2 - 4 + 6;
-        const mx = bx + Math.cos(t.barrelAngle) * barrelLen;
-        const my = by + Math.sin(t.barrelAngle) * barrelLen;
-
-        // ── Blaster: 1 bullet per 2 power ──
-        if (t.type === 'blaster') {
-          if (t.storedPower < BLASTER_POWER_COST || now - t.lastActionTime <= BLASTER_COOLDOWN) continue;
-          if (bestEnemy) {
-            t.storedPower -= BLASTER_POWER_COST;
-            state.projectiles.push({ id: genId(), x: mx, y: my, targetId: bestEnemy.id, speed: BLASTER_BULLET_SPEED, damage: BLASTER_DAMAGE });
-            t.lastActionTime = now; changed = true;
-          } else if (bestTarget) {
-            t.storedPower -= BLASTER_POWER_COST;
-            state.projectiles.push({ id: genId(), x: mx, y: my, targetId: bestTarget.id, speed: BLASTER_BULLET_SPEED, damage: BLASTER_DAMAGE, isTargetTower: true });
-            t.lastActionTime = now; changed = true;
-          }
-        }
-
-        // ── Gatling: heat-driven rapid fire, power fuels heat ──
-        if (t.type === 'gatling') {
-          const heat = t.heat;
-          if (heat < 0.05) continue;
-          const interval = (GATLING_MAX_INTERVAL - (GATLING_MAX_INTERVAL - GATLING_MIN_INTERVAL) * heat) / 2;
-          if (now - t.lastActionTime <= interval) continue;
-          const spread = GATLING_MIN_SPREAD + (GATLING_MAX_SPREAD - GATLING_MIN_SPREAD) * t.heat;
-          const spreadAngle = t.barrelAngle + (Math.random() - 0.5) * spread * 2;
-          const targetId = bestEnemy?.id ?? bestTarget?.id ?? '';
-          state.projectiles.push({
-            id: genId(), x: mx, y: my, targetId,
-            speed: GATLING_BULLET_SPEED, damage: GATLING_DAMAGE,
-            isTargetTower: !!bestTarget && !bestEnemy,
-            angle: spreadAngle, traveled: 0, maxRange: GATLING_BULLET_RANGE,
-            color: '#f59e0b', size: 2,
-          });
-          t.lastActionTime = now; changed = true;
-        }
-
-        // ── Sniper: straight-line piercing shot, long CD, must hold aim before firing ──
-        if (t.type === 'sniper') {
-          const desiredAngle = Math.atan2(tgtY - by, tgtX - bx);
-          let aimDiff = desiredAngle - t.barrelAngle;
-          while (aimDiff > Math.PI) aimDiff -= TWO_PI;
-          while (aimDiff < -Math.PI) aimDiff += TWO_PI;
-          const aligned = Math.abs(aimDiff) <= SNIPER_AIM_THRESHOLD;
-          if (!aligned) t.sniperAimSince = undefined;
-          else if (t.sniperAimSince === undefined) t.sniperAimSince = now;
-
-          if (t.storedPower < SNIPER_POWER_COST || now - t.lastActionTime <= SNIPER_COOLDOWN) continue;
-          if (!aligned || t.sniperAimSince === undefined || now - t.sniperAimSince < SNIPER_MIN_AIM_MS) continue;
-
-          t.storedPower -= SNIPER_POWER_COST;
-          const fireAngle = t.barrelAngle;
-          state.projectiles.push({
-            id: genId(), x: mx, y: my, targetId: bestEnemy?.id ?? bestTarget?.id ?? '',
-            speed: SNIPER_SPEED, damage: SNIPER_DAMAGE,
-            angle: fireAngle, traveled: 0, maxRange: SNIPER_MAX_RANGE,
-            piercing: true, piercedIds: [],
-            color: '#a78bfa', size: 4,
-          });
-          t.sniperAimSince = undefined;
-          t.lastActionTime = now; changed = true;
-        }
-      }
-
-      // ── Tesla: chain lightning ───────────────────────────────────────
-      for (const t of state.towers) {
-        if (t.type !== 'tesla' || !t.powered || t.storedPower <= 0) continue;
-        if (now - t.lastActionTime <= TESLA_COOLDOWN) continue;
-        const bx = (t.x + t.width / 2) * CELL_SIZE, by = (t.y + t.height / 2) * CELL_SIZE;
-
-        // Find first target: enemy or practice target tower
-        let firstEnemy = findNearestEnemy(state.enemies, bx, by, TESLA_RANGE);
-        let firstTarget: Tower | null = null;
-        let firstTargetDist = firstEnemy ? Math.hypot(firstEnemy.x - bx, firstEnemy.y - by) : TESLA_RANGE;
-        for (const tgt of state.towers) {
-          if (tgt.type !== 'target') continue;
-          const tx = (tgt.x + tgt.width / 2) * CELL_SIZE, ty = (tgt.y + tgt.height / 2) * CELL_SIZE;
-          const d = Math.hypot(tx - bx, ty - by);
-          if (d < firstTargetDist) { firstTargetDist = d; firstTarget = tgt; firstEnemy = null; }
-        }
-        if (!firstEnemy && !firstTarget) continue;
-
-        const power = t.storedPower;
-        t.storedPower = 0;
-        const totalDmg = power * TESLA_DAMAGE_PER_POWER;
-        const bounces = power;
-
-        const clSegments: { x1: number; y1: number; x2: number; y2: number }[] = [];
-        const hitIds = new Set<string>();
-        let cx = bx, cy = by;
-
-        if (firstTarget) {
-          const tx = (firstTarget.x + firstTarget.width / 2) * CELL_SIZE;
-          const ty = (firstTarget.y + firstTarget.height / 2) * CELL_SIZE;
-          clSegments.push({ x1: cx, y1: cy, x2: tx, y2: ty });
-          firstTarget.hp -= totalDmg;
-          createExplosion(state, tx, ty, '#e879f9', 5);
-        } else {
-          let curEnemy: typeof state.enemies[0] | null = firstEnemy;
-          for (let b = 0; b < bounces && curEnemy; b++) {
-            clSegments.push({ x1: cx, y1: cy, x2: curEnemy.x, y2: curEnemy.y });
-            applyDamageToEnemy(state, curEnemy, totalDmg / bounces, curEnemy.color, true);
-            hitIds.add(curEnemy.id);
-            cx = curEnemy.x; cy = curEnemy.y;
-            curEnemy = findNearestEnemy(state.enemies, cx, cy, TESLA_BOUNCE_RANGE, hitIds);
-          }
-        }
-
-        if (clSegments.length > 0) {
-          state.chainLightnings.push({ segments: clSegments, life: 0, maxLife: 0.4 });
-        }
-        t.lastActionTime = now; changed = true;
-      }
-
-      // ── Wave management with roguelike pick (skipped in custom mode) ────
-      if (state.gameMode !== 'custom') {
-        if (state.enemies.length === 0 && state.enemiesToSpawn === 0) {
-          if (state.needsPick) {
-            // Wave cleared — enter pick phase
-            if (state.wave > 0) state.score += state.wave * WAVE_CLEAR_SCORE_MUL;
-            const isBossWave = state.wave > 0 && state.wave % BOSS_WAVE_INTERVAL === 0;
-            state.bossBonusPickQueued = isBossWave;
-            state.pickUiPhase = 'standard';
-            state.pickOptions = generatePickOptions();
-            state.status = 'pick';
-            changed = true;
-          } else {
-            // Countdown to next wave
-            state.waveTimer += dt;
-            if (state.waveTimer > WAVE_DELAY) {
-              state.wave++;
-              state.enemiesToSpawn = Math.floor(ENEMY_SCALING.spawnBase + state.wave * ENEMY_SCALING.spawnLinear + Math.sqrt(state.wave) * ENEMY_SCALING.spawnSqrt);
-              state.waveTimer = 0;
-              state.needsPick = true; // will trigger pick after this wave clears
-              if (state.wave % BOSS_WAVE_INTERVAL === 0) spawnBoss(state, state.wave);
-              changed = true;
-            }
-          }
-        }
-        if (state.enemiesToSpawn > 0) {
-          state.spawnTimer += dt;
-          if (state.spawnTimer > SPAWN_INTERVAL) {
-            spawnEnemy(state, state.wave);
-            state.enemiesToSpawn--;
-            state.spawnTimer = 0;
-            changed = true;
-          }
-        }
-      }
-
-      // ── Enemy AI ────────────────────────────────────────────────────────
-      for (const enemy of state.enemies) {
-        let minD = Infinity, tgtPos = { x: 0, y: 0 }, isShield = false;
-        let tgtTower: typeof state.towers[0] | null = null;
-        let tgtWire: typeof state.wires[0] | null = null;
-
-        // Saboteurs prioritize wires — check wires first with a distance bonus
-        const isSaboteur = enemy.enemyType === 'saboteur';
-
-        for (const t of state.towers) {
-          if (t.type === 'target') continue;
-          const tx = Math.max(t.x * CELL_SIZE, Math.min(enemy.x, (t.x + t.width) * CELL_SIZE));
-          const ty = Math.max(t.y * CELL_SIZE, Math.min(enemy.y, (t.y + t.height) * CELL_SIZE));
-          const d = Math.hypot(tx - enemy.x, ty - enemy.y);
-          const ed = isSaboteur ? d * ENEMY_AI_CONFIG.saboteurTowerDistMul : d;
-          if (ed < minD) { minD = ed; tgtTower = t; tgtWire = null; isShield = false; tgtPos = { x: tx, y: ty }; }
-          if (t.shieldHp > 0 && t.shieldRadius > 0) {
-            const scx = (t.x + t.width / 2) * CELL_SIZE, scy = (t.y + t.height / 2) * CELL_SIZE;
-            const sd = Math.max(0, Math.hypot(scx - enemy.x, scy - enemy.y) - t.shieldRadius);
-            const esd = isSaboteur ? sd * ENEMY_AI_CONFIG.saboteurTowerDistMul : sd;
-            if (esd < minD) {
-              minD = esd; tgtTower = t; tgtWire = null; isShield = true;
-              const a = Math.atan2(enemy.y - scy, enemy.x - scx);
-              tgtPos = { x: scx + Math.cos(a) * t.shieldRadius, y: scy + Math.sin(a) * t.shieldRadius };
-            }
-          }
-        }
-        for (const w of state.wires) {
-          for (const p of w.path) {
-            const wx = p.x * CELL_SIZE + CELL_SIZE / 2, wy = p.y * CELL_SIZE + CELL_SIZE / 2;
-            const d = Math.hypot(wx - enemy.x, wy - enemy.y);
-            const ed = isSaboteur ? d * ENEMY_AI_CONFIG.saboteurWireDistMul : d;
-            if (ed < minD) { minD = ed; tgtTower = null; tgtWire = w; isShield = false; tgtPos = { x: wx, y: wy }; }
-          }
-        }
-
-        if (!tgtTower && !tgtWire) continue;
-        // Use actual distance for movement/attack range (not weighted)
-        const actualDist = Math.hypot(tgtPos.x - enemy.x, tgtPos.y - enemy.y);
-        if (actualDist > ATTACK_RANGE) {
-          const a = Math.atan2(tgtPos.y - enemy.y, tgtPos.x - enemy.x);
-          enemy.x += Math.cos(a) * enemy.speed * dt;
-          enemy.y += Math.sin(a) * enemy.speed * dt;
-          enemy.heading = a;
-          changed = true;
-        } else if (now - enemy.lastAttackTime > enemy.attackCooldown) {
-          if (tgtWire) {
-            tgtWire.hp -= enemy.damage * enemy.wireDamageMul;
-            // Hit VFX on wire
-            state.hitEffects.push({ x: tgtPos.x, y: tgtPos.y, life: 0, maxLife: 0.3, color: '#ef4444', radius: 12 });
-            createExplosion(state, tgtPos.x, tgtPos.y, '#ef4444', 3);
-            if (tgtWire.hp <= 0) { state.wires = state.wires.filter(w => w.id !== tgtWire!.id); updatePowerGrid(state); }
-          } else if (tgtTower) {
-            if (isShield) {
-              const prevHp = tgtTower.shieldHp;
-              tgtTower.shieldHp = Math.max(0, tgtTower.shieldHp - enemy.damage);
-              // Hit VFX on shield
-              state.hitEffects.push({ x: tgtPos.x, y: tgtPos.y, life: 0, maxLife: 0.35, color: '#22d3ee', radius: 18 });
-              createExplosion(state, tgtPos.x, tgtPos.y, '#22d3ee', 4);
-              // Shield break effect
-              if (prevHp > 0 && tgtTower.shieldHp <= 0) {
-                const scx = (tgtTower.x + tgtTower.width / 2) * CELL_SIZE;
-                const scy = (tgtTower.y + tgtTower.height / 2) * CELL_SIZE;
-                const frags: ShieldBreakEffect['fragments'] = [];
-                for (let f = 0; f < 16; f++) {
-                  frags.push({ angle: (f / 16) * Math.PI * 2 + (Math.random() - 0.5) * 0.2, dist: 0, size: 3 + Math.random() * 4, speed: 60 + Math.random() * 80 });
-                }
-                state.shieldBreakEffects.push({ x: scx, y: scy, radius: tgtTower.shieldRadius, life: 0, maxLife: 0.6, fragments: frags });
-                createExplosion(state, scx, scy, '#22d3ee', 20);
-              }
-            } else {
-              tgtTower.hp -= enemy.damage;
-              // Hit VFX on tower
-              state.hitEffects.push({ x: tgtPos.x, y: tgtPos.y, life: 0, maxLife: 0.3, color: '#ef4444', radius: 14 });
-              createExplosion(state, tgtPos.x, tgtPos.y, '#f87171', 4);
-              if (tgtTower.hp <= 0) {
-                if (tgtTower.type === 'core') state.status = 'gameover';
-                destroyTower(state, tgtTower.id);
-              }
-            }
-          }
-          enemy.lastAttackTime = now;
-          changed = true;
-        }
-      }
-
-      // ── Boss: spawn scouts & movement trail ──────────────────────────────
-      for (const enemy of state.enemies) {
-        if (enemy.enemyType !== 'overlord') continue;
-        if (enemy.lastSpawnTime === 0) { enemy.lastSpawnTime = now; continue; }
-        if (now - enemy.lastSpawnTime >= BOSS_SPAWN_INTERVAL) {
-          for (let i = 0; i < BOSS_SPAWN_COUNT; i++) {
-            const offset = (Math.random() - 0.5) * enemy.radius * 2;
-            spawnEnemyAt(state, 'scout', state.wave, enemy.x + offset, enemy.y + offset);
-          }
-          enemy.lastSpawnTime = now;
-          createExplosion(state, enemy.x, enemy.y, '#ef4444', 8);
-          changed = true;
-        }
-        if (Math.random() < 0.32) {
-          const ox = (Math.random() - 0.5) * enemy.radius * 0.8;
-          const oy = (Math.random() - 0.5) * enemy.radius * 0.8;
-          state.particles.push({
-            x: enemy.x + ox, y: enemy.y + oy,
-            vx: -Math.cos(enemy.heading) * 20 + (Math.random() - 0.5) * 15,
-            vy: -Math.sin(enemy.heading) * 20 + (Math.random() - 0.5) * 15,
-            life: 0, maxLife: 0.4 + Math.random() * 0.3,
-            color: '#ef4444', size: 2 + Math.random() * 3,
-          });
-          changed = true;
-        }
-        if (Math.random() < 0.45) {
-          const back = enemy.radius * 1.35;
-          const ox = (Math.random() - 0.5) * enemy.radius * 0.4;
-          const oy = (Math.random() - 0.5) * enemy.radius * 0.4;
-          state.particles.push({
-            x: enemy.x - Math.cos(enemy.heading) * back + ox,
-            y: enemy.y - Math.sin(enemy.heading) * back + oy,
-            vx: -Math.cos(enemy.heading) * (35 + Math.random() * 25) + (Math.random() - 0.5) * 20,
-            vy: -Math.sin(enemy.heading) * (35 + Math.random() * 25) + (Math.random() - 0.5) * 20,
-            life: 0, maxLife: 0.35 + Math.random() * 0.35,
-            color: Math.random() < 0.5 ? '#fca5a5' : '#ef4444',
-            size: 2 + Math.random() * 4,
-          });
-          changed = true;
-        }
-      }
-
-      // ── Projectile movement ─────────────────────────────────────────────
-      for (let i = state.projectiles.length - 1; i >= 0; i--) {
-        const p = state.projectiles[i];
-
-        // Non-homing projectiles (gatling, sniper line-shot)
-        if (p.angle !== undefined) {
-          const step = p.speed * dt;
-          p.x += Math.cos(p.angle) * step;
-          p.y += Math.sin(p.angle) * step;
-          p.traveled = (p.traveled ?? 0) + step;
-          if (p.maxRange && p.traveled > p.maxRange) { state.projectiles.splice(i, 1); changed = true; continue; }
-
-          // Check collision with all enemies
-          let hit = false;
-          for (const e of state.enemies) {
-            if (p.piercedIds?.includes(e.id)) continue;
-            if (Math.hypot(e.x - p.x, e.y - p.y) < e.radius + 4) {
-              applyDamageToEnemy(state, e, p.damage, p.color ?? '#fbbf24');
-              if (!p.piercing) { state.projectiles.splice(i, 1); hit = true; }
-              else { p.piercedIds = p.piercedIds ?? []; p.piercedIds.push(e.id); }
-              changed = true;
-              break;
-            }
-          }
-          if (hit) continue;
-          changed = true;
-          continue;
-        }
-
-        // Homing projectiles (blaster, sniper)
-        let tgtX: number, tgtY: number;
-        let tgtFound = false;
-
-        if (p.isTargetTower) {
-          const tgt = state.towerMap.get(p.targetId);
-          if (!tgt || tgt.type !== 'target') { state.projectiles.splice(i, 1); changed = true; continue; }
-          tgtX = (tgt.x + tgt.width / 2) * CELL_SIZE;
-          tgtY = (tgt.y + tgt.height / 2) * CELL_SIZE;
-          tgtFound = true;
-          const d = Math.hypot(tgtX - p.x, tgtY - p.y);
-          if (d < 10) {
-            tgt.hp -= p.damage;
-            createExplosion(state, tgtX, tgtY, p.color ?? '#fbbf24', 5);
-            if (p.piercing) {
-              p.piercedIds = p.piercedIds ?? []; p.piercedIds.push(p.targetId);
-              // Find next target tower (unlikely but handle it)
-              state.projectiles.splice(i, 1);
-            } else {
-              state.projectiles.splice(i, 1);
-            }
-            if (tgt.hp <= 0) {
-              destroyTower(state, tgt.id);
-              createExplosion(state, tgtX, tgtY, '#f97316', 15);
-            }
-            changed = true;
-            continue;
-          }
-        } else {
-          const tgt = state.enemies.find(e => e.id === p.targetId);
-          if (!tgt) {
-            // For piercing, find next enemy instead of removing
-            if (p.piercing) {
-              const bestE = findNearestEnemy(state.enemies, p.x, p.y, 300, p.piercedIds);
-              if (bestE) { p.targetId = bestE.id; } else { state.projectiles.splice(i, 1); changed = true; continue; }
-              const et = state.enemies.find(e => e.id === p.targetId)!;
-              tgtX = et.x; tgtY = et.y; tgtFound = true;
-            } else {
-              state.projectiles.splice(i, 1); changed = true; continue;
-            }
-          } else {
-            tgtX = tgt.x;
-            tgtY = tgt.y;
-            tgtFound = true;
-            const d = Math.hypot(tgtX - p.x, tgtY - p.y);
-            if (d < tgt.radius + 4) {
-              applyDamageToEnemy(state, tgt, p.damage, p.color ?? '#fbbf24', true);
-              if (p.piercing) {
-                p.piercedIds = p.piercedIds ?? []; p.piercedIds.push(tgt.id);
-                // Re-target next enemy
-                const bestE = findNearestEnemy(state.enemies, p.x, p.y, 300, p.piercedIds);
-                if (bestE) { p.targetId = bestE.id; } else { state.projectiles.splice(i, 1); changed = true; continue; }
-              } else {
-                state.projectiles.splice(i, 1);
-              }
-              changed = true;
-              continue;
-            }
-          }
-        }
-
-        if (tgtFound) {
-          const a = Math.atan2(tgtY! - p.y, tgtX! - p.x);
-          p.x += Math.cos(a) * p.speed * dt;
-          p.y += Math.sin(a) * p.speed * dt;
-          changed = true;
-        }
-      }
-
-      // ── Chain lightning update ─────────────────────────────────────────
-      for (let i = state.chainLightnings.length - 1; i >= 0; i--) {
-        state.chainLightnings[i].life += dt;
-        if (state.chainLightnings[i].life >= state.chainLightnings[i].maxLife) {
-          state.chainLightnings.splice(i, 1);
-        }
-        changed = true;
-      }
-
-      // ── Particles ───────────────────────────────────────────────────────
-      for (let i = state.particles.length - 1; i >= 0; i--) {
-        const p = state.particles[i];
-        p.life += dt;
-        if (p.life >= p.maxLife) { state.particles.splice(i, 1); }
-        else { p.x += p.vx * dt; p.y += p.vy * dt; }
-        changed = true;
-      }
-
-      // ── Hit effects ──────────────────────────────────────────────────────
-      for (let i = state.hitEffects.length - 1; i >= 0; i--) {
-        state.hitEffects[i].life += dt;
-        if (state.hitEffects[i].life >= state.hitEffects[i].maxLife) state.hitEffects.splice(i, 1);
-        changed = true;
-      }
-
-      // ── Shield break effects ─────────────────────────────────────────────
-      for (let i = state.shieldBreakEffects.length - 1; i >= 0; i--) {
-        const sb = state.shieldBreakEffects[i];
-        sb.life += dt;
-        for (const f of sb.fragments) f.dist += f.speed * dt;
-        if (sb.life >= sb.maxLife) state.shieldBreakEffects.splice(i, 1);
-        changed = true;
-      }
-
-      if (changed) sync();
+    if (state.status === 'playing' && updateGameState(state, dt)) {
+      sync();
     }
 
     // ── Render ────────────────────────────────────────────────────────────
