@@ -337,6 +337,10 @@ const updateCombatTowers = (state: GameState, dt: number, now: number) => {
 
   for (const tower of state.towers) {
     if (!turretTypes.has(tower.type)) continue;
+    if (!tower.powered) {
+      if (tower.type === 'sniper') tower.sniperAimSince = undefined;
+      continue;
+    }
 
     const baseX = (tower.x + tower.width / 2) * GLOBAL_CONFIG.cellSize;
     const baseY = (tower.y + tower.height / 2) * GLOBAL_CONFIG.cellSize;
@@ -370,10 +374,14 @@ const updateCombatTowers = (state: GameState, dt: number, now: number) => {
       changed = true;
     }
 
-    if (tower.type === 'sniper' && (!tower.powered || !hasTarget)) tower.sniperAimSince = undefined;
-    if (!tower.powered || !hasTarget) continue;
+    if (tower.type === 'sniper' && !hasTarget) tower.sniperAimSince = undefined;
+    if (!hasTarget) continue;
 
-    const barrelLength = Math.min(tower.width, tower.height) * GLOBAL_CONFIG.cellSize / 2 - 4 + 6;
+    const baseBarrelLength = Math.min(tower.width, tower.height) * GLOBAL_CONFIG.cellSize / 2 - 4;
+    const barrelLength =
+      tower.type === 'sniper' ? (baseBarrelLength + 10) * 2 - GLOBAL_CONFIG.cellSize :
+      tower.type === 'gatling' ? (baseBarrelLength + 4) * 2 :
+      (baseBarrelLength + 6) * 1.6;
     const muzzleX = baseX + Math.cos(tower.barrelAngle) * barrelLength;
     const muzzleY = baseY + Math.sin(tower.barrelAngle) * barrelLength;
 

@@ -177,7 +177,7 @@ export const drawWireHpBars = (ctx: CanvasRenderingContext2D, state: GameState) 
 // ── Shields (fade-based visualization) ───────────────────────────────
 export const drawShields = (ctx: CanvasRenderingContext2D, state: GameState, now: number) => {
   for (const t of state.towers) {
-    if (t.maxShieldHp <= 0 || t.shieldHp <= 0) continue;
+    if (t.maxShieldHp <= 0 || t.shieldHp <= 0 || !t.powered) continue;
     const cx = (t.x + t.width / 2) * CELL_SIZE, cy = (t.y + t.height / 2) * CELL_SIZE;
     const ratio = t.shieldHp / t.maxShieldHp;
     const r = t.shieldRadius;
