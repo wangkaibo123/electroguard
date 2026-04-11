@@ -81,7 +81,7 @@ export const TOWER_CONFIG: Record<TowerType, {
   /* 发电机：电网的能量来源 */
   generator: { hp: 100,  description: 'Power source for the network. Dispatches energy.',           color: '#fbbf24', width: 3, height: 3, maxPower: 0, maxShieldHp: 0,   shieldRadius: 0 },
   /* 护盾塔：消耗电力投射防护盾 */
-  shield:    { hp: 100,  description: 'Projects a protective shield. Consumes power to recharge.', color: '#22d3ee', width: 2, height: 2, maxPower: 4, maxShieldHp: 300, shieldRadius: 150 },
+  shield:    { hp: 100,  description: 'Projects a protective shield. Consumes power to recharge.', color: '#22d3ee', width: 3, height: 3, maxPower: 4, maxShieldHp: 300, shieldRadius: 170 },
   /* 电池：储存电力并快速放电 */
   battery:   { hp: 150,  description: 'Stores 4 units of power and discharges quickly.',            color: '#34d399', width: 3, height: 3, maxPower: 4, maxShieldHp: 0,   shieldRadius: 0 },
   /* 汇流器：将 3 条输入线合并为 3 条输出线 */

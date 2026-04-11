@@ -17,6 +17,7 @@ import { addTowerToState, createTowerAt } from './towerFactory';
 import { findAutoPlacementNearCore } from './placement';
 import { updateGameState } from './updateGameState';
 import { getRotationKnobLayout } from './render/towers';
+import { isWorldPointInTowerFootprint } from './footprint';
 
 const { maxZoom: MAX_ZOOM, waveDelay: WAVE_DELAY } = GLOBAL_CONFIG;
 
@@ -479,8 +480,7 @@ export const useGameLoop = () => {
 
     // Tower drag check (core cannot be dragged or rotated)
     for (const tower of state.towers) {
-      if (wx >= tower.x * CELL_SIZE && wx <= (tower.x + tower.width) * CELL_SIZE &&
-          wy >= tower.y * CELL_SIZE && wy <= (tower.y + tower.height) * CELL_SIZE) {
+      if (isWorldPointInTowerFootprint(tower, wx, wy)) {
         if (tower.type === 'core') {
           showToast(t().coreCannotMove);
           return;
@@ -577,8 +577,8 @@ export const useGameLoop = () => {
       const nx = (wx / CELL_SIZE | 0) - (tower.width >> 1);
       const ny = (wy / CELL_SIZE | 0) - (tower.height >> 1);
       if (nx < 0 || ny < 0 || nx + tower.width > GRID_WIDTH || ny + tower.height > GRID_HEIGHT) return;
-      if (collidesWithTowers(nx, ny, tower.width, tower.height, state.towers, tower.id)) return;
-      if (collidesWithWires(nx, ny, tower.width, tower.height, state.wires, tower.id)) return;
+      if (collidesWithTowers(nx, ny, tower.width, tower.height, state.towers, tower.id, 0, tower.type)) return;
+      if (collidesWithWires(nx, ny, tower.width, tower.height, state.wires, tower.id, 0, tower.type)) return;
       if (tower.x === nx && tower.y === ny) return;
 
       tower.x = nx;
@@ -627,8 +627,7 @@ export const useGameLoop = () => {
     } else if (!dragWireStartRef.current) {
       let hit = false;
       for (const t of state.towers) {
-        if (wx >= t.x * CELL_SIZE && wx <= (t.x + t.width) * CELL_SIZE &&
-            wy >= t.y * CELL_SIZE && wy <= (t.y + t.height) * CELL_SIZE) { hit = true; break; }
+        if (isWorldPointInTowerFootprint(t, wx, wy)) { hit = true; break; }
       }
       if (!hit) updateRotating(null);
     }
@@ -754,8 +753,7 @@ export const useGameLoop = () => {
 
     // Tower drag check (core cannot be dragged or rotated)
     for (const tower of state.towers) {
-      if (wx >= tower.x * CELL_SIZE && wx <= (tower.x + tower.width) * CELL_SIZE &&
-          wy >= tower.y * CELL_SIZE && wy <= (tower.y + tower.height) * CELL_SIZE) {
+      if (isWorldPointInTowerFootprint(tower, wx, wy)) {
         if (tower.type === 'core') {
           showToast(t().coreCannotMove);
           return;
@@ -877,8 +875,8 @@ export const useGameLoop = () => {
       const nx = (wx / CELL_SIZE | 0) - (tower.width >> 1);
       const ny = (wy / CELL_SIZE | 0) - (tower.height >> 1);
       if (nx < 0 || ny < 0 || nx + tower.width > GRID_WIDTH || ny + tower.height > GRID_HEIGHT) return;
-      if (collidesWithTowers(nx, ny, tower.width, tower.height, state.towers, tower.id)) return;
-      if (collidesWithWires(nx, ny, tower.width, tower.height, state.wires, tower.id)) return;
+      if (collidesWithTowers(nx, ny, tower.width, tower.height, state.towers, tower.id, 0, tower.type)) return;
+      if (collidesWithWires(nx, ny, tower.width, tower.height, state.wires, tower.id, 0, tower.type)) return;
       if (tower.x === nx && tower.y === ny) return;
       tower.x = nx;
       tower.y = ny;

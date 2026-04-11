@@ -1,5 +1,6 @@
 import { GameState, GRID_HEIGHT, GRID_WIDTH, TOWER_STATS, TowerType } from './types';
 import { collidesWithTowers, collidesWithWires } from './engine';
+import { footprintsOverlap } from './footprint';
 
 export const canPlaceTowerAt = (
   state: GameState,
@@ -18,19 +19,18 @@ export const canPlaceTowerAt = (
   for (const drop of state.incomingDrops) {
     if (drop.id === ignoreDropId) continue;
     const dropStats = TOWER_STATS[drop.towerType];
-    if (
-      x < drop.targetGridX + dropStats.width + clearance &&
-      x + stats.width > drop.targetGridX - clearance &&
-      y < drop.targetGridY + dropStats.height + clearance &&
-      y + stats.height > drop.targetGridY - clearance
-    ) {
+    if (footprintsOverlap(
+      { x, y, width: stats.width, height: stats.height, type },
+      { x: drop.targetGridX, y: drop.targetGridY, width: dropStats.width, height: dropStats.height, type: drop.towerType },
+      clearance,
+    )) {
       return false;
     }
   }
 
   return (
-    !collidesWithTowers(x, y, stats.width, stats.height, state.towers, undefined, clearance) &&
-    !collidesWithWires(x, y, stats.width, stats.height, state.wires, undefined, clearance)
+    !collidesWithTowers(x, y, stats.width, stats.height, state.towers, undefined, clearance, type) &&
+    !collidesWithWires(x, y, stats.width, stats.height, state.wires, undefined, clearance, type)
   );
 };
 

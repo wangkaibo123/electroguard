@@ -7,6 +7,7 @@ import { t, pickKey } from './i18n';
 import { GLOBAL_CONFIG, ENEMY_CONFIG, ENEMY_SCALING, STARTING_INVENTORY, PICK_POOL_CONFIG, WEAPON_CONFIG } from './config';
 import { makeTowerCollider, makeEnemyCollider } from './collider';
 import { getLinearTowerBodyAspectRatio, getLinearTowerBodyRect } from './linearTowerGeometry';
+import { footprintsOverlap, getTowerCells, getTowerFootprintCells } from './footprint';
 
 const ENEMY_SPEED_MUL = GLOBAL_CONFIG.enemyBaseSpeedMul;
 
@@ -151,12 +152,7 @@ export const isPortAccessible = (
   if (cell.x < 0 || cell.x >= GRID_WIDTH || cell.y < 0 || cell.y >= GRID_HEIGHT) return false;
 
   for (const other of state.towers) {
-    if (
-      cell.x >= other.x &&
-      cell.x < other.x + other.width &&
-      cell.y >= other.y &&
-      cell.y < other.y + other.height
-    ) {
+    if (getTowerCells(other).some(otherCell => otherCell.x === cell.x && otherCell.y === cell.y)) {
       return hasDirectLinkCandidate(state, tower, port, ignoreWireId);
     }
   }
@@ -278,33 +274,30 @@ export const syncDirectPortLinks = (
 
 export const collidesWithTowers = (
   x: number, y: number, w: number, h: number,
-  towers: Tower[], excludeId?: string, clearance = 0
+  towers: Tower[], excludeId?: string, clearance = 0, type: TowerType = 'core'
 ): boolean => {
   for (const t of towers) {
     if (t.id === excludeId) continue;
-    if (
-      x < t.x + t.width + clearance &&
-      x + w > t.x - clearance &&
-      y < t.y + t.height + clearance &&
-      y + h > t.y - clearance
-    ) return true;
+    if (footprintsOverlap(
+      { x, y, width: w, height: h, type },
+      { x: t.x, y: t.y, width: t.width, height: t.height, type: t.type },
+      clearance,
+    )) return true;
   }
   return false;
 };
 
 export const collidesWithWires = (
   x: number, y: number, w: number, h: number,
-  wires: Wire[], excludeTowerId?: string, clearance = 0
+  wires: Wire[], excludeTowerId?: string, clearance = 0, type: TowerType = 'core'
 ): boolean => {
+  const cells = getTowerFootprintCells(x, y, w, h, type);
   for (const wire of wires) {
     if (excludeTowerId && (wire.startTowerId === excludeTowerId || wire.endTowerId === excludeTowerId)) continue;
     for (const p of wire.path) {
-      if (
-        p.x >= x - clearance &&
-        p.x < x + w + clearance &&
-        p.y >= y - clearance &&
-        p.y < y + h + clearance
-      ) return true;
+      if (cells.some(cell => Math.abs(cell.x - p.x) <= clearance && Math.abs(cell.y - p.y) <= clearance)) {
+        return true;
+      }
     }
   }
   return false;
@@ -317,8 +310,8 @@ export const canPlace = (
   const s = TOWER_STATS[type];
   if (state.gameMode !== 'custom' && (state.towerInventory[type] ?? 0) <= 0) return false;
   if (x < 0 || y < 0 || x + s.width > GRID_WIDTH || y + s.height > GRID_HEIGHT) return false;
-  return !collidesWithTowers(x, y, s.width, s.height, state.towers)
-      && !collidesWithWires(x, y, s.width, s.height, state.wires);
+  return !collidesWithTowers(x, y, s.width, s.height, state.towers, undefined, 0, type)
+      && !collidesWithWires(x, y, s.width, s.height, state.wires, undefined, 0, type);
 };
 
 // ── A* wire pathfinding ──────────────────────────────────────────────────────
@@ -333,9 +326,7 @@ export const findWirePath = (
   const key = (x: number, y: number) => y * GRID_WIDTH + x;
 
   for (const t of state.towers) {
-    for (let gx = t.x; gx < t.x + t.width; gx++)
-      for (let gy = t.y; gy < t.y + t.height; gy++)
-        blocked.add(key(gx, gy));
+    for (const cell of getTowerCells(t)) blocked.add(key(cell.x, cell.y));
   }
   for (const w of state.wires) {
     if (w.id === ignoreWireId) continue;
@@ -652,8 +643,8 @@ export const applyTowerRotation = (
   const nh = needsSwap ? tower.width : tower.height;
 
   if (tower.x < 0 || tower.y < 0 || tower.x + nw > GRID_WIDTH || tower.y + nh > GRID_HEIGHT) return false;
-  if (collidesWithTowers(tower.x, tower.y, nw, nh, state.towers, tower.id)) return false;
-  if (collidesWithWires(tower.x, tower.y, nw, nh, state.wires, tower.id)) return false;
+  if (collidesWithTowers(tower.x, tower.y, nw, nh, state.towers, tower.id, 0, tower.type)) return false;
+  if (collidesWithWires(tower.x, tower.y, nw, nh, state.wires, tower.id, 0, tower.type)) return false;
 
   tower.rotation = 0;
   tower.width = nw;

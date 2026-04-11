@@ -10,6 +10,13 @@ import { genId, generatePorts, syncDirectPortLinks, updatePowerGrid } from './en
 import { makeTowerCollider } from './collider';
 
 const createTowerPorts = (type: TowerType): Port[] => {
+  const allSideInputPorts = (): Port[] => [
+    { id: genId(), direction: 'top', portType: 'input' },
+    { id: genId(), direction: 'right', portType: 'input' },
+    { id: genId(), direction: 'bottom', portType: 'input' },
+    { id: genId(), direction: 'left', portType: 'input' },
+  ];
+
   if (type === 'battery') {
     return [
       { id: genId(), direction: 'left', portType: 'input' },
@@ -38,7 +45,7 @@ const createTowerPorts = (type: TowerType): Port[] => {
   }
 
   if (type === 'blaster' || type === 'gatling' || type === 'sniper' || type === 'tesla') {
-    return generatePorts('input');
+    return allSideInputPorts();
   }
 
   return [];

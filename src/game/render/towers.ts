@@ -11,6 +11,7 @@ import {
   FLASH_DUR_BLASTER, FLASH_DUR_GATLING, FLASH_DUR_SNIPER, FLASH_DUR_TESLA,
   SNIPER_COOLDOWN_MS,
 } from './helpers';
+import { getTowerCells, getTowerFootprintCells } from '../footprint';
 
 const ROTATION_KNOB_SCALE = 4 / 3;
 const ROTATION_KNOB_BASE_OFFSET = 20;
@@ -24,11 +25,7 @@ export const drawOccupiedGround = (ctx: CanvasRenderingContext2D, state: GameSta
 
   for (const tower of state.towers) {
     if (tower.type === 'core') hasCore = true;
-    for (let gx = tower.x; gx < tower.x + tower.width; gx++) {
-      for (let gy = tower.y; gy < tower.y + tower.height; gy++) {
-        occupied.add(`${gx},${gy}`);
-      }
-    }
+    for (const cell of getTowerCells(tower)) occupied.add(`${cell.x},${cell.y}`);
   }
 
   if (!occupied.size) return;
@@ -137,6 +134,21 @@ const drawEnergyEffect = (
       ctx.lineTo(spx + 2 - jx, spy + 2 - jy);
       ctx.stroke();
     }
+  }
+};
+
+const drawFootprintCells = (
+  ctx: CanvasRenderingContext2D,
+  cells: { x: number; y: number }[],
+  inset: number,
+  fill = true,
+  stroke = true,
+) => {
+  for (const cell of cells) {
+    const px = cell.x * CELL_SIZE;
+    const py = cell.y * CELL_SIZE;
+    if (fill) ctx.fillRect(px + inset, py + inset, CELL_SIZE - inset * 2, CELL_SIZE - inset * 2);
+    if (stroke) ctx.strokeRect(px + inset, py + inset, CELL_SIZE - inset * 2, CELL_SIZE - inset * 2);
   }
 };
 
@@ -322,6 +334,8 @@ export const drawTowers = (ctx: CanvasRenderingContext2D, state: GameState, now:
       const body = getLinearTowerBodyRect(px, py, tw, th, isLinearTowerLandscape(tower), getLinearTowerBodyAspectRatio(tower.type));
       ctx.fillRect(body.x + inset, body.y + inset, body.width - inset * 2, body.height - inset * 2);
       ctx.strokeRect(body.x + inset, body.y + inset, body.width - inset * 2, body.height - inset * 2);
+    } else if (tower.type === 'shield') {
+      drawFootprintCells(ctx, getTowerCells(tower), inset);
     } else {
       ctx.fillRect(px + inset, py + inset, tw - inset * 2, th - inset * 2);
       ctx.strokeRect(px + inset, py + inset, tw - inset * 2, th - inset * 2);
@@ -391,11 +405,19 @@ export const drawPlacementPreview = (
   ctx.strokeStyle = canPlaceFlag ? stats.color : '#ef4444';
   ctx.lineWidth = 2;
   ctx.globalAlpha = 0.6;
-  ctx.strokeRect(previewBody.x + pi, previewBody.y + pi, previewBody.width - pi * 2, previewBody.height - pi * 2);
+  if (selectedTower === 'shield') {
+    drawFootprintCells(ctx, getTowerFootprintCells(hoverPos.x, hoverPos.y, stats.width, stats.height, selectedTower), pi, false, true);
+  } else {
+    ctx.strokeRect(previewBody.x + pi, previewBody.y + pi, previewBody.width - pi * 2, previewBody.height - pi * 2);
+  }
   if (canPlaceFlag) {
     ctx.fillStyle = stats.color;
     ctx.globalAlpha = 0.15;
-    ctx.fillRect(previewBody.x + pi, previewBody.y + pi, previewBody.width - pi * 2, previewBody.height - pi * 2);
+    if (selectedTower === 'shield') {
+      drawFootprintCells(ctx, getTowerFootprintCells(hoverPos.x, hoverPos.y, stats.width, stats.height, selectedTower), pi, true, false);
+    } else {
+      ctx.fillRect(previewBody.x + pi, previewBody.y + pi, previewBody.width - pi * 2, previewBody.height - pi * 2);
+    }
   }
   ctx.globalAlpha = 1;
 };
@@ -418,10 +440,18 @@ export const drawDraggedTowerFootprint = (
   ctx.strokeStyle = '#facc15';
   ctx.lineWidth = 2;
   ctx.setLineDash([10, 6]);
-  ctx.strokeRect(px, py, tw, th);
+  if (tower.type === 'shield') {
+    drawFootprintCells(ctx, getTowerCells(tower), 0, false, true);
+  } else {
+    ctx.strokeRect(px, py, tw, th);
+  }
   ctx.setLineDash([4, 8]);
   ctx.fillStyle = 'rgba(250,204,21,0.08)';
-  ctx.fillRect(px, py, tw, th);
+  if (tower.type === 'shield') {
+    drawFootprintCells(ctx, getTowerCells(tower), 0, true, false);
+  } else {
+    ctx.fillRect(px, py, tw, th);
+  }
   ctx.restore();
 };
 
