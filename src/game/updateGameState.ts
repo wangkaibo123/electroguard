@@ -379,9 +379,9 @@ const updateCombatTowers = (state: GameState, dt: number, now: number) => {
 
     const baseBarrelLength = Math.min(tower.width, tower.height) * GLOBAL_CONFIG.cellSize / 2 - 4;
     const barrelLength =
-      tower.type === 'sniper' ? (baseBarrelLength + 10) * 2 - GLOBAL_CONFIG.cellSize :
+      tower.type === 'sniper' ? (baseBarrelLength + 10) * 2.4 - GLOBAL_CONFIG.cellSize :
       tower.type === 'gatling' ? (baseBarrelLength + 4) * 2 :
-      (baseBarrelLength + 6) * 1.6;
+      (baseBarrelLength + 6) * 1.28;
     const muzzleX = baseX + Math.cos(tower.barrelAngle) * barrelLength;
     const muzzleY = baseY + Math.sin(tower.barrelAngle) * barrelLength;
 

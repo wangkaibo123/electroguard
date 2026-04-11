@@ -700,7 +700,7 @@ function drawTowerDetails(
       ctx.globalAlpha = 1;
     }
     ctx.restore();
-    const barrelLen = (Math.min(tw, th) / 2 - inset + 6) * 1.6;
+    const barrelLen = (Math.min(tw, th) / 2 - inset + 6) * 1.28;
     const barrelStart = r * 0.3;
     const { mx, my } = drawCapsuleBarrel(
       ctx, cx, cy, localAngle, barrelStart, barrelLen, 5.2,
@@ -906,7 +906,7 @@ function drawTowerDetails(
     ctx.beginPath(); ctx.arc(cx, cy, r, 0, TWO_PI); ctx.stroke();
     drawPowerArc(ctx, cx, cy, r, t.maxPower, t.storedPower);
     const localAngle = t.barrelAngle - t.rotation;
-    const barrelLen = (Math.min(tw, th) / 2 - inset + 10) * 2;
+    const barrelLen = (Math.min(tw, th) / 2 - inset + 10) * 2.4;
     const barrelOffset = -CELL_SIZE;
     const { mx, my } = drawCapsuleBarrel(
       ctx, cx, cy, localAngle, barrelOffset + r * 0.2, barrelOffset + barrelLen, 4,
@@ -916,6 +916,7 @@ function drawTowerDetails(
     drawBarrelBand(ctx, cx, cy, localAngle, barrelOffset + barrelLen * 0.78, 5.8, 7, 'rgba(15,23,42,0.94)', tColor);
     drawMuzzleRing(ctx, mx, my, localAngle, 5, 'rgba(15,23,42,0.96)', tColor);
     drawMuzzleBrake(ctx, cx, cy, localAngle, barrelOffset + barrelLen - 6, 5.2, tColor);
+    drawMuzzleBrake(ctx, cx, cy, localAngle, barrelOffset + barrelLen - 18, 5.2, tColor);
     const sFlashT = now - t.lastActionTime;
     if (t.powered && sFlashT < FLASH_DUR_SNIPER && t.lastActionTime > 0) {
       drawMuzzleFlash(ctx, mx, my, localAngle, sFlashT / FLASH_DUR_SNIPER, tColor, '167,139,250', 14, true, t.lastActionTime);
