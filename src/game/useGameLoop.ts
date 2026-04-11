@@ -443,6 +443,7 @@ export const useGameLoop = () => {
         if (Math.hypot(pp.x - wx, pp.y - wy) >= 11) continue;
         const existIdx = state.wires.findIndex(w => w.startPortId === port.id || w.endPortId === port.id);
         if (existIdx !== -1) {
+          if (state.wires[existIdx].direct) return;
           state.wires.splice(existIdx, 1);
           if (state.gameMode !== 'custom') state.wireInventory++;
           updatePowerGrid(state);
@@ -712,6 +713,7 @@ export const useGameLoop = () => {
         if (Math.hypot(pp.x - wx, pp.y - wy) >= 18) continue;
         const existIdx = state.wires.findIndex(w => w.startPortId === port.id || w.endPortId === port.id);
         if (existIdx !== -1) {
+          if (state.wires[existIdx].direct) return;
           state.wires.splice(existIdx, 1);
           if (state.gameMode !== 'custom') state.wireInventory++;
           updatePowerGrid(state);

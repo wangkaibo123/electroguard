@@ -6,7 +6,7 @@ import {
   TowerType,
   TOWER_STATS,
 } from './types';
-import { genId, generatePorts, updatePowerGrid } from './engine';
+import { genId, generatePorts, syncDirectPortLinks, updatePowerGrid } from './engine';
 import { makeTowerCollider } from './collider';
 
 const createTowerPorts = (type: TowerType): Port[] => {
@@ -78,5 +78,7 @@ export const createTowerAt = (type: TowerType, x: number, y: number): Tower => {
 export const addTowerToState = (state: GameState, tower: Tower) => {
   state.towers.push(tower);
   state.towerMap.set(tower.id, tower);
-  updatePowerGrid(state);
+  if (!syncDirectPortLinks(state, { towerId: tower.id, createSpark: true })) {
+    updatePowerGrid(state);
+  }
 };

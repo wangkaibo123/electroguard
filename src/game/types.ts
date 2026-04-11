@@ -38,6 +38,7 @@ export interface Wire {
   path: Position[];
   hp: number;
   maxHp: number;
+  direct?: boolean;
 }
 
 export interface Pulse {
@@ -132,6 +133,7 @@ export interface Particle {
   maxLife: number;
   color: string;
   size: number;
+  kind?: 'spark';
 }
 
 export interface HitEffect {

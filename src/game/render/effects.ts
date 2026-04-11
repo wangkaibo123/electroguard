@@ -300,9 +300,24 @@ export const drawChainLightning = (ctx: CanvasRenderingContext2D, state: GameSta
 // ── Particles ─────────────────────────────────────────────────────────────
 export const drawParticles = (ctx: CanvasRenderingContext2D, state: GameState) => {
   for (const p of state.particles) {
-    ctx.globalAlpha = 1 - p.life / p.maxLife;
-    ctx.fillStyle = p.color;
-    ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, TWO_PI); ctx.fill();
+    const alpha = 1 - p.life / p.maxLife;
+    ctx.globalAlpha = alpha;
+    if (p.kind === 'spark') {
+      const tailScale = 0.035;
+      ctx.strokeStyle = p.color;
+      ctx.shadowColor = p.color;
+      ctx.shadowBlur = 9 * alpha;
+      ctx.lineWidth = p.size;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(p.x - p.vx * tailScale, p.y - p.vy * tailScale);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    } else {
+      ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, TWO_PI); ctx.fill();
+    }
   }
   ctx.globalAlpha = 1;
 };

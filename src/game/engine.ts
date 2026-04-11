@@ -17,6 +17,7 @@ export const genId = () => (++_idCounter).toString(36);
 const PORT_DIRS: PortDirection[] = ['top', 'right', 'bottom', 'left'];
 const NEIGHBOR_OFFSETS = [[0, 1], [1, 0], [0, -1], [-1, 0]] as const;
 const GATLING_RANGE = WEAPON_CONFIG.gatling.range;
+const DIRECT_PORT_OVERLAP_EPS = 0.75;
 
 const gatlingNeedsPower = (state: GameState, tower: Tower) => {
   if (tower.overloaded) return false;
@@ -117,6 +118,118 @@ export const isPortAccessible = (
 };
 
 // ── Collision helpers ────────────────────────────────────────────────────────
+
+const portsOverlap = (towerA: Tower, portA: Port, towerB: Tower, portB: Port): boolean => {
+  const posA = getPortPos(towerA, portA);
+  const posB = getPortPos(towerB, portB);
+  return Math.hypot(posA.x - posB.x, posA.y - posB.y) <= DIRECT_PORT_OVERLAP_EPS;
+};
+
+const getDirectLinkEndpoint = (towerA: Tower, portA: Port, towerB: Tower, portB: Port) => {
+  if (portA.portType === portB.portType) return null;
+  return portA.portType === 'output'
+    ? { startTower: towerA, startPort: portA, endTower: towerB, endPort: portB }
+    : { startTower: towerB, startPort: portB, endTower: towerA, endPort: portA };
+};
+
+const isPortLinked = (state: GameState, portId: string, ignoreWireId?: string): boolean =>
+  state.wires.some(wire => wire.id !== ignoreWireId && (wire.startPortId === portId || wire.endPortId === portId));
+
+const createDirectConnectSpark = (state: GameState, x: number, y: number) => {
+  state.hitEffects.push({
+    x,
+    y,
+    life: 0,
+    maxLife: 0.22,
+    color: '#60a5fa',
+    radius: 16,
+  });
+
+  for (let i = 0; i < 14; i++) {
+    const angle = (i / 14) * Math.PI * 2 + (Math.random() - 0.5) * 0.35;
+    const speed = 110 + Math.random() * 140;
+    state.particles.push({
+      x,
+      y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: 0,
+      maxLife: 0.14 + Math.random() * 0.14,
+      color: Math.random() < 0.3 ? '#dbeafe' : '#60a5fa',
+      size: 1.2 + Math.random() * 1.2,
+      kind: 'spark',
+    });
+  }
+};
+
+const isDirectPortLinkStillValid = (state: GameState, wire: Wire): boolean => {
+  const startTower = state.towerMap.get(wire.startTowerId);
+  const endTower = state.towerMap.get(wire.endTowerId);
+  const startPort = startTower?.ports.find(port => port.id === wire.startPortId);
+  const endPort = endTower?.ports.find(port => port.id === wire.endPortId);
+  if (!startTower || !endTower || !startPort || !endPort) return false;
+  if (startPort.portType !== 'output' || endPort.portType !== 'input') return false;
+  return portsOverlap(startTower, startPort, endTower, endPort);
+};
+
+export const syncDirectPortLinks = (
+  state: GameState,
+  options: { towerId?: string; createSpark?: boolean } = {},
+): boolean => {
+  let changed = false;
+
+  for (let i = state.wires.length - 1; i >= 0; i--) {
+    const wire = state.wires[i];
+    if (!wire.direct) continue;
+    if (options.towerId && wire.startTowerId !== options.towerId && wire.endTowerId !== options.towerId) continue;
+    if (isDirectPortLinkStillValid(state, wire)) continue;
+    state.wires.splice(i, 1);
+    changed = true;
+  }
+
+  for (let i = 0; i < state.towers.length; i++) {
+    const towerA = state.towers[i];
+    for (let j = i + 1; j < state.towers.length; j++) {
+      const towerB = state.towers[j];
+      if (options.towerId && towerA.id !== options.towerId && towerB.id !== options.towerId) continue;
+
+      for (const portA of towerA.ports) {
+        if (isPortLinked(state, portA.id)) continue;
+
+        for (const portB of towerB.ports) {
+          if (portA.portType === portB.portType) continue;
+          if (isPortLinked(state, portB.id)) continue;
+          if (!portsOverlap(towerA, portA, towerB, portB)) continue;
+
+          const endpoint = getDirectLinkEndpoint(towerA, portA, towerB, portB);
+          if (!endpoint) continue;
+
+          state.wires.push({
+            id: genId(),
+            startTowerId: endpoint.startTower.id,
+            startPortId: endpoint.startPort.id,
+            endTowerId: endpoint.endTower.id,
+            endPortId: endpoint.endPort.id,
+            path: [],
+            hp: WIRE_MAX_HP,
+            maxHp: WIRE_MAX_HP,
+            direct: true,
+          });
+
+          if (options.createSpark) {
+            const sparkPos = getPortPos(endpoint.startTower, endpoint.startPort);
+            createDirectConnectSpark(state, sparkPos.x, sparkPos.y);
+          }
+          changed = true;
+          break;
+        }
+      }
+    }
+  }
+
+  if (changed) updatePowerGrid(state);
+  return changed;
+};
 
 export const collidesWithTowers = (
   x: number, y: number, w: number, h: number,
@@ -449,28 +562,36 @@ export const repathConnectedWires = (state: GameState, towerId: string) => {
   for (let i = state.wires.length - 1; i >= 0; i--) {
     const w = state.wires[i];
     if (w.startTowerId !== towerId && w.endTowerId !== towerId) continue;
+    if (w.direct) {
+      if (!isDirectPortLinkStillValid(state, w)) {
+        state.wires.splice(i, 1);
+        changed = true;
+      }
+      continue;
+    }
     const st = state.towerMap.get(w.startTowerId);
     const et = state.towerMap.get(w.endTowerId);
     if (!st || !et) {
       state.wires.splice(i, 1);
-      if (state.gameMode !== 'custom') state.wireInventory++;
+      if (!w.direct && state.gameMode !== 'custom') state.wireInventory++;
       changed = true; continue;
     }
     const sp = st.ports.find(p => p.id === w.startPortId);
     const ep = et.ports.find(p => p.id === w.endPortId);
     if (!sp || !ep) {
       state.wires.splice(i, 1);
-      if (state.gameMode !== 'custom') state.wireInventory++;
+      if (!w.direct && state.gameMode !== 'custom') state.wireInventory++;
       changed = true; continue;
     }
     const np = findWirePath(getPortCell(st, sp), getPortCell(et, ep), state, w.id);
     if (np) { w.path = np; } else {
       state.wires.splice(i, 1);
-      if (state.gameMode !== 'custom') state.wireInventory++;
+      if (!w.direct && state.gameMode !== 'custom') state.wireInventory++;
       changed = true;
     }
   }
-  if (changed) updatePowerGrid(state);
+  const directChanged = syncDirectPortLinks(state, { towerId, createSpark: true });
+  if (changed && !directChanged) updatePowerGrid(state);
 };
 
 // ── Tower rotation ───────────────────────────────────────────────────────────
