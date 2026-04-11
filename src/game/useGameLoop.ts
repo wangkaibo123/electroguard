@@ -8,7 +8,7 @@ import {
   createInitialState, updatePowerGrid, getPortPos, getPortCell, findWirePath,
   snapRotation, applyTowerRotation, canPlace, collidesWithTowers,
   collidesWithWires, repathConnectedWires, genId, generatePickOptions, spawnEnemyAt,
-  isPortAccessible,
+  canDirectLinkPorts, isPortAccessible,
 } from './engine';
 import { renderGame } from './renderer';
 import { GLOBAL_CONFIG } from './config';
@@ -342,6 +342,24 @@ export const useGameLoop = () => {
             return;
           }
 
+          if (canDirectLinkPorts(state, startTower, startPort, endTower, endPort)) {
+            state.wires.push({
+              id: genId(),
+              startTowerId: startTower.id,
+              startPortId: startPort.id,
+              endTowerId: endTower.id,
+              endPortId: endPort.id,
+              path: [],
+              hp: WIRE_MAX_HP,
+              maxHp: WIRE_MAX_HP,
+              direct: true,
+            });
+            updatePowerGrid(state);
+            sync();
+            clearWireDragState();
+            return;
+          }
+
           const path = findWirePath(getPortCell(startTower, startPort), getPortCell(endTower, endPort), state);
           if (path) {
             if (state.gameMode !== 'custom') state.wireInventory--;
@@ -533,18 +551,23 @@ export const useGameLoop = () => {
       if (st && sp) {
         const sc = getPortCell(st, sp);
         let endCell = { x: gx, y: gy };
+        let directPath = false;
         for (const tower of state.towers) {
           for (const port of tower.ports) {
             const pp = getPortPos(tower, port);
             if (Math.hypot(pp.x - wx, pp.y - wy) < 15 && tower.id !== st.id) {
-              if (isPortAccessible(state, tower, port)) {
+              if (canDirectLinkPorts(state, st, sp, tower, port)) {
+                directPath = true;
+                break;
+              } else if (isPortAccessible(state, tower, port)) {
                 endCell = getPortCell(tower, port);
                 break;
               }
             }
           }
+          if (directPath) break;
         }
-        dragWirePathRef.current = findWirePath(sc, endCell, state);
+        dragWirePathRef.current = directPath ? [] : findWirePath(sc, endCell, state);
       }
     }
 
@@ -828,18 +851,23 @@ export const useGameLoop = () => {
       if (st && sp) {
         const sc = getPortCell(st, sp);
         let endCell = { x: gx, y: gy };
+        let directPath = false;
         for (const tower of state.towers) {
           for (const port of tower.ports) {
             const pp = getPortPos(tower, port);
             if (Math.hypot(pp.x - wx, pp.y - wy) < 20 && tower.id !== st.id) {
-              if (isPortAccessible(state, tower, port)) {
+              if (canDirectLinkPorts(state, st, sp, tower, port)) {
+                directPath = true;
+                break;
+              } else if (isPortAccessible(state, tower, port)) {
                 endCell = getPortCell(tower, port);
                 break;
               }
             }
           }
+          if (directPath) break;
         }
-        dragWirePathRef.current = findWirePath(sc, endCell, state);
+        dragWirePathRef.current = directPath ? [] : findWirePath(sc, endCell, state);
       }
     }
 

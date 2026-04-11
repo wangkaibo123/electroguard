@@ -6,6 +6,7 @@ import {
 import { t, pickKey } from './i18n';
 import { GLOBAL_CONFIG, ENEMY_CONFIG, ENEMY_SCALING, STARTING_INVENTORY, PICK_POOL_CONFIG, WEAPON_CONFIG } from './config';
 import { makeTowerCollider, makeEnemyCollider } from './collider';
+import { getLinearTowerBodyAspectRatio, getLinearTowerBodyRect } from './linearTowerGeometry';
 
 const ENEMY_SPEED_MUL = GLOBAL_CONFIG.enemyBaseSpeedMul;
 
@@ -52,6 +53,17 @@ const rotationSteps = (from: number, to: number): number => {
   return ((t - f) % 4 + 4) % 4;
 };
 
+export const isLinearTowerLandscape = (
+  t: Pick<Tower, 'type' | 'width' | 'height' | 'ports'>,
+): boolean => {
+  if (t.type !== 'battery' && t.type !== 'bus') return t.width >= t.height;
+  if (t.width !== t.height) return t.width > t.height;
+
+  const sidePorts = t.ports.filter(port => port.direction === 'left' || port.direction === 'right').length;
+  const edgePorts = t.ports.filter(port => port.direction === 'top' || port.direction === 'bottom').length;
+  return t.type === 'battery' ? sidePorts >= edgePorts : edgePorts >= sidePorts;
+};
+
 // ── Port position helpers ────────────────────────────────────────────────────
 
 export const getPortPos = (t: Tower, p: Port): Position => {
@@ -59,14 +71,13 @@ export const getPortPos = (t: Tower, p: Port): Position => {
   const tw = t.width * CELL_SIZE, th = t.height * CELL_SIZE;
   const off = p.sideOffset ?? 0.5;
   if (t.type === 'battery' || t.type === 'bus') {
-    const landscape = tw >= th;
-    const yIn = landscape ? Math.max((th - tw / 2) / 2, 0) : 0;
-    const xIn = !landscape ? Math.max((tw - th / 2) / 2, 0) : 0;
+    const landscape = isLinearTowerLandscape(t);
+    const body = getLinearTowerBodyRect(px, py, tw, th, landscape, getLinearTowerBodyAspectRatio(t.type));
     switch (p.direction) {
-      case 'top':    return { x: px + tw * off, y: py + yIn };
-      case 'bottom': return { x: px + tw * off, y: py + th - yIn };
-      case 'right':  return { x: px + tw - xIn, y: py + th * off };
-      case 'left':   return { x: px + xIn,      y: py + th * off };
+      case 'top':    return { x: px + tw * off, y: body.y };
+      case 'bottom': return { x: px + tw * off, y: body.y + body.height };
+      case 'right':  return { x: body.x + body.width, y: py + th * off };
+      case 'left':   return { x: body.x,              y: py + th * off };
     }
   }
   switch (p.direction) {
@@ -87,6 +98,49 @@ export const getPortCell = (t: Tower, p: Port): Position => {
   }
 };
 
+const portsOverlap = (towerA: Tower, portA: Port, towerB: Tower, portB: Port): boolean => {
+  const posA = getPortPos(towerA, portA);
+  const posB = getPortPos(towerB, portB);
+  return Math.hypot(posA.x - posB.x, posA.y - posB.y) <= DIRECT_PORT_OVERLAP_EPS;
+};
+
+const isPortLinked = (state: GameState, portId: string, ignoreWireId?: string): boolean =>
+  state.wires.some(wire => wire.id !== ignoreWireId && (wire.startPortId === portId || wire.endPortId === portId));
+
+export const canDirectLinkPorts = (
+  state: GameState,
+  towerA: Tower,
+  portA: Port,
+  towerB: Tower,
+  portB: Port,
+  ignoreWireId?: string,
+): boolean =>
+  towerA.id !== towerB.id &&
+  portA.portType !== portB.portType &&
+  !isPortLinked(state, portA.id, ignoreWireId) &&
+  !isPortLinked(state, portB.id, ignoreWireId) &&
+  portsOverlap(towerA, portA, towerB, portB);
+
+const hasDirectLinkCandidate = (
+  state: GameState,
+  tower: Tower,
+  port: Port,
+  ignoreWireId?: string,
+): boolean => {
+  if (isPortLinked(state, port.id, ignoreWireId)) return false;
+
+  for (const otherTower of state.towers) {
+    if (otherTower.id === tower.id) continue;
+    for (const otherPort of otherTower.ports) {
+      if (canDirectLinkPorts(state, tower, port, otherTower, otherPort, ignoreWireId)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+};
+
 export const isPortAccessible = (
   state: GameState,
   tower: Tower,
@@ -103,7 +157,7 @@ export const isPortAccessible = (
       cell.y >= other.y &&
       cell.y < other.y + other.height
     ) {
-      return false;
+      return hasDirectLinkCandidate(state, tower, port, ignoreWireId);
     }
   }
 
@@ -119,21 +173,12 @@ export const isPortAccessible = (
 
 // ── Collision helpers ────────────────────────────────────────────────────────
 
-const portsOverlap = (towerA: Tower, portA: Port, towerB: Tower, portB: Port): boolean => {
-  const posA = getPortPos(towerA, portA);
-  const posB = getPortPos(towerB, portB);
-  return Math.hypot(posA.x - posB.x, posA.y - posB.y) <= DIRECT_PORT_OVERLAP_EPS;
-};
-
 const getDirectLinkEndpoint = (towerA: Tower, portA: Port, towerB: Tower, portB: Port) => {
   if (portA.portType === portB.portType) return null;
   return portA.portType === 'output'
     ? { startTower: towerA, startPort: portA, endTower: towerB, endPort: portB }
     : { startTower: towerB, startPort: portB, endTower: towerA, endPort: portA };
 };
-
-const isPortLinked = (state: GameState, portId: string, ignoreWireId?: string): boolean =>
-  state.wires.some(wire => wire.id !== ignoreWireId && (wire.startPortId === portId || wire.endPortId === portId));
 
 const createDirectConnectSpark = (state: GameState, x: number, y: number) => {
   state.hitEffects.push({
@@ -613,8 +658,8 @@ export const applyTowerRotation = (
   tower.rotation = 0;
   tower.width = nw;
   tower.height = nh;
-  tower.collider = makeTowerCollider(tower.type, nw, nh);
   for (const port of tower.ports) port.direction = rotatePortDir(port.direction, steps);
+  tower.collider = makeTowerCollider(tower.type, nw, nh, isLinearTowerLandscape(tower));
 
   repathConnectedWires(state, tower.id);
   updatePowerGrid(state);

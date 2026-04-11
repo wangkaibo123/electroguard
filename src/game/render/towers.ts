@@ -1,5 +1,6 @@
 import { GameState, Tower, TowerType, CELL_SIZE, HALF_CELL, TOWER_STATS, TURRET_RANGE } from '../types';
-import { getPortPos, isPortAccessible } from '../engine';
+import { getPortPos, isLinearTowerLandscape, isPortAccessible } from '../engine';
+import { getLinearTowerBodyAspectRatio, getLinearTowerBodyRect } from '../linearTowerGeometry';
 import {
   TWO_PI, BG_DARK, UNPOWERED, PULSE_CLR, HP_BG, HP_FG,
   PORT_OUT, PORT_OUT_USED, PORT_IN, PORT_IN_USED, KNOB_CLR, POWER_ON,
@@ -10,31 +11,6 @@ import {
   FLASH_DUR_BLASTER, FLASH_DUR_GATLING, FLASH_DUR_SNIPER, FLASH_DUR_TESLA,
   SNIPER_COOLDOWN_MS,
 } from './helpers';
-
-const getLinearTowerBodyRect = (
-  px: number, py: number, tw: number, th: number,
-) => {
-  const isLandscape = tw >= th;
-  if (isLandscape) {
-    const bodyH = tw / 2;
-    return {
-      isLandscape,
-      x: px,
-      y: py + (th - bodyH) / 2,
-      width: tw,
-      height: bodyH,
-    };
-  }
-
-  const bodyW = th / 2;
-  return {
-    isLandscape,
-    x: px + (tw - bodyW) / 2,
-    y: py,
-    width: bodyW,
-    height: th,
-  };
-};
 
 const ROTATION_KNOB_SCALE = 4 / 3;
 const ROTATION_KNOB_BASE_OFFSET = 20;
@@ -343,7 +319,7 @@ export const drawTowers = (ctx: CanvasRenderingContext2D, state: GameState, now:
       ctx.fill();
       ctx.stroke();
     } else if (tower.type === 'battery' || tower.type === 'bus') {
-      const body = getLinearTowerBodyRect(px, py, tw, th);
+      const body = getLinearTowerBodyRect(px, py, tw, th, isLinearTowerLandscape(tower), getLinearTowerBodyAspectRatio(tower.type));
       ctx.fillRect(body.x + inset, body.y + inset, body.width - inset * 2, body.height - inset * 2);
       ctx.strokeRect(body.x + inset, body.y + inset, body.width - inset * 2, body.height - inset * 2);
     } else {
@@ -352,7 +328,7 @@ export const drawTowers = (ctx: CanvasRenderingContext2D, state: GameState, now:
     }
 
     if (tower.type === 'battery' || tower.type === 'bus') {
-      const body = getLinearTowerBodyRect(px, py, tw, th);
+      const body = getLinearTowerBodyRect(px, py, tw, th, isLinearTowerLandscape(tower), getLinearTowerBodyAspectRatio(tower.type));
       drawTowerDetails(
         ctx, tower, body.x, body.y, body.width, body.height, cx, cy, tColor, inset, now,
       );
@@ -410,7 +386,7 @@ export const drawPlacementPreview = (
   const prevTw = stats.width * CELL_SIZE;
   const prevTh = stats.height * CELL_SIZE;
   const previewBody = (selectedTower === 'battery' || selectedTower === 'bus')
-    ? getLinearTowerBodyRect(prevPx, prevPy, prevTw, prevTh)
+    ? getLinearTowerBodyRect(prevPx, prevPy, prevTw, prevTh, prevTw >= prevTh, getLinearTowerBodyAspectRatio(selectedTower))
     : { x: prevPx, y: prevPy, width: prevTw, height: prevTh };
   ctx.strokeStyle = canPlaceFlag ? stats.color : '#ef4444';
   ctx.lineWidth = 2;

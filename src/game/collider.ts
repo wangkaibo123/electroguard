@@ -4,6 +4,7 @@
 //  queries (e.g. closest point) live in this file so callers don't need to
 //  branch on entity / tower type.
 
+import { getLinearTowerBodyAspectRatio, getLinearTowerBodyCrossSpan } from './linearTowerGeometry';
 import { Collider, Tower, Enemy, TowerType, CELL_SIZE } from './types';
 
 // Inset (px) shaved off the cell bounding box to match the visible body.
@@ -13,7 +14,7 @@ const TINY_INSET = 5; // for 1×1 towers (no current ones, kept for parity)
 
 /** Build the collider for a tower of the given type and current size. */
 export const makeTowerCollider = (
-  type: TowerType, widthCells: number, heightCells: number,
+  type: TowerType, widthCells: number, heightCells: number, linearLandscape?: boolean,
 ): Collider => {
   const tw = widthCells * CELL_SIZE;
   const th = heightCells * CELL_SIZE;
@@ -35,9 +36,10 @@ export const makeTowerCollider = (
     case 'battery':
     case 'bus': {
       // Linear body — narrower than the cell bounding box.
-      const isLandscape = tw >= th;
-      const bw = isLandscape ? tw : th / 2;
-      const bh = isLandscape ? tw / 2 : th;
+      const isLandscape = linearLandscape ?? tw >= th;
+      const aspectRatio = getLinearTowerBodyAspectRatio(type);
+      const bw = isLandscape ? tw : getLinearTowerBodyCrossSpan(th, tw, aspectRatio);
+      const bh = isLandscape ? getLinearTowerBodyCrossSpan(tw, th, aspectRatio) : th;
       return { shape: 'rect', halfW: bw / 2 - inset, halfH: bh / 2 - inset };
     }
 
