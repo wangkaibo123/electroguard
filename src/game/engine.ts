@@ -71,7 +71,7 @@ export const getPortPos = (t: Tower, p: Port): Position => {
   const px = t.x * CELL_SIZE, py = t.y * CELL_SIZE;
   const tw = t.width * CELL_SIZE, th = t.height * CELL_SIZE;
   const off = p.sideOffset ?? 0.5;
-  if (t.type === 'battery' || t.type === 'bus') {
+  if (t.type === 'battery') {
     const landscape = isLinearTowerLandscape(t);
     const body = getLinearTowerBodyRect(px, py, tw, th, landscape, getLinearTowerBodyAspectRatio(t.type));
     switch (p.direction) {

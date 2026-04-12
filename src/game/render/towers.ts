@@ -172,7 +172,7 @@ export const getRotationKnobLayout = (tower: Tower) => {
 export const drawPorts = (ctx: CanvasRenderingContext2D, state: GameState) => {
   const PORT_SCALE = 4 / 3;
   const OUT_TRI = 7.5 * PORT_SCALE;
-  const IN_CHEVRON = OUT_TRI;
+  const IN_CHEVRON = OUT_TRI * 0.5;
   const DIRECT_DOCK_MS = 420;
   const DIRECT_INPUT_RECOIL = 3.5;
   const DIRECT_OUTPUT_RECOIL = 9;

@@ -85,7 +85,7 @@ export const TOWER_CONFIG: Record<TowerType, {
   /* 电池：储存电力并快速放电 */
   battery:   { hp: 150,  description: 'Stores 4 units of power and discharges quickly.',            color: '#34d399', width: 3, height: 3, maxPower: 4, maxShieldHp: 0,   shieldRadius: 0 },
   /* 汇流器：将 3 条输入线合并为 3 条输出线 */
-  bus:       { hp: 120,  description: 'Merges up to 3 input wires into 3 outputs.',                color: '#38bdf8', width: 3, height: 3, maxPower: 0, maxShieldHp: 0,   shieldRadius: 0 },
+  bus:       { hp: 120,  description: 'Merges up to 3 input wires into 3 outputs.',                color: '#38bdf8', width: 3, height: 2, maxPower: 0, maxShieldHp: 0,   shieldRadius: 0 },
 };
 
 // ── 3. 武器参数 ─────────────────────────────────────────────────────────────
