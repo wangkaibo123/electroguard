@@ -50,6 +50,18 @@ export interface I18nStrings {
   staticMonsterHint: string;
   openPick: string;
 
+  // Shop & Gold
+  gold: string;
+  shop: string;
+  towerPack: string;
+  towerPackDesc: string;
+  infraPack: string;
+  infraPackDesc: string;
+  sell: string;
+  notEnoughGold: string;
+  shopPickTitle: string;
+  shopPickDescription: string;
+
   // Wave
   startNextWave: string;
 
@@ -137,6 +149,17 @@ const en: I18nStrings = {
   staticMonster: 'Stationary',
   staticMonsterHint: 'When off, placed monsters behave normally',
   openPick: 'Open Upgrade Pick',
+
+  gold: 'Gold',
+  shop: 'Shop',
+  towerPack: 'Turret Pack',
+  towerPackDesc: 'Pick 1 of 3 random turrets',
+  infraPack: 'Infra Pack',
+  infraPackDesc: 'Pick 1 of 3 infra items',
+  sell: 'Sell',
+  notEnoughGold: 'Not enough gold!',
+  shopPickTitle: 'SHOP PURCHASE',
+  shopPickDescription: 'Choose one item from the pack',
 
   startNextWave: 'Start Next Wave',
   noWires: 'No wires available!',
@@ -305,6 +328,17 @@ const zh: I18nStrings = {
   staticMonster: '是否静止',
   staticMonsterHint: '关闭后，放置的怪物会按正常逻辑移动和攻击',
   openPick: '开启三选一',
+
+  gold: '金币',
+  shop: '商店',
+  towerPack: '炮塔卡包',
+  towerPackDesc: '获得一次只含炮塔的三选一',
+  infraPack: '基建卡包',
+  infraPackDesc: '获得一次只含基建的三选一',
+  sell: '出售',
+  notEnoughGold: '金币不足！',
+  shopPickTitle: '商店购买',
+  shopPickDescription: '从卡包中选择一项',
 
   startNextWave: '提前开始下一波',
   noWires: '没有可用的线缆！',

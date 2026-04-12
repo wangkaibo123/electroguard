@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(npx tsc:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(wc -l /c/All/program/H5/electroguard/src/game/*.ts)",
+      "Bash(npx vite:*)"
     ]
   }
 }

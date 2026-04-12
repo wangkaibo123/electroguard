@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Battery, Zap, Crosshair, Activity, Play, RotateCcw, Pause, Hexagon, Cable, Wrench, ChevronRight, ChevronLeft, Flame, Focus, Radio, GitMerge, Globe, LogOut, BookOpen, X, Keyboard, Menu, Eye, EyeOff } from 'lucide-react';
+import { Battery, Zap, Crosshair, Activity, Play, RotateCcw, Pause, Hexagon, Cable, Wrench, ChevronRight, ChevronLeft, Flame, Focus, Radio, GitMerge, Globe, LogOut, BookOpen, X, Keyboard, Menu, Eye, EyeOff, ShoppingBag, Coins, Trash2 } from 'lucide-react';
 import { useGameLoop } from './game/useGameLoop';
 import { TOWER_STATS, TowerType, PickOption, EnemyType } from './game/types';
 import { t, getLocale, setLocale, Locale } from './game/i18n';
-import { GLOBAL_CONFIG, TIPS_CONFIG, TOWER_CONFIG, WEAPON_CONFIG } from './game/config';
+import { GLOBAL_CONFIG, TIPS_CONFIG, TOWER_CONFIG, WEAPON_CONFIG, SHOP_CONFIG } from './game/config';
 
 const TowerIcon = ({ type, size = 22 }: { type: string; size?: number }) => {
   const icons: Record<string, React.ComponentType<{ size: number }>> = {
@@ -61,6 +61,9 @@ export default function App() {
     returnToMenu,
     handlePick,
     openCustomPick,
+    buyShopPack,
+    sellTower,
+    rotatingTowerId,
     selectedTower,
     setSelectedTower,
     placeMonsterMode,
@@ -289,6 +292,14 @@ export default function App() {
           <span className="text-base sm:text-lg font-mono font-bold ml-0.5 sm:ml-1">{gameState.score}</span>
         </div>
 
+        {gameState.gameMode !== 'custom' && (
+          <div className="flex items-center gap-1 sm:gap-1.5 text-yellow-400">
+            <Coins size={14} />
+            <span className="text-xs text-gray-500 uppercase font-bold hidden sm:inline">{i.gold}</span>
+            <span className="text-base sm:text-lg font-mono font-bold ml-0.5 sm:ml-1">{gameState.gold}</span>
+          </div>
+        )}
+
         {gameState.gameMode !== 'custom' && gameState.status === 'playing' && gameState.enemiesToSpawn === 0 && gameState.enemies.length === 0 && (
           <div className="flex items-center gap-1 sm:gap-3 ml-1 sm:ml-2">
             <div className="text-blue-300 text-[10px] sm:text-xs font-medium animate-pulse hidden sm:block">
@@ -405,6 +416,28 @@ export default function App() {
               </div>
             )}
 
+            {/* Sell Button Overlay */}
+            {rotatingTowerId && gameState.status === 'playing' && gameState.gameMode !== 'custom' && (() => {
+              const tower = gameState.towers.find(t => t.id === rotatingTowerId);
+              if (!tower || tower.type === 'core') return null;
+              const cam = cameraRef.current;
+              const worldCX = (tower.x + tower.width / 2) * GLOBAL_CONFIG.cellSize;
+              const towerBottomWorld = (tower.y + tower.height) * GLOBAL_CONFIG.cellSize;
+              const sx = (worldCX - cam.x) * cam.zoom;
+              const sy = (towerBottomWorld - cam.y) * cam.zoom + 28;
+              return (
+                <button
+                  type="button"
+                  onClick={() => sellTower(rotatingTowerId)}
+                  className="absolute z-40 flex items-center gap-1.5 px-3 py-1.5 bg-red-600/90 hover:bg-red-500 border border-red-500/80 text-white text-xs font-bold rounded-lg shadow-lg transition-all -translate-x-1/2"
+                  style={{ left: sx, top: sy }}
+                >
+                  <Trash2 size={13} />
+                  {i.sell} (+{SHOP_CONFIG.sellPrice}<Coins size={10} className="inline ml-0.5" />)
+                </button>
+              );
+            })()}
+
             {/* Menu Overlay */}
             {gameState.status === 'menu' && (
               <div className="absolute inset-0 bg-gray-950/80 backdrop-blur-sm flex flex-col items-center justify-center p-4 sm:p-8 text-center">
@@ -458,7 +491,12 @@ export default function App() {
                 </div>
                 {!pickOverlayHidden && (
                 <div className="absolute inset-0 bg-gray-950/85 backdrop-blur-sm flex flex-col items-center justify-center p-4 sm:p-8 text-center overflow-y-auto">
-                {gameState.pickUiPhase === 'boss_bonus' ? (
+                {gameState.pickUiPhase === 'shop_tower' || gameState.pickUiPhase === 'shop_infra' ? (
+                  <>
+                    <h2 className="text-2xl sm:text-3xl font-black mb-1 text-yellow-400 tracking-tight">{i.shopPickTitle}</h2>
+                    <p className="text-gray-400 text-xs sm:text-sm mb-4 sm:mb-6 max-w-md leading-relaxed px-2">{i.shopPickDescription}</p>
+                  </>
+                ) : gameState.pickUiPhase === 'boss_bonus' ? (
                   <>
                     <h2 className="text-2xl sm:text-3xl font-black mb-1 text-amber-400 tracking-tight">{i.bossBonusPickTitle}</h2>
                     <p className="text-gray-400 text-xs sm:text-sm mb-4 sm:mb-6 max-w-md leading-relaxed px-2">{i.bossBonusPickDescription}</p>
@@ -774,8 +812,8 @@ export default function App() {
           </div>
         </div>
 
-        {/* Sidebar toggle + panel (custom mode only) */}
-        {gameState.gameMode === 'custom' && (isMobile ? (
+        {/* Sidebar toggle + panel */}
+        {(gameState.status === 'playing' || gameState.status === 'paused' || gameState.status === 'pick') && (isMobile ? (
           <>
             {/* Mobile sidebar toggle FAB */}
             {(gameState.status === 'playing' || gameState.status === 'paused') && !sidebarOpen && (
@@ -801,40 +839,94 @@ export default function App() {
                       <X size={16} />
                     </button>
                   </div>
-                  {renderTowerButton('blaster')}
-                  {renderTowerButton('gatling')}
-                  {renderTowerButton('sniper')}
-                  {renderTowerButton('tesla')}
-                  {renderTowerButton('generator')}
-                  {renderTowerButton('shield')}
-                  {renderTowerButton('battery')}
-                  {renderTowerButton('bus')}
-                  {renderPlaceMonsterButton()}
+                  {gameState.gameMode === 'custom' && (
+                    <>
+                      {renderTowerButton('blaster')}
+                      {renderTowerButton('gatling')}
+                      {renderTowerButton('sniper')}
+                      {renderTowerButton('tesla')}
+                      {renderTowerButton('generator')}
+                      {renderTowerButton('shield')}
+                      {renderTowerButton('battery')}
+                      {renderTowerButton('bus')}
+                      {renderPlaceMonsterButton()}
 
-                  <div className="flex items-center gap-2.5 px-3 py-3 rounded-lg border border-gray-800 bg-gray-900/50 w-full">
-                    <div className="text-blue-400 shrink-0"><Cable size={22} /></div>
-                    <div className="flex flex-col items-start min-w-0">
-                      <span className="text-sm font-bold text-gray-200 leading-tight">{i.wires}</span>
-                      <span className="text-xs text-blue-400 font-mono leading-tight">{gameState.gameMode === 'custom' ? '\u221E' : `x${gameState.wireInventory}`}</span>
-                    </div>
-                  </div>
+                      <div className="flex items-center gap-2.5 px-3 py-3 rounded-lg border border-gray-800 bg-gray-900/50 w-full">
+                        <div className="text-blue-400 shrink-0"><Cable size={22} /></div>
+                        <div className="flex flex-col items-start min-w-0">
+                          <span className="text-sm font-bold text-gray-200 leading-tight">{i.wires}</span>
+                          <span className="text-xs text-blue-400 font-mono leading-tight">{'\u221E'}</span>
+                        </div>
+                      </div>
+                    </>
+                  )}
 
-                  <button
-                    type="button"
-                    onClick={openCustomPick}
-                    disabled={gameState.status !== 'playing' && gameState.status !== 'paused'}
-                    className={`flex items-center gap-2.5 px-3 py-3 rounded-lg border transition-all ${
-                      gameState.status === 'playing' || gameState.status === 'paused'
-                        ? 'border-amber-700/70 bg-amber-500/10 text-amber-200 hover:bg-amber-500/15 hover:border-amber-500/70'
-                        : 'border-gray-800 bg-gray-900/50 text-gray-500 cursor-not-allowed opacity-50'
-                    }`}
-                  >
-                    <div className="shrink-0"><Play size={18} /></div>
-                    <span className="text-sm font-bold leading-tight">{i.openPick}</span>
-                  </button>
+                  {gameState.gameMode !== 'custom' && (
+                    <>
+                      <div className="text-xs font-bold uppercase tracking-widest text-gray-500 px-1 py-1.5 mt-2">
+                        <div className="flex items-center gap-1.5">
+                          <ShoppingBag size={12} />
+                          {i.shop}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => { buyShopPack('tower'); setSidebarOpen(false); }}
+                        disabled={gameState.status !== 'playing' || gameState.gold < SHOP_CONFIG.towerPackPrice}
+                        className={`flex items-center gap-2.5 px-3 py-3 rounded-lg border transition-all ${
+                          gameState.status === 'playing' && gameState.gold >= SHOP_CONFIG.towerPackPrice
+                            ? 'border-yellow-700/70 bg-yellow-500/10 text-yellow-200 hover:bg-yellow-500/15 hover:border-yellow-500/70'
+                            : 'border-gray-800 bg-gray-900/50 text-gray-500 cursor-not-allowed opacity-40'
+                        }`}
+                      >
+                        <div className="shrink-0 text-yellow-400"><Crosshair size={20} /></div>
+                        <div className="flex flex-col items-start min-w-0 flex-1">
+                          <span className="text-sm font-bold leading-tight">{i.towerPack}</span>
+                          <span className="text-xs text-gray-400 leading-tight">{i.towerPackDesc}</span>
+                        </div>
+                        <div className="flex items-center gap-1 text-yellow-400 text-xs font-bold shrink-0">
+                          <Coins size={12} />{SHOP_CONFIG.towerPackPrice}
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { buyShopPack('infra'); setSidebarOpen(false); }}
+                        disabled={gameState.status !== 'playing' || gameState.gold < SHOP_CONFIG.infraPackPrice}
+                        className={`flex items-center gap-2.5 px-3 py-3 rounded-lg border transition-all ${
+                          gameState.status === 'playing' && gameState.gold >= SHOP_CONFIG.infraPackPrice
+                            ? 'border-yellow-700/70 bg-yellow-500/10 text-yellow-200 hover:bg-yellow-500/15 hover:border-yellow-500/70'
+                            : 'border-gray-800 bg-gray-900/50 text-gray-500 cursor-not-allowed opacity-40'
+                        }`}
+                      >
+                        <div className="shrink-0 text-yellow-400"><Zap size={20} /></div>
+                        <div className="flex flex-col items-start min-w-0 flex-1">
+                          <span className="text-sm font-bold leading-tight">{i.infraPack}</span>
+                          <span className="text-xs text-gray-400 leading-tight">{i.infraPackDesc}</span>
+                        </div>
+                        <div className="flex items-center gap-1 text-yellow-400 text-xs font-bold shrink-0">
+                          <Coins size={12} />{SHOP_CONFIG.infraPackPrice}
+                        </div>
+                      </button>
+                    </>
+                  )}
+
+                  {gameState.gameMode === 'custom' && (
+                    <button
+                      type="button"
+                      onClick={openCustomPick}
+                      disabled={gameState.status !== 'playing' && gameState.status !== 'paused'}
+                      className={`flex items-center gap-2.5 px-3 py-3 rounded-lg border transition-all ${
+                        gameState.status === 'playing' || gameState.status === 'paused'
+                          ? 'border-amber-700/70 bg-amber-500/10 text-amber-200 hover:bg-amber-500/15 hover:border-amber-500/70'
+                          : 'border-gray-800 bg-gray-900/50 text-gray-500 cursor-not-allowed opacity-50'
+                      }`}
+                    >
+                      <div className="shrink-0"><Play size={18} /></div>
+                      <span className="text-sm font-bold leading-tight">{i.openPick}</span>
+                    </button>
+                  )}
 
                   <div className="mt-2 text-xs text-gray-600 px-1 py-1 leading-relaxed">
-                    <p>{i.clickToPlaceMonster}</p>
                     <p>{i.clickToRotate}</p>
                     <p>{i.dragToWire}</p>
                   </div>
@@ -861,40 +953,95 @@ export default function App() {
               } ${tutorialStep === 3 || tutorialStep === 4 ? 'shadow-[0_0_20px_rgba(6,182,212,0.4),inset_0_0_20px_rgba(6,182,212,0.15)] border-l-cyan-500/50' : ''}`}
             >
               <div className="min-w-[236px] flex flex-col h-full">
-                <div className="text-xs font-bold uppercase tracking-widest text-gray-500 px-1 py-1.5">
-                  {i.inventory}
-                </div>
-                {renderTowerButton('blaster')}
-                {renderTowerButton('gatling')}
-                {renderTowerButton('sniper')}
-                {renderTowerButton('tesla')}
-                {renderTowerButton('generator')}
-                {renderTowerButton('shield')}
-                {renderTowerButton('battery')}
-                {renderTowerButton('bus')}
-                {renderPlaceMonsterButton()}
+                {gameState.gameMode === 'custom' && (
+                  <>
+                    <div className="text-xs font-bold uppercase tracking-widest text-gray-500 px-1 py-1.5">
+                      {i.inventory}
+                    </div>
+                    {renderTowerButton('blaster')}
+                    {renderTowerButton('gatling')}
+                    {renderTowerButton('sniper')}
+                    {renderTowerButton('tesla')}
+                    {renderTowerButton('generator')}
+                    {renderTowerButton('shield')}
+                    {renderTowerButton('battery')}
+                    {renderTowerButton('bus')}
+                    {renderPlaceMonsterButton()}
 
-                <div className="flex items-center gap-2.5 px-3 py-3 rounded-lg border border-gray-800 bg-gray-900/50 w-full">
-                  <div className="text-blue-400 shrink-0"><Cable size={22} /></div>
-                  <div className="flex flex-col items-start min-w-0">
-                    <span className="text-sm font-bold text-gray-200 leading-tight">{i.wires}</span>
-                    <span className="text-xs text-blue-400 font-mono leading-tight">{gameState.gameMode === 'custom' ? '\u221E' : `x${gameState.wireInventory}`}</span>
-                  </div>
-                </div>
+                    <div className="flex items-center gap-2.5 px-3 py-3 rounded-lg border border-gray-800 bg-gray-900/50 w-full">
+                      <div className="text-blue-400 shrink-0"><Cable size={22} /></div>
+                      <div className="flex flex-col items-start min-w-0">
+                        <span className="text-sm font-bold text-gray-200 leading-tight">{i.wires}</span>
+                        <span className="text-xs text-blue-400 font-mono leading-tight">{'\u221E'}</span>
+                      </div>
+                    </div>
+                  </>
+                )}
 
-                <button
-                  type="button"
-                  onClick={openCustomPick}
-                  disabled={gameState.status !== 'playing' && gameState.status !== 'paused'}
-                  className={`flex items-center gap-2.5 px-3 py-3 rounded-lg border transition-all ${
-                    gameState.status === 'playing' || gameState.status === 'paused'
-                      ? 'border-amber-700/70 bg-amber-500/10 text-amber-200 hover:bg-amber-500/15 hover:border-amber-500/70'
-                      : 'border-gray-800 bg-gray-900/50 text-gray-500 cursor-not-allowed opacity-50'
-                  }`}
-                >
-                  <div className="shrink-0"><Play size={18} /></div>
-                  <span className="text-sm font-bold leading-tight">{i.openPick}</span>
-                </button>
+                {gameState.gameMode !== 'custom' && (
+                  <>
+                    <div className="text-xs font-bold uppercase tracking-widest text-gray-500 px-1 py-1.5 mt-2">
+                      <div className="flex items-center gap-1.5">
+                        <ShoppingBag size={12} />
+                        {i.shop}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => buyShopPack('tower')}
+                      disabled={gameState.status !== 'playing' || gameState.gold < SHOP_CONFIG.towerPackPrice}
+                      className={`flex items-center gap-2.5 px-3 py-3 rounded-lg border transition-all ${
+                        gameState.status === 'playing' && gameState.gold >= SHOP_CONFIG.towerPackPrice
+                          ? 'border-yellow-700/70 bg-yellow-500/10 text-yellow-200 hover:bg-yellow-500/15 hover:border-yellow-500/70'
+                          : 'border-gray-800 bg-gray-900/50 text-gray-500 cursor-not-allowed opacity-40'
+                      }`}
+                    >
+                      <div className="shrink-0 text-yellow-400"><Crosshair size={20} /></div>
+                      <div className="flex flex-col items-start min-w-0 flex-1">
+                        <span className="text-sm font-bold leading-tight">{i.towerPack}</span>
+                        <span className="text-xs text-gray-400 leading-tight">{i.towerPackDesc}</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-yellow-400 text-xs font-bold shrink-0">
+                        <Coins size={12} />{SHOP_CONFIG.towerPackPrice}
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => buyShopPack('infra')}
+                      disabled={gameState.status !== 'playing' || gameState.gold < SHOP_CONFIG.infraPackPrice}
+                      className={`flex items-center gap-2.5 px-3 py-3 rounded-lg border transition-all ${
+                        gameState.status === 'playing' && gameState.gold >= SHOP_CONFIG.infraPackPrice
+                          ? 'border-yellow-700/70 bg-yellow-500/10 text-yellow-200 hover:bg-yellow-500/15 hover:border-yellow-500/70'
+                          : 'border-gray-800 bg-gray-900/50 text-gray-500 cursor-not-allowed opacity-40'
+                      }`}
+                    >
+                      <div className="shrink-0 text-yellow-400"><Zap size={20} /></div>
+                      <div className="flex flex-col items-start min-w-0 flex-1">
+                        <span className="text-sm font-bold leading-tight">{i.infraPack}</span>
+                        <span className="text-xs text-gray-400 leading-tight">{i.infraPackDesc}</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-yellow-400 text-xs font-bold shrink-0">
+                        <Coins size={12} />{SHOP_CONFIG.infraPackPrice}
+                      </div>
+                    </button>
+                  </>
+                )}
+
+                {gameState.gameMode === 'custom' && (
+                  <button
+                    type="button"
+                    onClick={openCustomPick}
+                    disabled={gameState.status !== 'playing' && gameState.status !== 'paused'}
+                    className={`flex items-center gap-2.5 px-3 py-3 rounded-lg border transition-all ${
+                      gameState.status === 'playing' || gameState.status === 'paused'
+                        ? 'border-amber-700/70 bg-amber-500/10 text-amber-200 hover:bg-amber-500/15 hover:border-amber-500/70'
+                        : 'border-gray-800 bg-gray-900/50 text-gray-500 cursor-not-allowed opacity-50'
+                    }`}
+                  >
+                    <div className="shrink-0"><Play size={18} /></div>
+                    <span className="text-sm font-bold leading-tight">{i.openPick}</span>
+                  </button>
+                )}
 
                 <div className="mt-4 text-xs text-gray-600 px-1 py-2 leading-relaxed">
                   <p>{i.clickToPlaceMonster}</p>

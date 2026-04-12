@@ -436,6 +436,68 @@ export const generatePickOptions = (): PickOption[] => {
   });
 };
 
+const TURRET_TYPES = new Set<string>(['blaster', 'gatling', 'sniper', 'tesla']);
+
+export const generateTowerOnlyPickOptions = (): PickOption[] => {
+  const loc = t();
+  const remaining = PICK_POOL_CONFIG.pool
+    .filter(o => o.kind === 'tower' && TURRET_TYPES.has(o.towerType ?? ''))
+    .map((o, i) => ({ ...o, idx: i }));
+  const picked: typeof remaining = [];
+
+  for (let n = 0; n < PICK_POOL_CONFIG.pickCount && remaining.length > 0; n++) {
+    const totalWeight = remaining.reduce((s, o) => s + o.weight, 0);
+    let roll = Math.random() * totalWeight;
+    let chosenIdx = 0;
+    for (let i = 0; i < remaining.length; i++) {
+      roll -= remaining[i].weight;
+      if (roll <= 0) { chosenIdx = i; break; }
+    }
+    picked.push(remaining[chosenIdx]);
+    remaining.splice(chosenIdx, 1);
+  }
+
+  return picked.map(o => {
+    const k = pickKey(o.kind, o.towerType, o.count);
+    return {
+      kind: o.kind, towerType: o.towerType, count: o.count,
+      id: genId(),
+      label: loc.pickLabel[k] ?? k,
+      description: loc.pickDesc[k] ?? '',
+    };
+  });
+};
+
+export const generateInfraOnlyPickOptions = (): PickOption[] => {
+  const loc = t();
+  const remaining = PICK_POOL_CONFIG.pool
+    .filter(o => o.kind === 'wire' || (o.kind === 'tower' && !TURRET_TYPES.has(o.towerType ?? '')))
+    .map((o, i) => ({ ...o, idx: i }));
+  const picked: typeof remaining = [];
+
+  for (let n = 0; n < PICK_POOL_CONFIG.pickCount && remaining.length > 0; n++) {
+    const totalWeight = remaining.reduce((s, o) => s + o.weight, 0);
+    let roll = Math.random() * totalWeight;
+    let chosenIdx = 0;
+    for (let i = 0; i < remaining.length; i++) {
+      roll -= remaining[i].weight;
+      if (roll <= 0) { chosenIdx = i; break; }
+    }
+    picked.push(remaining[chosenIdx]);
+    remaining.splice(chosenIdx, 1);
+  }
+
+  return picked.map(o => {
+    const k = pickKey(o.kind, o.towerType, o.count);
+    return {
+      kind: o.kind, towerType: o.towerType, count: o.count,
+      id: genId(),
+      label: loc.pickLabel[k] ?? k,
+      description: loc.pickDesc[k] ?? '',
+    };
+  });
+};
+
 /** Fixed bonus 3-choice after clearing a boss wave: wire → generator → shield (display order). */
 export const generateBossBonusPickOptions = (): PickOption[] => {
   const loc = t();
@@ -488,6 +550,7 @@ export const createInitialState = (): GameState => {
     wave: 0,
     powerTimer: 0,
     wireInventory: STARTING_INVENTORY.wires,
+    gold: 0,
     towerInventory: { ...STARTING_INVENTORY.towers },
     pickOptions: [],
     bossBonusPickQueued: false,

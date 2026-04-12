@@ -7,8 +7,8 @@ export type PortDirection = 'top' | 'right' | 'bottom' | 'left';
 export type PortType = 'input' | 'output';
 export type GameStatus = 'menu' | 'playing' | 'paused' | 'pick' | 'gameover';
 
-/** Pick overlay: normal random pool vs. fixed boss-wave bonus */
-export type PickUiPhase = 'standard' | 'boss_bonus';
+/** Pick overlay: normal random pool vs. fixed boss-wave bonus vs. shop purchases */
+export type PickUiPhase = 'standard' | 'boss_bonus' | 'shop_tower' | 'shop_infra';
 export type EnemyType = 'scout' | 'grunt' | 'tank' | 'saboteur' | 'overlord';
 
 export interface Port {
@@ -183,6 +183,7 @@ export interface GameState {
   wave: number;
   powerTimer: number;
   wireInventory: number;
+  gold: number;
   towerInventory: Record<string, number>;
   pickOptions: PickOption[];
   /** After clearing a boss wave, show one extra fixed 3-choice after the normal pick */

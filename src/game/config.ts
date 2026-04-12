@@ -250,6 +250,15 @@ export const STARTING_INVENTORY = {
   towers: { blaster: 0, gatling: 0, sniper: 0, tesla: 0, generator: 0, shield: 0, battery: 0 } as Record<string, number>,
 } as const;
 
+// ── 7b. 商店与金币 ────────────────────────────────────────────────────────────
+
+export const SHOP_CONFIG = {
+  goldPerWave: 10,
+  towerPackPrice: 50,
+  infraPackPrice: 50,
+  sellPrice: 5,
+} as const;
+
 // ── 8. Roguelike 三选一奖励池 ───────────────────────────────────────────────
 //  每次清波后从 pool 中随机抽取 pickCount 个选项供玩家选择
 

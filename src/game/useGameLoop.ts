@@ -9,9 +9,10 @@ import {
   snapRotation, applyTowerRotation, canPlace, collidesWithTowers,
   collidesWithWires, repathConnectedWires, genId, generatePickOptions, spawnEnemyAt,
   canDirectLinkPorts, isPortAccessible,
+  generateTowerOnlyPickOptions, generateInfraOnlyPickOptions, rebuildTowerMap,
 } from './engine';
 import { renderGame } from './renderer';
-import { GLOBAL_CONFIG } from './config';
+import { GLOBAL_CONFIG, SHOP_CONFIG } from './config';
 import { t } from './i18n';
 import { addTowerToState, createTowerAt } from './towerFactory';
 import { findAutoPlacementNearCore } from './placement';
@@ -241,16 +242,23 @@ export const useGameLoop = () => {
       state.wireInventory += option.count;
     }
 
+    const isShopPick = state.pickUiPhase === 'shop_tower' || state.pickUiPhase === 'shop_infra';
+
     state.pickOptions = [];
-    state.needsPick = false;
     state.status = 'playing';
-    if (state.bossBonusPickQueued) {
-      state.bossBonusPickQueued = false;
-      state.pendingBossBonusPick = true;
+
+    if (isShopPick) {
       state.pickUiPhase = 'standard';
     } else {
-      state.pickUiPhase = 'standard';
-      state.waveTimer = 0;
+      state.needsPick = false;
+      if (state.bossBonusPickQueued) {
+        state.bossBonusPickQueued = false;
+        state.pendingBossBonusPick = true;
+        state.pickUiPhase = 'standard';
+      } else {
+        state.pickUiPhase = 'standard';
+        state.waveTimer = 0;
+      }
     }
     sync();
   };
@@ -265,6 +273,38 @@ export const useGameLoop = () => {
     state.pendingBossBonusPick = false;
     state.bossBonusPickQueued = false;
     state.status = 'pick';
+    sync();
+  };
+
+  const buyShopPack = (packType: 'tower' | 'infra') => {
+    const state = stateRef.current;
+    if (state.status !== 'playing' || state.gameMode === 'custom') return;
+    const price = packType === 'tower' ? SHOP_CONFIG.towerPackPrice : SHOP_CONFIG.infraPackPrice;
+    if (state.gold < price) {
+      showToast(t().notEnoughGold);
+      return;
+    }
+    state.gold -= price;
+    state.pickOptions = packType === 'tower' ? generateTowerOnlyPickOptions() : generateInfraOnlyPickOptions();
+    state.pickUiPhase = packType === 'tower' ? 'shop_tower' : 'shop_infra';
+    state.pendingBossBonusPick = false;
+    state.bossBonusPickQueued = false;
+    state.status = 'pick';
+    sync();
+  };
+
+  const sellTower = (towerId: string) => {
+    const state = stateRef.current;
+    if (state.status !== 'playing') return;
+    const tower = state.towerMap.get(towerId);
+    if (!tower || tower.type === 'core') return;
+    state.towers = state.towers.filter(t => t.id !== towerId);
+    state.wires = state.wires.filter(w => w.startTowerId !== towerId && w.endTowerId !== towerId);
+    state.towerMap.delete(towerId);
+    rebuildTowerMap(state);
+    updatePowerGrid(state);
+    state.gold += SHOP_CONFIG.sellPrice;
+    updateRotating(null);
     sync();
   };
 
@@ -1078,7 +1118,8 @@ export const useGameLoop = () => {
 
   return {
     canvasRef, cameraRef, gameState, startGame, startCustomGame, togglePause, returnToMenu, handlePick,
-    openCustomPick, selectedTower, setSelectedTower, placeMonsterMode, setPlaceMonsterMode, skipToNextWave, toastMessage,
+    openCustomPick, buyShopPack, sellTower, rotatingTowerId,
+    selectedTower, setSelectedTower, placeMonsterMode, setPlaceMonsterMode, skipToNextWave, toastMessage,
     selectedMonsterType, setSelectedMonsterType, staticMonster, setStaticMonster,
     handleCanvasMouseDown, handleCanvasMouseMove, handleCanvasMouseUp, handleCanvasMouseLeave,
     handleCanvasWheel, handleCanvasContextMenu,
