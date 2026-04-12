@@ -176,7 +176,7 @@ export const drawPorts = (ctx: CanvasRenderingContext2D, state: GameState) => {
   const DIRECT_DOCK_MS = 420;
   const DIRECT_INPUT_RECOIL = 3.5;
   const DIRECT_OUTPUT_RECOIL = 9;
-  const DIRECT_OUTPUT_INSERT = 4.5;
+  const DIRECT_OUTPUT_INSERT = 8;
   const portStrokeW = 1.35;
   const now = performance.now();
 
