@@ -1,7 +1,6 @@
 import {
   GameState,
   Port,
-  PortDirection,
   Tower,
   TowerType,
   TOWER_STATS,
@@ -29,8 +28,7 @@ const createTowerPorts = (type: TowerType): Port[] => {
   }
 
   if (type === 'shield') {
-    const dirs: PortDirection[] = ['top', 'right', 'bottom', 'left'];
-    return [{ id: genId(), direction: dirs[(Math.random() * 4) | 0], portType: 'input' }];
+    return allSideInputPorts();
   }
 
   if (type === 'bus') {

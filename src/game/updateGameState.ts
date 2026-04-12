@@ -578,7 +578,7 @@ const updateEnemyState = (state: GameState, dt: number, now: number) => {
         targetPos = { x: tx, y: ty };
       }
 
-      if (tower.shieldHp <= 0 || tower.shieldRadius <= 0) continue;
+      if (tower.shieldHp <= 0 || tower.shieldRadius <= 0 || !tower.powered) continue;
 
       const shieldCenterX = (tower.x + tower.width / 2) * GLOBAL_CONFIG.cellSize;
       const shieldCenterY = (tower.y + tower.height / 2) * GLOBAL_CONFIG.cellSize;

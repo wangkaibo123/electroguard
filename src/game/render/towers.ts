@@ -226,7 +226,7 @@ export const drawPorts = (ctx: CanvasRenderingContext2D, state: GameState) => {
       const portActive = tower.powered || tower.type === 'core';
       const pulse = portActive ? 0.55 + 0.45 * (Math.sin(now / 260) * 0.5 + 0.5) : 0;
 
-      const showPortStem = !(directWire && port.portType === 'input');
+      const showPortStem = port.portType === 'output';
 
       if (showPortStem) {
         ctx.strokeStyle = displayColor;
