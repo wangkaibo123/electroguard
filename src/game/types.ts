@@ -39,6 +39,7 @@ export interface Wire {
   hp: number;
   maxHp: number;
   direct?: boolean;
+  createdAt?: number;
 }
 
 export interface Pulse {

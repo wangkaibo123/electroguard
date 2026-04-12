@@ -354,6 +354,7 @@ export const useGameLoop = () => {
               hp: WIRE_MAX_HP,
               maxHp: WIRE_MAX_HP,
               direct: true,
+              createdAt: performance.now(),
             });
             updatePowerGrid(state);
             sync();

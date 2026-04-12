@@ -255,6 +255,7 @@ export const syncDirectPortLinks = (
             hp: WIRE_MAX_HP,
             maxHp: WIRE_MAX_HP,
             direct: true,
+            createdAt: performance.now(),
           });
 
           if (options.createSpark) {
