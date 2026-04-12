@@ -43,7 +43,7 @@ const createTowerPorts = (type: TowerType): Port[] => {
   }
 
   if (type === 'blaster' || type === 'gatling' || type === 'sniper' || type === 'tesla') {
-    return allSideInputPorts();
+    return generatePorts('input', 1 + Math.floor(Math.random() * 4));
   }
 
   return [];
