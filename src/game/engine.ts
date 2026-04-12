@@ -390,7 +390,7 @@ export const findWirePath = (
 
 // ── Port generation ─────────────────────────────────────────────────────────
 
-export const generatePorts = (portType: PortType, count = GLOBAL_CONFIG.portCount): Port[] => {
+export const generatePorts = (portType: PortType, count: number = GLOBAL_CONFIG.portCount): Port[] => {
   const dirs = [...PORT_DIRS];
   for (let i = dirs.length - 1; i > 0; i--) {
     const j = (Math.random() * (i + 1)) | 0;

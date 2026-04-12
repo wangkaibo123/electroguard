@@ -259,7 +259,6 @@ export const PICK_POOL_CONFIG = {
   /** 奖励池：kind=类型  towerType=建筑类型  count=获得数量  weight=出现权重（越大越容易被抽中） */
   pool: [
     { kind: 'tower' as const, towerType: 'blaster'   as TowerType, count: 1, weight: 10 },
-    { kind: 'tower' as const, towerType: 'blaster'   as TowerType, count: 2, weight: 5 },
     { kind: 'tower' as const, towerType: 'gatling'   as TowerType, count: 1, weight: 8 },
     { kind: 'tower' as const, towerType: 'sniper'    as TowerType, count: 1, weight: 6 },
     { kind: 'tower' as const, towerType: 'tesla'     as TowerType, count: 1, weight: 5 },
@@ -268,7 +267,6 @@ export const PICK_POOL_CONFIG = {
     { kind: 'tower' as const, towerType: 'battery'   as TowerType, count: 1, weight: 6 },
     { kind: 'tower' as const, towerType: 'bus'       as TowerType, count: 1, weight: 4 },
     { kind: 'wire'  as const,                                       count: 3, weight: 10 },
-    { kind: 'wire'  as const,                                       count: 5, weight: 6 },
   ],
 };
 
