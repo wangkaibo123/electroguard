@@ -19,87 +19,6 @@ const TOWER_BAR_SHOW_MS = 1800;
 const TOWER_BAR_FADE_MS = 700;
 const ENERGY_EFFECT_SIZE = CELL_SIZE * 0.5;
 
-const portAngle = (dir: string): number => {
-  switch (dir) {
-    case 'top': return -Math.PI / 2;
-    case 'bottom': return Math.PI / 2;
-    case 'left': return Math.PI;
-    default: return 0;
-  }
-};
-
-const drawOutputPlug = (
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  direction: string,
-  fillColor: string,
-  strokeColor: string,
-) => {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(portAngle(direction));
-
-  ctx.fillStyle = fillColor;
-  ctx.strokeStyle = strokeColor;
-  ctx.lineWidth = 1.35;
-
-  ctx.beginPath();
-  ctx.roundRect(-6, -8, 10, 16, 2);
-  ctx.fill();
-  ctx.stroke();
-
-  for (const slotY of [-4.5, 2.5]) {
-    ctx.beginPath();
-    ctx.roundRect(2, slotY, 14, 2.8, 1.2);
-    ctx.fill();
-    ctx.stroke();
-  }
-
-  ctx.fillStyle = 'rgba(255,255,255,0.22)';
-  ctx.fillRect(-3.5, -6, 2, 12);
-  ctx.restore();
-};
-
-const drawInputSocket = (
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  direction: string,
-  fillColor: string,
-  strokeColor: string,
-) => {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(portAngle(direction));
-
-  ctx.fillStyle = fillColor;
-  ctx.strokeStyle = strokeColor;
-  ctx.lineWidth = 1.35;
-
-  ctx.beginPath();
-  ctx.roundRect(-7, -9, 15, 18, 2.5);
-  ctx.fill();
-  ctx.stroke();
-
-  ctx.fillStyle = BG_DARK;
-  for (const slotY of [-4.8, 2.2]) {
-    ctx.beginPath();
-    ctx.roundRect(-1, slotY, 7.5, 3.2, 1.4);
-    ctx.fill();
-  }
-
-  ctx.strokeStyle = 'rgba(255,255,255,0.22)';
-  ctx.lineWidth = 0.9;
-  for (const slotY of [-4.8, 2.2]) {
-    ctx.beginPath();
-    ctx.roundRect(-1, slotY, 7.5, 3.2, 1.4);
-    ctx.stroke();
-  }
-
-  ctx.restore();
-};
-
 export const drawOccupiedGround = (ctx: CanvasRenderingContext2D, state: GameState) => {
   const occupied = new Set<string>();
   let hasCore = false;
@@ -251,6 +170,10 @@ export const getRotationKnobLayout = (tower: Tower) => {
 
 // ── Ports (drawn under tower bodies) ─────────────────────────────────────
 export const drawPorts = (ctx: CanvasRenderingContext2D, state: GameState) => {
+  const PORT_SCALE = 4 / 3;
+  const OUT_TRI = 7.5 * PORT_SCALE;
+  const IN_HALF = 6 * PORT_SCALE;
+  const portStrokeW = 1.35;
   const now = performance.now();
   for (const tower of state.towers) {
     const ppx = tower.x * CELL_SIZE, ppy = tower.y * CELL_SIZE;
@@ -296,23 +219,46 @@ export const drawPorts = (ctx: CanvasRenderingContext2D, state: GameState) => {
       }
 
       if (port.portType === 'output') {
+        ctx.fillStyle = displayColor;
+        const s = OUT_TRI;
+        ctx.beginPath();
+        switch (port.direction) {
+          case 'top':    ctx.moveTo(drawX - s, drawY + s / 2); ctx.lineTo(drawX + s, drawY + s / 2); ctx.lineTo(drawX, drawY - s); break;
+          case 'bottom': ctx.moveTo(drawX - s, drawY - s / 2); ctx.lineTo(drawX + s, drawY - s / 2); ctx.lineTo(drawX, drawY + s); break;
+          case 'left':   ctx.moveTo(drawX + s / 2, drawY - s); ctx.lineTo(drawX + s / 2, drawY + s); ctx.lineTo(drawX - s, drawY); break;
+          case 'right':  ctx.moveTo(drawX - s / 2, drawY - s); ctx.lineTo(drawX - s / 2, drawY + s); ctx.lineTo(drawX + s, drawY); break;
+        }
+        ctx.closePath();
+        ctx.fill();
         if (used && portActive) {
           ctx.save();
+          ctx.fillStyle = `rgba(255,255,255,${0.12 + pulse * 0.18})`;
           ctx.shadowColor = portColor;
           ctx.shadowBlur = 10 + 10 * pulse;
-          drawOutputPlug(ctx, drawX, drawY, port.direction, `rgba(255,255,255,${0.12 + pulse * 0.18})`, 'rgba(255,255,255,0)');
+          ctx.fill();
           ctx.restore();
         }
-        drawOutputPlug(ctx, drawX, drawY, port.direction, displayColor, BG_DARK);
+        ctx.strokeStyle = BG_DARK;
+        ctx.lineWidth = portStrokeW;
+        ctx.stroke();
       } else {
+        ctx.fillStyle = displayColor;
+        const h = IN_HALF;
+        const r = 2.25;
+        ctx.beginPath();
+        ctx.roundRect(drawX - h, drawY - h, h * 2, h * 2, r);
+        ctx.fill();
         if (used && portActive) {
           ctx.save();
+          ctx.fillStyle = `rgba(255,255,255,${0.1 + pulse * 0.16})`;
           ctx.shadowColor = portColor;
           ctx.shadowBlur = 10 + 10 * pulse;
-          drawInputSocket(ctx, drawX, drawY, port.direction, `rgba(255,255,255,${0.1 + pulse * 0.16})`, 'rgba(255,255,255,0)');
+          ctx.fill();
           ctx.restore();
         }
-        drawInputSocket(ctx, drawX, drawY, port.direction, displayColor, BG_DARK);
+        ctx.strokeStyle = BG_DARK;
+        ctx.lineWidth = portStrokeW;
+        ctx.stroke();
       }
     }
 
