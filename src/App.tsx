@@ -433,7 +433,8 @@ export default function App() {
                   style={{ left: sx, top: sy }}
                 >
                   <Trash2 size={13} />
-                  {i.sell} (+{SHOP_CONFIG.sellPrice}<Coins size={10} className="inline ml-0.5" />)
+                  {SHOP_CONFIG.sellPrice}
+                  <Coins size={12} />
                 </button>
               );
             })()}

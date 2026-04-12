@@ -30,6 +30,7 @@ export const useGameLoop = () => {
     width: VIEWPORT_WIDTH,
     height: VIEWPORT_HEIGHT,
   });
+  const pendingCanvasSizeRef = useRef<{ w: number; h: number; pw: number; ph: number } | null>(null);
 
   const selectedTowerRef = useRef<TowerType | null>(null);
   const [selectedTower, _setSelectedTower] = useState<TowerType | null>(null);
@@ -483,14 +484,18 @@ export const useGameLoop = () => {
       return;
     }
 
-    // Rotation knob check
+    // Rotation knob check — click to rotate 90°
     if (rotatingRef.current) {
       const tower = state.towerMap.get(rotatingRef.current);
       if (tower) {
         const { kx, ky } = getRotationKnobLayout(tower);
         if (Math.hypot(wx - kx, wy - ky) < 19) {
-          rotStartAngleRef.current = 0;
+          const newAngle = snapRotation(tower.rotation + Math.PI / 2);
+          if (!applyTowerRotation(tower, newAngle, 0, state)) {
+            tower.rotation = 0;
+          }
           isRotKnobRef.current = true;
+          sync();
           return;
         }
       }
@@ -570,17 +575,6 @@ export const useGameLoop = () => {
     const { wx, wy } = toWorld(sx, sy);
     mousePxRef.current = { x: wx, y: wy };
 
-    if (isRotKnobRef.current && rotatingRef.current) {
-      const tower = state.towerMap.get(rotatingRef.current);
-      if (tower) {
-        const cx = (tower.x + tower.width / 2) * CELL_SIZE;
-        const cy = (tower.y + tower.height / 2) * CELL_SIZE;
-        tower.rotation = Math.atan2(wy - cy, wx - cx) + Math.PI / 2;
-        sync();
-      }
-      return;
-    }
-
     const gx = (wx / CELL_SIZE) | 0, gy = (wy / CELL_SIZE) | 0;
     hoverRef.current = (gx >= 0 && gx < GRID_WIDTH && gy >= 0 && gy < GRID_HEIGHT)
       ? { x: gx, y: gy } : null;
@@ -645,15 +639,6 @@ export const useGameLoop = () => {
     if (isRotKnobRef.current) {
       isRotKnobRef.current = false;
       mouseDownPosRef.current = null;
-      if (rotatingRef.current) {
-        const tower = state.towerMap.get(rotatingRef.current);
-        if (tower) {
-          if (!applyTowerRotation(tower, snapRotation(tower.rotation), snapRotation(rotStartAngleRef.current), state)) {
-            tower.rotation = 0;
-          }
-          sync();
-        }
-      }
       return;
     }
 
@@ -756,14 +741,18 @@ export const useGameLoop = () => {
       return;
     }
 
-    // Rotation knob check
+    // Rotation knob check — tap to rotate 90°
     if (rotatingRef.current) {
       const tower = state.towerMap.get(rotatingRef.current);
       if (tower) {
         const { kx, ky } = getRotationKnobLayout(tower);
         if (Math.hypot(wx - kx, wy - ky) < 27) {
-          rotStartAngleRef.current = 0;
+          const newAngle = snapRotation(tower.rotation + Math.PI / 2);
+          if (!applyTowerRotation(tower, newAngle, 0, state)) {
+            tower.rotation = 0;
+          }
           isRotKnobRef.current = true;
+          sync();
           return;
         }
       }
@@ -868,17 +857,6 @@ export const useGameLoop = () => {
     const { wx, wy } = toWorld(sx, sy);
     mousePxRef.current = { x: wx, y: wy };
 
-    if (isRotKnobRef.current && rotatingRef.current) {
-      const tower = state.towerMap.get(rotatingRef.current);
-      if (tower) {
-        const cx = (tower.x + tower.width / 2) * CELL_SIZE;
-        const cy = (tower.y + tower.height / 2) * CELL_SIZE;
-        tower.rotation = Math.atan2(wy - cy, wx - cx) + Math.PI / 2;
-        sync();
-      }
-      return;
-    }
-
     const gx = (wx / CELL_SIZE) | 0, gy = (wy / CELL_SIZE) | 0;
     hoverRef.current = (gx >= 0 && gx < GRID_WIDTH && gy >= 0 && gy < GRID_HEIGHT)
       ? { x: gx, y: gy } : null;
@@ -946,15 +924,6 @@ export const useGameLoop = () => {
     if (isRotKnobRef.current) {
       isRotKnobRef.current = false;
       mouseDownPosRef.current = null;
-      if (rotatingRef.current) {
-        const tower = state.towerMap.get(rotatingRef.current);
-        if (tower) {
-          if (!applyTowerRotation(tower, snapRotation(tower.rotation), snapRotation(rotStartAngleRef.current), state)) {
-            tower.rotation = 0;
-          }
-          sync();
-        }
-      }
       return;
     }
 
@@ -984,6 +953,18 @@ export const useGameLoop = () => {
     }
 
     // 鈹€鈹€ Render 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+    const pending = pendingCanvasSizeRef.current;
+    if (pending && canvasRef.current) {
+      const c = canvasRef.current;
+      if (c.width !== pending.pw) c.width = pending.pw;
+      if (c.height !== pending.ph) c.height = pending.ph;
+      viewportRef.current = { width: pending.w, height: pending.h };
+      const cam = cameraRef.current;
+      const minZoom = getMinZoom();
+      if (cam.zoom < minZoom) cam.zoom = minZoom;
+      clampCamera(cam);
+      pendingCanvasSizeRef.current = null;
+    }
     const ctx = canvasRef.current?.getContext('2d');
     if (ctx) {
       const dpr = window.devicePixelRatio || 1;
@@ -1024,17 +1005,9 @@ export const useGameLoop = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const updateCanvasSize = () => {
-      const rect = canvas.getBoundingClientRect();
-      const width = Math.max(1, Math.round(rect.width));
-      const height = Math.max(1, Math.round(rect.height));
-      const dpr = window.devicePixelRatio || 1;
-      const pixelW = Math.max(1, Math.round(width * dpr));
-      const pixelH = Math.max(1, Math.round(height * dpr));
-
+    const applyCanvasSize = (width: number, height: number, pixelW: number, pixelH: number) => {
       if (canvas.width !== pixelW) canvas.width = pixelW;
       if (canvas.height !== pixelH) canvas.height = pixelH;
-
       viewportRef.current = { width, height };
       const cam = cameraRef.current;
       const minZoom = getMinZoom();
@@ -1042,15 +1015,31 @@ export const useGameLoop = () => {
       clampCamera(cam);
     };
 
-    updateCanvasSize();
+    const updateCanvasSize = (immediate?: boolean) => {
+      const rect = canvas.getBoundingClientRect();
+      const width = Math.max(1, Math.round(rect.width));
+      const height = Math.max(1, Math.round(rect.height));
+      const dpr = window.devicePixelRatio || 1;
+      const pixelW = Math.max(1, Math.round(width * dpr));
+      const pixelH = Math.max(1, Math.round(height * dpr));
+
+      if (immediate) {
+        applyCanvasSize(width, height, pixelW, pixelH);
+      } else {
+        pendingCanvasSizeRef.current = { w: width, h: height, pw: pixelW, ph: pixelH };
+      }
+    };
+
+    updateCanvasSize(true);
     // Center on core after first measurement so all devices start with the same view
     centerOnCore(stateRef.current);
-    const ro = new ResizeObserver(updateCanvasSize);
+    const deferredResize = () => updateCanvasSize();
+    const ro = new ResizeObserver(deferredResize);
     ro.observe(canvas);
-    window.addEventListener('resize', updateCanvasSize);
+    window.addEventListener('resize', deferredResize);
     return () => {
       ro.disconnect();
-      window.removeEventListener('resize', updateCanvasSize);
+      window.removeEventListener('resize', deferredResize);
     };
   }, []);
 

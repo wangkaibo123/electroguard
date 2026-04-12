@@ -566,40 +566,24 @@ export const drawRotationKnob = (ctx: CanvasRenderingContext2D, state: GameState
   ctx.fillStyle = BG_DARK;
   ctx.beginPath(); ctx.arc(kx, ky, innerR, 0, TWO_PI); ctx.fill();
 
-  // Arc arrow wrapping around the knob
-  const arcStart = Math.PI * 0.8;
-  const arcEnd = Math.PI * 0.2;
-  ctx.strokeStyle = 'rgba(255,255,255,0.7)';
-  ctx.lineWidth = 1.8;
+  // Circular arrow icon (rotate 90°)
+  const iconR = arcR * 0.6;
+  const arcStart = -Math.PI * 0.55;
+  const arcEnd = Math.PI * 0.55;
+  ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+  ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.arc(kx, ky, arcR, arcStart, arcEnd, false);
+  ctx.arc(kx, ky, iconR, arcStart, arcEnd);
   ctx.stroke();
-  // Left arrowhead
-  const la = arcStart;
-  const lx = kx + arcR * Math.cos(la), ly = ky + arcR * Math.sin(la);
-  const lTan = la - Math.PI / 2;
-  ctx.fillStyle = 'rgba(255,255,255,0.7)';
+  const ax = kx + iconR * Math.cos(arcEnd);
+  const ay = ky + iconR * Math.sin(arcEnd);
+  const aTan = arcEnd + Math.PI / 2;
+  ctx.fillStyle = 'rgba(255,255,255,0.8)';
   ctx.beginPath();
-  ctx.moveTo(lx + arrowLen * Math.cos(lTan - 0.5), ly + arrowLen * Math.sin(lTan - 0.5));
-  ctx.lineTo(lx, ly);
-  ctx.lineTo(lx + arrowLen * Math.cos(lTan + 0.5), ly + arrowLen * Math.sin(lTan + 0.5));
+  ctx.moveTo(ax + arrowLen * Math.cos(aTan - 0.5), ay + arrowLen * Math.sin(aTan - 0.5));
+  ctx.lineTo(ax, ay);
+  ctx.lineTo(ax + arrowLen * Math.cos(aTan + 0.5), ay + arrowLen * Math.sin(aTan + 0.5));
   ctx.fill();
-  // Right arrowhead
-  const ra = arcEnd;
-  const rx = kx + arcR * Math.cos(ra), ry = ky + arcR * Math.sin(ra);
-  const rTan = ra + Math.PI / 2;
-  ctx.beginPath();
-  ctx.moveTo(rx + arrowLen * Math.cos(rTan - 0.5), ry + arrowLen * Math.sin(rTan - 0.5));
-  ctx.lineTo(rx, ry);
-  ctx.lineTo(rx + arrowLen * Math.cos(rTan + 0.5), ry + arrowLen * Math.sin(rTan + 0.5));
-  ctx.fill();
-
-  // "拖动旋转" label
-  ctx.fillStyle = 'rgba(255,255,255,0.65)';
-  ctx.font = '10px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'bottom';
-  ctx.fillText('拖动旋转', kx, ky - arcR - 6);
 };
 
 const drawCapsuleBarrel = (
@@ -761,7 +745,7 @@ function drawTowerDetails(
     ctx.strokeStyle = tColor; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.arc(cx, cy, r, 0, TWO_PI); ctx.stroke();
     const localAngle = t.barrelAngle - t.rotation;
-    const barrelLen = (Math.min(tw, th) / 2 - inset + 4) * 2;
+    const barrelLen = (Math.min(tw, th) / 2 - inset + 4) * 1.5;
     const firingRecently = t.powered && t.lastActionTime > 0 && now - t.lastActionTime < 140;
     // Heat glow on barrels
     const heat = t.heat;
