@@ -176,6 +176,7 @@ export const drawPorts = (ctx: CanvasRenderingContext2D, state: GameState) => {
   const DIRECT_DOCK_MS = 420;
   const DIRECT_INPUT_RECOIL = 3.5;
   const DIRECT_OUTPUT_RECOIL = 9;
+  const DIRECT_OUTPUT_INSERT = 4.5;
   const portStrokeW = 1.35;
   const now = performance.now();
 
@@ -210,11 +211,12 @@ export const drawPorts = (ctx: CanvasRenderingContext2D, state: GameState) => {
       const unit = unitForDirection(port.direction);
       const linkedWire = state.wires.find(w => w.startPortId === port.id || w.endPortId === port.id);
       const directWire = linkedWire?.direct ? linkedWire : null;
+      const directOutputInsert = directWire && port.portType === 'output' ? DIRECT_OUTPUT_INSERT : 0;
       const recoil = directWire
         ? directRecoil(directWire.createdAt, port.portType === 'output' ? DIRECT_OUTPUT_RECOIL : DIRECT_INPUT_RECOIL)
         : 0;
-      const lineX = directWire ? pos.x - unit.x * recoil : pos.x + off.x;
-      const lineY = directWire ? pos.y - unit.y * recoil : pos.y + off.y;
+      const lineX = directWire ? pos.x + unit.x * directOutputInsert - unit.x * recoil : pos.x + off.x;
+      const lineY = directWire ? pos.y + unit.y * directOutputInsert - unit.y * recoil : pos.y + off.y;
       const used = Boolean(linkedWire);
       const accessible = isPortAccessible(state, tower, port);
       const portColor = port.portType === 'output'
@@ -251,8 +253,8 @@ export const drawPorts = (ctx: CanvasRenderingContext2D, state: GameState) => {
       if (port.portType === 'output') {
         ctx.fillStyle = displayColor;
         const s = OUT_TRI;
-        const centerX = directWire ? pos.x - unit.x * (s + recoil) : pos.x + off.x;
-        const centerY = directWire ? pos.y - unit.y * (s + recoil) : pos.y + off.y;
+        const centerX = directWire ? pos.x + unit.x * directOutputInsert - unit.x * (s + recoil) : pos.x + off.x;
+        const centerY = directWire ? pos.y + unit.y * directOutputInsert - unit.y * (s + recoil) : pos.y + off.y;
         const perp = { x: -unit.y, y: unit.x };
         const tip = { x: centerX + unit.x * s, y: centerY + unit.y * s };
         const base = { x: centerX - unit.x * s / 2, y: centerY - unit.y * s / 2 };
