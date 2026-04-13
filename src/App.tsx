@@ -304,7 +304,7 @@ export default function App() {
           });
         }}
         disabled={gameState.status !== 'playing'}
-        className={`group relative aspect-[3/4] w-full rounded-lg border p-3 text-left transition-all active:scale-95 ${
+        className={`group relative aspect-[5/3] w-full rounded-lg border p-3 text-left transition-all active:scale-95 ${
           gameState.status === 'playing'
             ? `bg-gray-900/90 hover:bg-gray-800/95 ${isCoreCommandCard ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing'}`
             : 'bg-gray-900/40 opacity-60 cursor-not-allowed'
@@ -329,7 +329,7 @@ export default function App() {
   };
 
   const renderCommandCardPanelContents = () => (
-    <div className="min-w-[172px] flex flex-col gap-2 h-full">
+    <div className="min-w-[235px] flex flex-col gap-2 h-full">
       <div className="text-xs font-bold uppercase tracking-widest text-gray-500 px-1 py-1.5">
         {i.commandCard}
       </div>
@@ -455,7 +455,7 @@ export default function App() {
             </button>
             <div
               className={`bg-gray-900/80 border-r border-gray-800 p-3.5 flex flex-col gap-2.5 overflow-y-auto overflow-x-hidden transition-all duration-300 ease-in-out ${
-                commandSidebarOpen ? 'w-[196px] opacity-100' : 'w-0 opacity-0 p-0 border-r-0'
+                commandSidebarOpen ? 'w-[260px] opacity-100' : 'w-0 opacity-0 p-0 border-r-0'
               }`}
             >
               {renderCommandCardPanelContents()}
@@ -914,7 +914,7 @@ export default function App() {
             {commandSidebarOpen && (
               <div className="absolute inset-0 z-40 flex" onClick={() => setCommandSidebarOpen(false)}>
                 <div
-                  className="w-[210px] bg-gray-900/95 backdrop-blur-md border-r border-gray-800 p-3 flex flex-col gap-2 overflow-y-auto animate-[slideInLeft_0.2s_ease-out]"
+                  className="w-[280px] bg-gray-900/95 backdrop-blur-md border-r border-gray-800 p-3 flex flex-col gap-2 overflow-y-auto animate-[slideInLeft_0.2s_ease-out]"
                   onClick={e => e.stopPropagation()}
                 >
                   <div className="flex items-center justify-between px-1 py-1">

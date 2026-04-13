@@ -24,6 +24,7 @@ export const DELETE_BUTTON_HEIGHT = 28;
 const TOWER_BAR_SHOW_MS = 1800;
 const TOWER_BAR_FADE_MS = 700;
 const ENERGY_EFFECT_SIZE = CELL_SIZE * 0.5;
+const MAX_COMMAND_UPGRADE_MARKS = 3;
 type LucideIconNode = [string, Record<string, string>][];
 
 export const drawOccupiedGround = (ctx: CanvasRenderingContext2D, state: GameState) => {
@@ -248,6 +249,36 @@ const getTowerVisualRect = (tower: Tower, px: number, py: number, tw: number, th
 
 const getLinearTowerVisualLandscape = (tower: Tower) =>
   TOWER_STATS[tower.type].width >= TOWER_STATS[tower.type].height;
+
+const drawCommandUpgradeMarks = (
+  ctx: CanvasRenderingContext2D,
+  tower: Tower,
+  px: number,
+  py: number,
+  tw: number,
+) => {
+  const count = Math.min(MAX_COMMAND_UPGRADE_MARKS, tower.commandUpgradeCount ?? 0);
+  if (count <= 0) return;
+
+  const markSize = 6;
+  const gap = 3;
+  const totalW = count * markSize + (count - 1) * gap;
+  const startX = px + tw - totalW - 5;
+  const y = py + 5;
+
+  ctx.save();
+  ctx.fillStyle = '#facc15';
+  ctx.strokeStyle = 'rgba(10,14,26,0.9)';
+  ctx.lineWidth = 1.5;
+  for (let i = 0; i < count; i++) {
+    const x = startX + i * (markSize + gap);
+    ctx.beginPath();
+    ctx.roundRect(x, y, markSize, markSize, 1.5);
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.restore();
+};
 
 // ── Ports (drawn under tower bodies) ─────────────────────────────────────
 export const drawPorts = (ctx: CanvasRenderingContext2D, state: GameState) => {
@@ -478,6 +509,8 @@ export const drawTowers = (ctx: CanvasRenderingContext2D, state: GameState, now:
     }
 
     ctx.restore();
+
+    drawCommandUpgradeMarks(ctx, tower, px, py, tw);
 
     // Bars (not rotated) — shield bar removed, shield uses fade visualization
     if (tower.hp < tower.maxHp) {

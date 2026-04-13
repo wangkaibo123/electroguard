@@ -81,6 +81,7 @@ export interface Tower {
   selfPowerLevel?: number;
   selfPowerTimer?: number;
   rangeMultiplier?: number;
+  commandUpgradeCount?: number;
   corePowerBonus?: number;
   coreTurretUnlocked?: boolean;
   coreTurretLastShot?: number;

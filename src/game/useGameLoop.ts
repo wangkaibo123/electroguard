@@ -23,6 +23,7 @@ import { getDeleteButtonLayout, getRotationKnobLayout } from './render/towers';
 import { isWorldPointInTowerFootprint } from './footprint';
 
 const { maxZoom: MAX_ZOOM, waveDelay: WAVE_DELAY } = GLOBAL_CONFIG;
+const MAX_MACHINE_COMMAND_UPGRADES = 3;
 
 export const useGameLoop = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -561,15 +562,18 @@ export const useGameLoop = () => {
       used = true;
     } else if (cardType === 'add_input' || cardType === 'add_output') {
       if (!targetTower || targetTower.type === 'core') return false;
+      if ((targetTower.commandUpgradeCount ?? 0) >= MAX_MACHINE_COMMAND_UPGRADES) return false;
       used = addMachinePort(state, targetTower, cardType === 'add_input' ? 'input' : 'output');
     } else if (cardType === 'self_power') {
       if (!targetTower || targetTower.type === 'core') return false;
+      if ((targetTower.commandUpgradeCount ?? 0) >= MAX_MACHINE_COMMAND_UPGRADES) return false;
       targetTower.selfPowerLevel = (targetTower.selfPowerLevel ?? 0) + 1;
       targetTower.selfPowerTimer = 0;
       updatePowerGrid(state);
       used = true;
     } else if (cardType === 'range_boost') {
       if (!targetTower || targetTower.type === 'core' || getTowerRange(targetTower) == null) return false;
+      if ((targetTower.commandUpgradeCount ?? 0) >= MAX_MACHINE_COMMAND_UPGRADES) return false;
       targetTower.rangeMultiplier = (targetTower.rangeMultiplier ?? 1) + (COMMAND_CARD_CONFIG.range_boost.rangeBoostMultiplier ?? 0.2);
       used = true;
     } else if (cardType === 'core_power_boost') {
@@ -590,6 +594,9 @@ export const useGameLoop = () => {
     }
 
     if (!used) return false;
+    if (targetTower && targetTower.type !== 'core' && cardType !== 'airstrike') {
+      targetTower.commandUpgradeCount = (targetTower.commandUpgradeCount ?? 0) + 1;
+    }
     state.commandCardInventory[cardType] = Math.max(0, (state.commandCardInventory[cardType] ?? 0) - 1);
     sync();
     return true;
