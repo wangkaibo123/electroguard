@@ -86,6 +86,9 @@ export const TOWER_CONFIG: Record<TowerType, {
   battery:   { hp: 150,  description: 'Stores 4 units of power and discharges quickly.',            color: '#34d399', width: 3, height: 3, maxPower: 4, maxShieldHp: 0,   shieldRadius: 0 },
   /* 汇流器：将 3 条输入线合并为 3 条输出线 */
   bus:       { hp: 120,  description: 'Merges up to 3 input wires into 3 outputs.',                color: '#38bdf8', width: 3, height: 2, maxPower: 0, maxShieldHp: 0,   shieldRadius: 0 },
+  missile:   { hp: 180,  description: 'Long-range tower. Converts 3 power into one homing missile with splash damage.', color: '#fb7185', width: 4, height: 4, maxPower: 3, maxShieldHp: 0, shieldRadius: 0 },
+  big_generator: { hp: 220, description: 'Large power source. Produces 4 power every 2 seconds.', color: '#fde047', width: 4, height: 4, maxPower: 0, maxShieldHp: 0, shieldRadius: 0 },
+  repair_drone: { hp: 170, description: 'Deploys a drone that spends power to repair buildings, or attacks enemies when idle.', color: '#2dd4bf', width: 4, height: 4, maxPower: 4, maxShieldHp: 0, shieldRadius: 0 },
 };
 
 // ── 3. 武器参数 ─────────────────────────────────────────────────────────────
@@ -154,6 +157,23 @@ export const WEAPON_CONFIG = {
     bounceRange: 180,
     /** 每点储电的伤害量，总伤害 = storedPower × damagePerPower */
     damagePerPower: 25,
+  },
+  missile: {
+    cooldown: 1800,
+    range: 720,
+    damage: 120,
+    splashRadius: 70,
+    powerCost: 3,
+    bulletSpeed: 240,
+  },
+  repairDrone: {
+    repairCooldown: 700,
+    repairAmount: 14,
+    repairCost: 1,
+    repairRange: 280,
+    attackCooldown: 900,
+    attackRange: 260,
+    attackDamage: 18,
   },
 } as const;
 
@@ -247,7 +267,7 @@ export const STARTING_INVENTORY = {
   /** 开局拥有的导线数量 */
   wires: 5,
   /** 开局拥有的各类建筑数量 */
-  towers: { blaster: 0, gatling: 0, sniper: 0, tesla: 0, generator: 0, shield: 0, battery: 0 } as Record<string, number>,
+  towers: { blaster: 0, gatling: 0, sniper: 0, tesla: 0, generator: 0, shield: 0, battery: 0, missile: 0, big_generator: 0, repair_drone: 0 } as Record<string, number>,
 } as const;
 
 // ── 7b. 商店与金币 ────────────────────────────────────────────────────────────
@@ -256,6 +276,7 @@ export const SHOP_CONFIG = {
   goldPerWave: 10,
   towerPackPrice: 50,
   infraPackPrice: 50,
+  advancedPackPrice: 100,
   sellPrice: 5,
 } as const;
 

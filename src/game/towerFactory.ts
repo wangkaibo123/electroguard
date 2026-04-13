@@ -15,12 +15,22 @@ const createTowerPorts = (type: TowerType): Port[] => {
     { id: genId(), direction: 'bottom', portType: 'input' },
     { id: genId(), direction: 'left', portType: 'input' },
   ];
+  const doubleCenterPorts = (portType: 'input' | 'output'): Port[] => {
+    const offsets = [3 / 8, 5 / 8];
+    return (['top', 'right', 'bottom', 'left'] as const).flatMap((direction) =>
+      offsets.map((sideOffset) => ({ id: genId(), direction, portType, sideOffset })),
+    );
+  };
 
   if (type === 'battery') {
     return [
       { id: genId(), direction: 'left', portType: 'input' },
       { id: genId(), direction: 'right', portType: 'output' },
     ];
+  }
+
+  if (type === 'big_generator') {
+    return doubleCenterPorts('output');
   }
 
   if (type === 'generator') {
@@ -40,6 +50,10 @@ const createTowerPorts = (type: TowerType): Port[] => {
       { id: genId(), direction: 'bottom', portType: 'output', sideOffset: 3 / 6 },
       { id: genId(), direction: 'bottom', portType: 'output', sideOffset: 5 / 6 },
     ];
+  }
+
+  if (type === 'missile' || type === 'repair_drone') {
+    return doubleCenterPorts('input');
   }
 
   if (type === 'blaster' || type === 'gatling' || type === 'sniper' || type === 'tesla') {

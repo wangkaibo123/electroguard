@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Battery, Zap, Crosshair, Activity, Play, RotateCcw, Pause, Hexagon, Cable, Wrench, ChevronRight, ChevronLeft, Flame, Focus, Radio, GitMerge, Globe, LogOut, BookOpen, X, Keyboard, Menu, Eye, EyeOff, ShoppingBag, Coins } from 'lucide-react';
+import { Battery, Zap, Crosshair, Activity, Play, RotateCcw, Pause, Hexagon, Cable, Wrench, ChevronRight, ChevronLeft, Flame, Focus, Radio, GitMerge, Globe, LogOut, BookOpen, X, Keyboard, Menu, Eye, EyeOff, ShoppingBag, Coins, Rocket, Bot } from 'lucide-react';
 import { useGameLoop } from './game/useGameLoop';
 import { TOWER_STATS, TowerType, PickOption, EnemyType } from './game/types';
 import { t, getLocale, setLocale, Locale } from './game/i18n';
@@ -9,6 +9,7 @@ const TowerIcon = ({ type, size = 22 }: { type: string; size?: number }) => {
   const icons: Record<string, React.ComponentType<{ size: number }>> = {
     blaster: Crosshair, gatling: Flame, sniper: Focus, tesla: Radio,
     generator: Zap, shield: Hexagon, battery: Battery, bus: GitMerge,
+    missile: Rocket, big_generator: Zap, repair_drone: Bot,
   };
   const Icon = icons[type];
   return Icon ? <Icon size={size} /> : null;
@@ -825,6 +826,9 @@ export default function App() {
                       {renderTowerButton('shield')}
                       {renderTowerButton('battery')}
                       {renderTowerButton('bus')}
+                      {renderTowerButton('missile')}
+                      {renderTowerButton('big_generator')}
+                      {renderTowerButton('repair_drone')}
                       {renderPlaceMonsterButton()}
 
                       <div className="flex items-center gap-2.5 px-3 py-3 rounded-lg border border-gray-800 bg-gray-900/50 w-full">
@@ -881,6 +885,25 @@ export default function App() {
                         </div>
                         <div className="flex items-center gap-1 text-yellow-400 text-xs font-bold shrink-0">
                           <Coins size={12} />{SHOP_CONFIG.infraPackPrice}
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { buyShopPack('advanced'); setSidebarOpen(false); }}
+                        disabled={gameState.status !== 'playing' || gameState.gold < SHOP_CONFIG.advancedPackPrice}
+                        className={`flex items-center gap-2.5 px-3 py-3 rounded-lg border transition-all ${
+                          gameState.status === 'playing' && gameState.gold >= SHOP_CONFIG.advancedPackPrice
+                            ? 'border-rose-700/70 bg-rose-500/10 text-rose-200 hover:bg-rose-500/15 hover:border-rose-500/70'
+                            : 'border-gray-800 bg-gray-900/50 text-gray-500 cursor-not-allowed opacity-40'
+                        }`}
+                      >
+                        <div className="shrink-0 text-rose-400"><Rocket size={20} /></div>
+                        <div className="flex flex-col items-start min-w-0 flex-1">
+                          <span className="text-sm font-bold leading-tight">{i.advancedPack}</span>
+                          <span className="text-xs text-gray-400 leading-tight">{i.advancedPackDesc}</span>
+                        </div>
+                        <div className="flex items-center gap-1 text-yellow-400 text-xs font-bold shrink-0">
+                          <Coins size={12} />{SHOP_CONFIG.advancedPackPrice}
                         </div>
                       </button>
                     </>
@@ -942,6 +965,9 @@ export default function App() {
                     {renderTowerButton('shield')}
                     {renderTowerButton('battery')}
                     {renderTowerButton('bus')}
+                    {renderTowerButton('missile')}
+                    {renderTowerButton('big_generator')}
+                    {renderTowerButton('repair_drone')}
                     {renderPlaceMonsterButton()}
 
                     <div className="flex items-center gap-2.5 px-3 py-3 rounded-lg border border-gray-800 bg-gray-900/50 w-full">
@@ -998,6 +1024,25 @@ export default function App() {
                       </div>
                       <div className="flex items-center gap-1 text-yellow-400 text-xs font-bold shrink-0">
                         <Coins size={12} />{SHOP_CONFIG.infraPackPrice}
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => buyShopPack('advanced')}
+                      disabled={gameState.status !== 'playing' || gameState.gold < SHOP_CONFIG.advancedPackPrice}
+                      className={`flex items-center gap-2.5 px-3 py-3 rounded-lg border transition-all ${
+                        gameState.status === 'playing' && gameState.gold >= SHOP_CONFIG.advancedPackPrice
+                          ? 'border-rose-700/70 bg-rose-500/10 text-rose-200 hover:bg-rose-500/15 hover:border-rose-500/70'
+                          : 'border-gray-800 bg-gray-900/50 text-gray-500 cursor-not-allowed opacity-40'
+                      }`}
+                    >
+                      <div className="shrink-0 text-rose-400"><Rocket size={20} /></div>
+                      <div className="flex flex-col items-start min-w-0 flex-1">
+                        <span className="text-sm font-bold leading-tight">{i.advancedPack}</span>
+                        <span className="text-xs text-gray-400 leading-tight">{i.advancedPackDesc}</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-yellow-400 text-xs font-bold shrink-0">
+                        <Coins size={12} />{SHOP_CONFIG.advancedPackPrice}
                       </div>
                     </button>
                   </>

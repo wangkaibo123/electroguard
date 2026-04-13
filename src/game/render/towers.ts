@@ -1141,8 +1141,52 @@ function drawTowerDetails(
     if (t.powered && tFlashT < FLASH_DUR_TESLA && t.lastActionTime > 0) {
       drawMuzzleFlash(ctx, cx, cy, 0, tFlashT / FLASH_DUR_TESLA, tColor, '232,121,249', 14, false, t.lastActionTime);
     }
-  } else if (t.type === 'generator') {
+  } else if (t.type === 'missile') {
+    const localAngle = t.barrelAngle - t.rotation;
+    const rackW = Math.min(tw, th) * 0.24;
+    const rackLen = Math.min(tw, th) * 0.44;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(localAngle);
+    ctx.strokeStyle = tColor;
+    ctx.fillStyle = 'rgba(15,23,42,0.95)';
+    ctx.lineWidth = 1.8;
+    for (const off of [-rackW * 0.65, rackW * 0.65]) {
+      ctx.beginPath();
+      ctx.roundRect(-rackLen * 0.35, off - rackW * 0.35, rackLen, rackW * 0.7, 4);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = t.storedPower >= t.maxPower ? '#fecdd3' : 'rgba(15,23,42,0.95)';
+    }
+    ctx.restore();
+    drawPowerArc(ctx, cx, cy, Math.min(tw, th) / 2 - inset - 2, t.maxPower, t.storedPower, tColor);
+  } else if (t.type === 'generator' || t.type === 'big_generator') {
     drawEnergyEffect(ctx, cx, cy, now, t.powered, tColor);
+    if (t.type === 'big_generator') {
+      ctx.strokeStyle = tColor;
+      ctx.lineWidth = 1.5;
+      const r = Math.min(tw, th) / 2 - inset - 4;
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, TWO_PI); ctx.stroke();
+      for (let i = 0; i < 4; i++) {
+        const a = i * Math.PI / 2 + now / 700;
+        ctx.beginPath();
+        ctx.arc(cx + Math.cos(a) * r * 0.5, cy + Math.sin(a) * r * 0.5, 3, 0, TWO_PI);
+        ctx.fillStyle = tColor;
+        ctx.fill();
+      }
+    }
+  } else if (t.type === 'repair_drone') {
+    drawPowerArc(ctx, cx, cy, Math.min(tw, th) / 2 - inset - 2, t.maxPower, t.storedPower, tColor);
+    const orbit = Math.min(tw, th) * 0.28;
+    const a = now / 850;
+    const dx = cx + Math.cos(a) * orbit;
+    const dy = cy + Math.sin(a) * orbit * 0.55;
+    ctx.strokeStyle = tColor;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(cx, cy, orbit, 0, TWO_PI); ctx.stroke();
+    ctx.fillStyle = 'rgba(15,23,42,0.95)';
+    ctx.beginPath(); ctx.arc(dx, dy, 6, 0, TWO_PI); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(dx - 10, dy); ctx.lineTo(dx + 10, dy); ctx.stroke();
   } else if (t.type === 'battery') {
     const isLandscape = tw >= th;
     const cc = t.maxPower;

@@ -10,6 +10,7 @@ import {
   collidesWithWires, repathConnectedWires, genId, generatePickOptions, spawnEnemyAt,
   canDirectLinkPorts, isPortAccessible,
   generateTowerOnlyPickOptions, generateInfraOnlyPickOptions, rebuildTowerMap,
+  generateAdvancedPickOptions,
 } from './engine';
 import { renderGame } from './renderer';
 import { GLOBAL_CONFIG, SHOP_CONFIG } from './config';
@@ -277,17 +278,37 @@ export const useGameLoop = () => {
     sync();
   };
 
-  const buyShopPack = (packType: 'tower' | 'infra') => {
+  const buyShopPack = (packType: 'tower' | 'infra' | 'advanced') => {
     const state = stateRef.current;
     if (state.status !== 'playing' || state.gameMode === 'custom') return;
-    const price = packType === 'tower' ? SHOP_CONFIG.towerPackPrice : SHOP_CONFIG.infraPackPrice;
+    const price =
+      packType === 'tower' ? SHOP_CONFIG.towerPackPrice :
+      packType === 'infra' ? SHOP_CONFIG.infraPackPrice :
+      SHOP_CONFIG.advancedPackPrice;
     if (state.gold < price) {
       showToast(t().notEnoughGold);
       return;
     }
     state.gold -= price;
-    state.pickOptions = packType === 'tower' ? generateTowerOnlyPickOptions() : generateInfraOnlyPickOptions();
-    state.pickUiPhase = packType === 'tower' ? 'shop_tower' : 'shop_infra';
+    if (packType === 'advanced') {
+      const opt = generateAdvancedPickOptions()[0];
+      if (opt.towerType) {
+        for (let n = 0; n < opt.count; n++) {
+          if (!queueTowerDropNearCore(state, opt.towerType)) {
+            showToast(t().autoDeployFailed);
+            break;
+          }
+        }
+      }
+      sync();
+      return;
+    }
+    state.pickOptions =
+      packType === 'tower' ? generateTowerOnlyPickOptions() :
+      generateInfraOnlyPickOptions();
+    state.pickUiPhase =
+      packType === 'tower' ? 'shop_tower' :
+      'shop_infra';
     state.pendingBossBonusPick = false;
     state.bossBonusPickQueued = false;
     state.status = 'pick';

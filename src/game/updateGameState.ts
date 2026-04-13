@@ -82,6 +82,23 @@ const {
   powerCost: SNIPER_POWER_COST,
   range: SNIPER_RANGE,
 } = WEAPON_CONFIG.sniper;
+const {
+  bulletSpeed: MISSILE_SPEED,
+  cooldown: MISSILE_COOLDOWN,
+  damage: MISSILE_DAMAGE,
+  powerCost: MISSILE_POWER_COST,
+  range: MISSILE_RANGE,
+  splashRadius: MISSILE_SPLASH_RADIUS,
+} = WEAPON_CONFIG.missile;
+const {
+  attackCooldown: REPAIR_DRONE_ATTACK_COOLDOWN,
+  attackDamage: REPAIR_DRONE_ATTACK_DAMAGE,
+  attackRange: REPAIR_DRONE_ATTACK_RANGE,
+  repairAmount: REPAIR_DRONE_REPAIR_AMOUNT,
+  repairCooldown: REPAIR_DRONE_REPAIR_COOLDOWN,
+  repairCost: REPAIR_DRONE_REPAIR_COST,
+  repairRange: REPAIR_DRONE_REPAIR_RANGE,
+} = WEAPON_CONFIG.repairDrone;
 const SNIPER_AIM_THRESHOLD = 0.05;
 
 const applyDamageToEnemy = (
@@ -224,6 +241,9 @@ const updatePowerSystems = (state: GameState, dt: number, now: number) => {
       if (tower.type === 'core' || (tower.type === 'generator' && tower.powered)) {
         dispatchPulse(state, tower);
         changed = true;
+      } else if (tower.type === 'big_generator' && tower.powered) {
+        for (let pulse = 0; pulse < 4; pulse++) dispatchPulse(state, tower);
+        changed = true;
       }
     }
   }
@@ -334,7 +354,7 @@ const updateCombatTowers = (state: GameState, dt: number, now: number) => {
     }
   }
 
-  const turretTypes = new Set<Tower['type']>(['blaster', 'gatling', 'sniper']);
+  const turretTypes = new Set<Tower['type']>(['blaster', 'gatling', 'sniper', 'missile', 'repair_drone']);
 
   for (const tower of state.towers) {
     if (!turretTypes.has(tower.type)) continue;
@@ -345,8 +365,37 @@ const updateCombatTowers = (state: GameState, dt: number, now: number) => {
 
     const baseX = (tower.x + tower.width / 2) * GLOBAL_CONFIG.cellSize;
     const baseY = (tower.y + tower.height / 2) * GLOBAL_CONFIG.cellSize;
+
+    if (tower.type === 'repair_drone') {
+      const repairTarget = state.towers
+        .filter((other) => other.id !== tower.id && other.hp < other.maxHp)
+        .map((other) => ({ tower: other, distance: Math.hypot((other.x + other.width / 2) * GLOBAL_CONFIG.cellSize - baseX, (other.y + other.height / 2) * GLOBAL_CONFIG.cellSize - baseY) }))
+        .filter((item) => item.distance <= REPAIR_DRONE_REPAIR_RANGE)
+        .sort((a, b) => (a.tower.hp / a.tower.maxHp) - (b.tower.hp / b.tower.maxHp))[0]?.tower;
+
+      if (repairTarget) {
+        if (tower.storedPower >= REPAIR_DRONE_REPAIR_COST && now - tower.lastActionTime >= REPAIR_DRONE_REPAIR_COOLDOWN) {
+          tower.storedPower -= REPAIR_DRONE_REPAIR_COST;
+          repairTarget.hp = Math.min(repairTarget.maxHp, repairTarget.hp + REPAIR_DRONE_REPAIR_AMOUNT);
+          repairTarget.lastDamagedAt = now;
+          state.chainLightnings.push({
+            segments: [{ x1: baseX, y1: baseY, x2: (repairTarget.x + repairTarget.width / 2) * GLOBAL_CONFIG.cellSize, y2: (repairTarget.y + repairTarget.height / 2) * GLOBAL_CONFIG.cellSize }],
+            life: 0,
+            maxLife: 0.25,
+          });
+          tower.lastActionTime = now;
+          changed = true;
+        }
+        continue;
+      }
+    }
+
     const range: number =
-      tower.type === 'sniper' ? SNIPER_RANGE : tower.type === 'gatling' ? GATLING_RANGE : BLASTER_RANGE;
+      tower.type === 'sniper' ? SNIPER_RANGE :
+      tower.type === 'gatling' ? GATLING_RANGE :
+      tower.type === 'missile' ? MISSILE_RANGE :
+      tower.type === 'repair_drone' ? REPAIR_DRONE_ATTACK_RANGE :
+      BLASTER_RANGE;
 
     let bestDistance = range;
     let targetX = 0;
@@ -382,6 +431,7 @@ const updateCombatTowers = (state: GameState, dt: number, now: number) => {
     const barrelLength =
       tower.type === 'sniper' ? (baseBarrelLength + 10) * 2.4 - GLOBAL_CONFIG.cellSize :
       tower.type === 'gatling' ? (baseBarrelLength + 4) * 2 :
+      tower.type === 'missile' ? (baseBarrelLength + 6) * 1.2 :
       (baseBarrelLength + 6) * 1.28;
     const muzzleX = baseX + Math.cos(tower.barrelAngle) * barrelLength;
     const muzzleY = baseY + Math.sin(tower.barrelAngle) * barrelLength;
@@ -415,6 +465,44 @@ const updateCombatTowers = (state: GameState, dt: number, now: number) => {
 
       fireGatlingShot(state, tower, muzzleX, muzzleY, bestEnemy);
       tower.gatlingAmmo--;
+      tower.lastActionTime = now;
+      changed = true;
+      continue;
+    }
+
+    if (tower.type === 'missile') {
+      if (tower.storedPower < MISSILE_POWER_COST || now - tower.lastActionTime <= MISSILE_COOLDOWN) continue;
+
+      tower.storedPower -= MISSILE_POWER_COST;
+      state.projectiles.push({
+        id: genId(),
+        x: muzzleX,
+        y: muzzleY,
+        targetId: bestEnemy?.id ?? '',
+        speed: MISSILE_SPEED,
+        damage: MISSILE_DAMAGE,
+        splashRadius: MISSILE_SPLASH_RADIUS,
+        color: '#fb7185',
+        size: 5,
+      });
+      tower.lastActionTime = now;
+      changed = true;
+      continue;
+    }
+
+    if (tower.type === 'repair_drone') {
+      if (now - tower.lastActionTime <= REPAIR_DRONE_ATTACK_COOLDOWN) continue;
+
+      state.projectiles.push({
+        id: genId(),
+        x: baseX,
+        y: baseY,
+        targetId: bestEnemy?.id ?? '',
+        speed: 420,
+        damage: REPAIR_DRONE_ATTACK_DAMAGE,
+        color: '#2dd4bf',
+        size: 3,
+      });
       tower.lastActionTime = now;
       changed = true;
       continue;
@@ -745,6 +833,25 @@ const updateBossEffects = (state: GameState, now: number) => {
 
 const findEnemyById = (state: GameState, id: string) => state.enemies.find((enemy) => enemy.id === id);
 
+const applySplashDamage = (
+  state: GameState,
+  x: number,
+  y: number,
+  damage: number,
+  radius: number,
+  color: string,
+  primaryId?: string,
+) => {
+  const enemies = [...state.enemies];
+  for (const enemy of enemies) {
+    const distance = Math.hypot(enemy.x - x, enemy.y - y);
+    if (distance > radius) continue;
+    const falloff = enemy.id === primaryId ? 1 : Math.max(0.35, 1 - distance / radius);
+    applyDamageToEnemy(state, enemy, damage * falloff, color, true);
+  }
+  state.hitEffects.push({ x, y, life: 0, maxLife: 0.35, color, radius });
+};
+
 const updateProjectiles = (state: GameState, dt: number) => {
   let changed = false;
 
@@ -813,7 +920,19 @@ const updateProjectiles = (state: GameState, dt: number) => {
 
       const distance = Math.hypot(targetX - projectile.x, targetY - projectile.y);
       if (distance < target.radius + 4) {
-        applyDamageToEnemy(state, target, projectile.damage, projectile.color ?? '#fbbf24', true);
+        if (projectile.splashRadius) {
+          applySplashDamage(
+            state,
+            target.x,
+            target.y,
+            projectile.damage,
+            projectile.splashRadius,
+            projectile.color ?? '#fbbf24',
+            target.id,
+          );
+        } else {
+          applyDamageToEnemy(state, target, projectile.damage, projectile.color ?? '#fbbf24', true);
+        }
         if (projectile.piercing) {
           projectile.piercedIds = projectile.piercedIds ?? [];
           projectile.piercedIds.push(target.id);

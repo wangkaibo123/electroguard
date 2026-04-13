@@ -437,6 +437,7 @@ export const generatePickOptions = (): PickOption[] => {
 };
 
 const TURRET_TYPES = new Set<string>(['blaster', 'gatling', 'sniper', 'tesla']);
+const ADVANCED_TYPES: TowerType[] = ['missile', 'big_generator', 'repair_drone'];
 
 export const generateTowerOnlyPickOptions = (): PickOption[] => {
   const loc = t();
@@ -496,6 +497,20 @@ export const generateInfraOnlyPickOptions = (): PickOption[] => {
       description: loc.pickDesc[k] ?? '',
     };
   });
+};
+
+export const generateAdvancedPickOptions = (): PickOption[] => {
+  const loc = t();
+  const towerType = ADVANCED_TYPES[(Math.random() * ADVANCED_TYPES.length) | 0];
+  const k = pickKey('tower', towerType, 1);
+  return [{
+    kind: 'tower',
+    towerType,
+    count: 1,
+    id: genId(),
+    label: loc.pickLabel[k] ?? loc.towerName[towerType] ?? towerType,
+    description: loc.pickDesc[k] ?? loc.towerDesc[towerType] ?? '',
+  }];
 };
 
 /** Fixed bonus 3-choice after clearing a boss wave: wire → generator → shield (display order). */
@@ -569,7 +584,7 @@ export const updatePowerGrid = (state: GameState) => {
 
   const queue: string[] = [];
   for (const t of state.towers) {
-    if (t.type === 'core' || t.type === 'generator') {
+    if (t.type === 'core' || t.type === 'generator' || t.type === 'big_generator') {
       t.powered = true;
       queue.push(t.id);
     }
@@ -595,7 +610,7 @@ export const updatePowerGrid = (state: GameState) => {
 export const dispatchPulse = (state: GameState, src: Tower, isBattery = false): boolean => {
   const queue = [{ tower: src, path: [] as Wire[] }];
   const visited = new Set([src.id]);
-  const launchDuration = src.type === 'generator' ? 0.28 : 0;
+  const launchDuration = src.type === 'generator' || src.type === 'big_generator' ? 0.28 : 0;
 
   while (queue.length > 0) {
     const { tower, path } = queue.shift()!;

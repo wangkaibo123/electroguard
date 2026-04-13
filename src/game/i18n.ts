@@ -57,6 +57,8 @@ export interface I18nStrings {
   towerPackDesc: string;
   infraPack: string;
   infraPackDesc: string;
+  advancedPack: string;
+  advancedPackDesc: string;
   sell: string;
   notEnoughGold: string;
   shopPickTitle: string;
@@ -156,6 +158,8 @@ const en: I18nStrings = {
   towerPackDesc: 'Pick 1 of 3 random turrets',
   infraPack: 'Infra Pack',
   infraPackDesc: 'Pick 1 of 3 infra items',
+  advancedPack: 'Advanced Pack',
+  advancedPackDesc: 'Random advanced machine',
   sell: 'Sell',
   notEnoughGold: 'Not enough gold!',
   shopPickTitle: 'SHOP PURCHASE',
@@ -205,6 +209,9 @@ const en: I18nStrings = {
     shield: 'Shield',
     battery: 'Battery',
     bus: 'Bus',
+    missile: 'Missile',
+    big_generator: 'Big Generator',
+    repair_drone: 'Repair Drone',
     core: 'Core',
   },
 
@@ -226,6 +233,9 @@ const en: I18nStrings = {
     shield: 'Projects a protective shield. Consumes power to recharge.',
     battery: 'Stores 4 units of power and discharges quickly.',
     bus: 'Merges up to 3 input wires into 3 outputs.',
+    missile: 'Long-range homing missile launcher. Converts 3 power into splash damage.',
+    big_generator: 'Large power source. Produces 4 power every 2 seconds.',
+    repair_drone: 'Repairs damaged buildings with power, or attacks enemies when idle.',
   },
 
   codexButton: 'Codex',
@@ -269,6 +279,9 @@ const en: I18nStrings = {
     'shield_1': 'Shield',
     'battery_1': 'Battery',
     'bus_1': 'Bus',
+    'missile_1': 'Missile',
+    'big_generator_1': 'Big Generator',
+    'repair_drone_1': 'Repair Drone',
     'wire_3': 'Wire x3',
     'wire_5': 'Wire x5',
   },
@@ -283,6 +296,9 @@ const en: I18nStrings = {
     'shield_1': 'Projects a protective bubble',
     'battery_1': 'Stores power, discharges rapidly',
     'bus_1': 'Merges 3 inputs into 3 outputs',
+    'missile_1': '3 power launches one long-range splash missile',
+    'big_generator_1': 'Produces 4 power every 2 seconds',
+    'repair_drone_1': 'Repairs buildings, attacks when idle',
     'wire_3': 'Power line connectors',
     'wire_5': 'Large bundle of power lines',
   },
@@ -335,6 +351,8 @@ const zh: I18nStrings = {
   towerPackDesc: '获得一次只含炮塔的三选一',
   infraPack: '基建卡包',
   infraPackDesc: '获得一次只含基建的三选一',
+  advancedPack: '高级卡包',
+  advancedPackDesc: '随机获得一台高级机器',
   sell: '出售',
   notEnoughGold: '金币不足！',
   shopPickTitle: '商店购买',
@@ -384,6 +402,9 @@ const zh: I18nStrings = {
     shield: '护盾塔',
     battery: '蓄电池',
     bus: '插线板',
+    missile: '导弹',
+    big_generator: '大发电机',
+    repair_drone: '维修无人机',
     core: '核心',
   },
 
@@ -405,6 +426,9 @@ const zh: I18nStrings = {
     shield: '投射防护罩，消耗能量充能。',
     battery: '存储4格电，快速放电。',
     bus: '合并最多3条输入线为3条输出。',
+    missile: '超远程追踪导弹，每3格电发射1枚，命中造成范围伤害。',
+    big_generator: '大型能源设备，每2秒生产4个电。',
+    repair_drone: '消耗电力维修其他建筑；无维修目标时攻击射程内敌人。',
   },
 
   codexButton: '图鉴',
@@ -448,6 +472,9 @@ const zh: I18nStrings = {
     'shield_1': '护盾塔',
     'battery_1': '蓄电池',
     'bus_1': '插线板',
+    'missile_1': '导弹',
+    'big_generator_1': '大发电机',
+    'repair_drone_1': '维修无人机',
     'wire_3': '线缆 x3',
     'wire_5': '线缆 x5',
   },
@@ -462,6 +489,9 @@ const zh: I18nStrings = {
     'shield_1': '投射防护罩',
     'battery_1': '存储能量，快速放电',
     'bus_1': '合并3条输入为3条输出',
+    'missile_1': '3格电发射1枚超远程范围导弹',
+    'big_generator_1': '每2秒生产4个电',
+    'repair_drone_1': '维修建筑，空闲时攻击敌人',
     'wire_3': '电力线缆连接器',
     'wire_5': '大捆电力线缆',
   },

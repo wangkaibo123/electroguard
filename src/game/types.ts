@@ -1,7 +1,7 @@
 import { GLOBAL_CONFIG, TOWER_CONFIG, WEAPON_CONFIG } from './config';
 
 export type Position = { x: number; y: number };
-export type TowerType = 'core' | 'blaster' | 'gatling' | 'sniper' | 'tesla' | 'generator' | 'shield' | 'battery' | 'bus';
+export type TowerType = 'core' | 'blaster' | 'gatling' | 'sniper' | 'tesla' | 'generator' | 'shield' | 'battery' | 'bus' | 'missile' | 'big_generator' | 'repair_drone';
 export type GameMode = 'normal' | 'custom';
 export type PortDirection = 'top' | 'right' | 'bottom' | 'left';
 export type PortType = 'input' | 'output';
@@ -110,11 +110,13 @@ export interface Projectile {
   targetId: string;
   speed: number;
   damage: number;
+  sourceTowerId?: string;
   angle?: number;          // fixed direction for non-homing (gatling)
   traveled?: number;       // distance traveled so far
   maxRange?: number;       // max range before despawn
   piercing?: boolean;      // passes through enemies (sniper)
   piercedIds?: string[];   // enemies already hit by piercing
+  splashRadius?: number;   // area damage radius on hit (missile)
   color?: string;          // custom projectile color
   size?: number;           // custom projectile size
 }
@@ -242,4 +244,6 @@ export const TURRET_RANGE: Partial<Record<TowerType, number>> = {
   gatling: WEAPON_CONFIG.gatling.range,
   sniper: WEAPON_CONFIG.sniper.range,
   tesla: WEAPON_CONFIG.tesla.range,
+  missile: WEAPON_CONFIG.missile.range,
+  repair_drone: WEAPON_CONFIG.repairDrone.attackRange,
 };
