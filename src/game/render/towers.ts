@@ -2,6 +2,8 @@ import { GameState, Tower, TowerType, CELL_SIZE, HALF_CELL, TOWER_STATS, TURRET_
 import { getPortPos, isPortAccessible } from '../engine';
 import { getLinearTowerBodyAspectRatio, getLinearTowerBodyRect } from '../linearTowerGeometry';
 import { SHOP_CONFIG } from '../config';
+import { __iconNode as coinsIconNode } from 'lucide-react/dist/esm/icons/coins.js';
+import { __iconNode as trash2IconNode } from 'lucide-react/dist/esm/icons/trash-2.js';
 import {
   TWO_PI, BG_DARK, UNPOWERED, PULSE_CLR, HP_BG, HP_FG,
   PORT_OUT, PORT_OUT_USED, PORT_IN, PORT_IN_USED, KNOB_CLR, POWER_ON,
@@ -22,6 +24,7 @@ export const DELETE_BUTTON_HEIGHT = 28;
 const TOWER_BAR_SHOW_MS = 1800;
 const TOWER_BAR_FADE_MS = 700;
 const ENERGY_EFFECT_SIZE = CELL_SIZE * 0.5;
+type LucideIconNode = [string, Record<string, string>][];
 
 export const drawOccupiedGround = (ctx: CanvasRenderingContext2D, state: GameState) => {
   const occupied = new Set<string>();
@@ -156,6 +159,41 @@ const drawFootprintCells = (
     if (fill) ctx.fillRect(px + inset, py + inset, CELL_SIZE - inset * 2, CELL_SIZE - inset * 2);
     if (stroke) ctx.strokeRect(px + inset, py + inset, CELL_SIZE - inset * 2, CELL_SIZE - inset * 2);
   }
+};
+
+const drawLucideIconNode = (
+  ctx: CanvasRenderingContext2D,
+  iconNode: LucideIconNode,
+  cx: number,
+  cy: number,
+  size: number,
+  color: string,
+) => {
+  ctx.save();
+  ctx.translate(cx - size / 2, cy - size / 2);
+  ctx.scale(size / 24, size / 24);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.fillStyle = 'transparent';
+
+  for (const [tag, attrs] of iconNode) {
+    if (tag === 'path' && attrs.d) {
+      ctx.stroke(new Path2D(attrs.d));
+    } else if (tag === 'circle') {
+      ctx.beginPath();
+      ctx.arc(Number(attrs.cx), Number(attrs.cy), Number(attrs.r), 0, TWO_PI);
+      ctx.stroke();
+    } else if (tag === 'line') {
+      ctx.beginPath();
+      ctx.moveTo(Number(attrs.x1), Number(attrs.y1));
+      ctx.lineTo(Number(attrs.x2), Number(attrs.y2));
+      ctx.stroke();
+    }
+  }
+
+  ctx.restore();
 };
 
 export const getRotationKnobLayout = (tower: Tower) => {
@@ -588,10 +626,10 @@ export const drawRotationKnob = (ctx: CanvasRenderingContext2D, state: GameState
 
   const buttonCx = buttonX + buttonWidth / 2;
   const buttonCy = buttonY + buttonHeight / 2;
-  const arrowY = buttonY - 13;
-  const arrowR = 9;
-  const arrowStart = -Math.PI * 0.9;
-  const arrowEnd = Math.PI * 0.42;
+  const arrowY = buttonY;
+  const arrowR = 19;
+  const arrowStart = Math.PI * 1.12;
+  const arrowEnd = Math.PI * 1.9;
 
   ctx.strokeStyle = 'rgba(245,158,11,0.72)';
   ctx.lineWidth = 1.6;
@@ -600,21 +638,26 @@ export const drawRotationKnob = (ctx: CanvasRenderingContext2D, state: GameState
   ctx.lineTo(tcx, tcy);
   ctx.stroke();
 
-  ctx.strokeStyle = 'rgba(255,255,255,0.9)';
-  ctx.lineWidth = 2.2;
+  ctx.strokeStyle = 'rgba(255,255,255,0.92)';
+  ctx.lineWidth = 3.4;
   ctx.lineCap = 'round';
   ctx.beginPath();
   ctx.arc(buttonCx, arrowY, arrowR, arrowStart, arrowEnd);
   ctx.stroke();
-  const arrowTipX = buttonCx + arrowR * Math.cos(arrowEnd);
-  const arrowTipY = arrowY + arrowR * Math.sin(arrowEnd);
-  const arrowTan = arrowEnd + Math.PI / 2;
-  const arrowLen = 5.5;
-  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  const arrowDir = arrowEnd + Math.PI / 2;
+  const arrowTipOffset = 4;
+  const arrowTipX = buttonCx + arrowR * Math.cos(arrowEnd) + Math.cos(arrowDir) * arrowTipOffset;
+  const arrowTipY = arrowY + arrowR * Math.sin(arrowEnd) + Math.sin(arrowDir) * arrowTipOffset;
+  const arrowBaseX = arrowTipX - Math.cos(arrowDir) * 8;
+  const arrowBaseY = arrowTipY - Math.sin(arrowDir) * 8;
+  const arrowSideX = -Math.sin(arrowDir);
+  const arrowSideY = Math.cos(arrowDir);
+  const arrowHalfW = 4.5;
+  ctx.fillStyle = 'rgba(255,255,255,0.95)';
   ctx.beginPath();
   ctx.moveTo(arrowTipX, arrowTipY);
-  ctx.lineTo(arrowTipX - arrowLen * Math.cos(arrowTan - 0.55), arrowTipY - arrowLen * Math.sin(arrowTan - 0.55));
-  ctx.lineTo(arrowTipX - arrowLen * Math.cos(arrowTan + 0.55), arrowTipY - arrowLen * Math.sin(arrowTan + 0.55));
+  ctx.lineTo(arrowBaseX + arrowSideX * arrowHalfW, arrowBaseY + arrowSideY * arrowHalfW);
+  ctx.lineTo(arrowBaseX - arrowSideX * arrowHalfW, arrowBaseY - arrowSideY * arrowHalfW);
   ctx.closePath();
   ctx.fill();
   ctx.lineCap = 'butt';
@@ -670,38 +713,11 @@ export const drawDeleteButton = (ctx: CanvasRenderingContext2D, state: GameState
   const trashX = contentCx - 21;
   const coinX = contentCx + 22;
 
-  ctx.strokeStyle = '#ffffff';
-  ctx.lineWidth = 1.6;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  ctx.beginPath();
-  ctx.moveTo(trashX - 5, centerY - 5);
-  ctx.lineTo(trashX + 5, centerY - 5);
-  ctx.moveTo(trashX - 2.5, centerY - 7.5);
-  ctx.lineTo(trashX + 2.5, centerY - 7.5);
-  ctx.moveTo(trashX - 4, centerY - 3);
-  ctx.lineTo(trashX - 3, centerY + 6);
-  ctx.lineTo(trashX + 3, centerY + 6);
-  ctx.lineTo(trashX + 4, centerY - 3);
-  ctx.moveTo(trashX - 1.5, centerY - 1);
-  ctx.lineTo(trashX - 1.5, centerY + 4);
-  ctx.moveTo(trashX + 1.5, centerY - 1);
-  ctx.lineTo(trashX + 1.5, centerY + 4);
-  ctx.stroke();
+  drawLucideIconNode(ctx, trash2IconNode as LucideIconNode, trashX, centerY, 13, '#ffffff');
 
   ctx.fillText(String(SHOP_CONFIG.sellPrice), contentCx, centerY + 0.5);
 
-  ctx.fillStyle = 'rgba(250,204,21,0.95)';
-  ctx.strokeStyle = 'rgba(254,243,199,0.95)';
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.arc(coinX, centerY, 5.2, 0, TWO_PI);
-  ctx.fill();
-  ctx.stroke();
-  ctx.fillStyle = 'rgba(120,53,15,0.85)';
-  ctx.font = 'bold 8px sans-serif';
-  ctx.fillText('$', coinX, centerY + 0.5);
-  ctx.lineCap = 'butt';
+  drawLucideIconNode(ctx, coinsIconNode as LucideIconNode, coinX, centerY, 13, 'rgba(250,204,21,0.96)');
 };
 
 const drawCapsuleBarrel = (
