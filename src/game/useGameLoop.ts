@@ -17,7 +17,7 @@ import { t } from './i18n';
 import { addTowerToState, createTowerAt } from './towerFactory';
 import { findAutoPlacementNearCore } from './placement';
 import { updateGameState } from './updateGameState';
-import { getRotationKnobLayout } from './render/towers';
+import { getDeleteButtonLayout, getRotationKnobLayout } from './render/towers';
 import { isWorldPointInTowerFootprint } from './footprint';
 
 const { maxZoom: MAX_ZOOM, waveDelay: WAVE_DELAY } = GLOBAL_CONFIG;
@@ -484,16 +484,26 @@ export const useGameLoop = () => {
       return;
     }
 
+    if (rotatingRef.current && state.gameMode !== 'custom') {
+      const tower = state.towerMap.get(rotatingRef.current);
+      if (tower && tower.type !== 'core') {
+        const { buttonX, buttonY, buttonWidth, buttonHeight } = getDeleteButtonLayout(tower);
+        if (wx >= buttonX && wx <= buttonX + buttonWidth && wy >= buttonY && wy <= buttonY + buttonHeight) {
+          sellTower(tower.id);
+          return;
+        }
+      }
+    }
+
     // Rotation knob check — click to rotate 90°
     if (rotatingRef.current) {
       const tower = state.towerMap.get(rotatingRef.current);
       if (tower) {
-        const { kx, ky } = getRotationKnobLayout(tower);
-        if (Math.hypot(wx - kx, wy - ky) < 19) {
-          const newAngle = snapRotation(tower.rotation + Math.PI / 2);
-          if (!applyTowerRotation(tower, newAngle, 0, state)) {
-            tower.rotation = 0;
-          }
+        const { buttonX, buttonY, buttonWidth, buttonHeight } = getRotationKnobLayout(tower);
+        if (wx >= buttonX && wx <= buttonX + buttonWidth && wy >= buttonY && wy <= buttonY + buttonHeight) {
+          const oldAngle = snapRotation(tower.rotation);
+          const newAngle = snapRotation(oldAngle + Math.PI / 2);
+          applyTowerRotation(tower, newAngle, oldAngle, state);
           isRotKnobRef.current = true;
           sync();
           return;
@@ -741,16 +751,38 @@ export const useGameLoop = () => {
       return;
     }
 
+    if (rotatingRef.current && state.gameMode !== 'custom') {
+      const tower = state.towerMap.get(rotatingRef.current);
+      if (tower && tower.type !== 'core') {
+        const { buttonX, buttonY, buttonWidth, buttonHeight } = getDeleteButtonLayout(tower);
+        const touchPadding = 8;
+        if (
+          wx >= buttonX - touchPadding &&
+          wx <= buttonX + buttonWidth + touchPadding &&
+          wy >= buttonY - touchPadding &&
+          wy <= buttonY + buttonHeight + touchPadding
+        ) {
+          sellTower(tower.id);
+          return;
+        }
+      }
+    }
+
     // Rotation knob check — tap to rotate 90°
     if (rotatingRef.current) {
       const tower = state.towerMap.get(rotatingRef.current);
       if (tower) {
-        const { kx, ky } = getRotationKnobLayout(tower);
-        if (Math.hypot(wx - kx, wy - ky) < 27) {
-          const newAngle = snapRotation(tower.rotation + Math.PI / 2);
-          if (!applyTowerRotation(tower, newAngle, 0, state)) {
-            tower.rotation = 0;
-          }
+        const { buttonX, buttonY, buttonWidth, buttonHeight } = getRotationKnobLayout(tower);
+        const touchPadding = 8;
+        if (
+          wx >= buttonX - touchPadding &&
+          wx <= buttonX + buttonWidth + touchPadding &&
+          wy >= buttonY - touchPadding &&
+          wy <= buttonY + buttonHeight + touchPadding
+        ) {
+          const oldAngle = snapRotation(tower.rotation);
+          const newAngle = snapRotation(oldAngle + Math.PI / 2);
+          applyTowerRotation(tower, newAngle, oldAngle, state);
           isRotKnobRef.current = true;
           sync();
           return;
@@ -1064,10 +1096,6 @@ export const useGameLoop = () => {
         // Cancel rotation knob
         if (isRotKnobRef.current) {
           isRotKnobRef.current = false;
-          if (rotatingRef.current) {
-            const tower = state.towerMap.get(rotatingRef.current);
-            if (tower) tower.rotation = 0;
-          }
           sync();
           return;
         }
@@ -1115,6 +1143,3 @@ export const useGameLoop = () => {
     handleCanvasTouchStart, handleCanvasTouchMove, handleCanvasTouchEnd,
   };
 };
-
-
-

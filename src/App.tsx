@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Battery, Zap, Crosshair, Activity, Play, RotateCcw, Pause, Hexagon, Cable, Wrench, ChevronRight, ChevronLeft, Flame, Focus, Radio, GitMerge, Globe, LogOut, BookOpen, X, Keyboard, Menu, Eye, EyeOff, ShoppingBag, Coins, Trash2 } from 'lucide-react';
+import { Battery, Zap, Crosshair, Activity, Play, RotateCcw, Pause, Hexagon, Cable, Wrench, ChevronRight, ChevronLeft, Flame, Focus, Radio, GitMerge, Globe, LogOut, BookOpen, X, Keyboard, Menu, Eye, EyeOff, ShoppingBag, Coins } from 'lucide-react';
 import { useGameLoop } from './game/useGameLoop';
 import { TOWER_STATS, TowerType, PickOption, EnemyType } from './game/types';
 import { t, getLocale, setLocale, Locale } from './game/i18n';
@@ -62,8 +62,6 @@ export default function App() {
     handlePick,
     openCustomPick,
     buyShopPack,
-    sellTower,
-    rotatingTowerId,
     selectedTower,
     setSelectedTower,
     placeMonsterMode,
@@ -415,29 +413,6 @@ export default function App() {
                 {toastMessage}
               </div>
             )}
-
-            {/* Sell Button Overlay */}
-            {rotatingTowerId && gameState.status === 'playing' && gameState.gameMode !== 'custom' && (() => {
-              const tower = gameState.towers.find(t => t.id === rotatingTowerId);
-              if (!tower || tower.type === 'core') return null;
-              const cam = cameraRef.current;
-              const worldCX = (tower.x + tower.width / 2) * GLOBAL_CONFIG.cellSize;
-              const towerBottomWorld = (tower.y + tower.height) * GLOBAL_CONFIG.cellSize;
-              const sx = (worldCX - cam.x) * cam.zoom;
-              const sy = (towerBottomWorld - cam.y) * cam.zoom + 28;
-              return (
-                <button
-                  type="button"
-                  onClick={() => sellTower(rotatingTowerId)}
-                  className="absolute z-40 flex items-center gap-1.5 px-3 py-1.5 bg-red-600/90 hover:bg-red-500 border border-red-500/80 text-white text-xs font-bold rounded-lg shadow-lg transition-all -translate-x-1/2"
-                  style={{ left: sx, top: sy }}
-                >
-                  <Trash2 size={13} />
-                  {SHOP_CONFIG.sellPrice}
-                  <Coins size={12} />
-                </button>
-              );
-            })()}
 
             {/* Menu Overlay */}
             {gameState.status === 'menu' && (

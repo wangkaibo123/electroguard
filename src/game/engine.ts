@@ -700,7 +700,7 @@ export const applyTowerRotation = (
   tower: Tower, newAngle: number, oldAngle: number, state: GameState
 ): boolean => {
   const steps = rotationSteps(oldAngle, newAngle);
-  if (steps === 0) { tower.rotation = 0; return true; }
+  if (steps === 0) { tower.rotation = snapRotation(newAngle); return true; }
 
   const needsSwap = (steps === 1 || steps === 3) && tower.width !== tower.height;
   const nw = needsSwap ? tower.height : tower.width;
@@ -710,7 +710,8 @@ export const applyTowerRotation = (
   if (collidesWithTowers(tower.x, tower.y, nw, nh, state.towers, tower.id, 0, tower.type)) return false;
   if (collidesWithWires(tower.x, tower.y, nw, nh, state.wires, tower.id, 0, tower.type)) return false;
 
-  tower.rotation = 0;
+  tower.rotation = snapRotation(newAngle);
+  tower.barrelAngle += steps * (Math.PI / 2);
   tower.width = nw;
   tower.height = nh;
   for (const port of tower.ports) port.direction = rotatePortDir(port.direction, steps);

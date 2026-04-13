@@ -3,7 +3,7 @@ import { BG_DARK, BG_MID, BG_GRID, MAP_BORDER } from './render/constants';
 import { updateAndDrawDecorations } from './render/decorations';
 import {
   drawOccupiedGround, drawPorts, drawTowers, drawPlacementPreview, drawRangePreview,
-  drawRotationKnob, drawDraggedTowerFootprint,
+  drawRotationKnob, drawDeleteButton, drawDraggedTowerFootprint,
 } from './render/towers';
 import { drawEnemies, drawEnemyPreview } from './render/enemies';
 import {
@@ -84,6 +84,7 @@ export const renderGame = (
   drawPlacementPreview(ctx, state, hoverPos, selectedTower, canPlaceFlag);
   drawDraggedTowerFootprint(ctx, state, draggedTowerId);
   drawRotationKnob(ctx, state, rotatingTowerId);
+  drawDeleteButton(ctx, state, rotatingTowerId);
 
   drawIncomingDrops(ctx, state);
   drawEnemies(ctx, state, now);

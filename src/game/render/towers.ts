@@ -1,6 +1,7 @@
 import { GameState, Tower, TowerType, CELL_SIZE, HALF_CELL, TOWER_STATS, TURRET_RANGE } from '../types';
-import { getPortPos, isLinearTowerLandscape, isPortAccessible } from '../engine';
+import { getPortPos, isPortAccessible } from '../engine';
 import { getLinearTowerBodyAspectRatio, getLinearTowerBodyRect } from '../linearTowerGeometry';
+import { SHOP_CONFIG } from '../config';
 import {
   TWO_PI, BG_DARK, UNPOWERED, PULSE_CLR, HP_BG, HP_FG,
   PORT_OUT, PORT_OUT_USED, PORT_IN, PORT_IN_USED, KNOB_CLR, POWER_ON,
@@ -13,8 +14,11 @@ import {
 } from './helpers';
 import { getTowerCells, getTowerFootprintCells } from '../footprint';
 
-const ROTATION_KNOB_SCALE = 4 / 3;
 const ROTATION_KNOB_BASE_OFFSET = 20;
+export const ROTATION_BUTTON_WIDTH = 58;
+export const ROTATION_BUTTON_HEIGHT = 28;
+export const DELETE_BUTTON_WIDTH = 78;
+export const DELETE_BUTTON_HEIGHT = 28;
 const TOWER_BAR_SHOW_MS = 1800;
 const TOWER_BAR_FADE_MS = 700;
 const ENERGY_EFFECT_SIZE = CELL_SIZE * 0.5;
@@ -161,12 +165,51 @@ export const getRotationKnobLayout = (tower: Tower) => {
   const tth = tower.height * CELL_SIZE;
   const tcx = tpx + ttw / 2;
   const tcy = tpy + tth / 2;
-  const kd = Math.max(tower.width, tower.height) * CELL_SIZE / 2 + ROTATION_KNOB_BASE_OFFSET * 2;
-  const kx = tcx + Math.cos(tower.rotation - Math.PI / 2) * kd;
-  const ky = tcy + Math.sin(tower.rotation - Math.PI / 2) * kd;
+  const kd = tth / 2 + ROTATION_KNOB_BASE_OFFSET * 2;
+  const kx = tcx;
+  const ky = tcy - kd;
+  const buttonWidth = ROTATION_BUTTON_WIDTH;
+  const buttonHeight = ROTATION_BUTTON_HEIGHT;
+  const buttonX = kx - buttonWidth / 2;
+  const buttonY = ky - buttonHeight / 2;
 
-  return { tpx, tpy, ttw, tth, tcx, tcy, kd, kx, ky };
+  return { tpx, tpy, ttw, tth, tcx, tcy, kd, kx, ky, buttonX, buttonY, buttonWidth, buttonHeight };
 };
+
+export const getDeleteButtonLayout = (tower: Tower) => {
+  const tpx = tower.x * CELL_SIZE;
+  const tpy = tower.y * CELL_SIZE;
+  const ttw = tower.width * CELL_SIZE;
+  const tth = tower.height * CELL_SIZE;
+  const tcx = tpx + ttw / 2;
+  const buttonWidth = DELETE_BUTTON_WIDTH;
+  const buttonHeight = DELETE_BUTTON_HEIGHT;
+  const buttonX = tcx - buttonWidth / 2;
+  const buttonY = tpy + tth + 22;
+
+  return { buttonX, buttonY, buttonWidth, buttonHeight };
+};
+
+const getTowerVisualRect = (tower: Tower, px: number, py: number, tw: number, th: number) => {
+  const steps = Math.round(tower.rotation / (Math.PI / 2));
+  if (Math.abs(steps) % 2 !== 1 || tower.width === tower.height) {
+    return { px, py, tw, th };
+  }
+
+  const cx = px + tw / 2;
+  const cy = py + th / 2;
+  const visualTw = th;
+  const visualTh = tw;
+  return {
+    px: cx - visualTw / 2,
+    py: cy - visualTh / 2,
+    tw: visualTw,
+    th: visualTh,
+  };
+};
+
+const getLinearTowerVisualLandscape = (tower: Tower) =>
+  TOWER_STATS[tower.type].width >= TOWER_STATS[tower.type].height;
 
 // ── Ports (drawn under tower bodies) ─────────────────────────────────────
 export const drawPorts = (ctx: CanvasRenderingContext2D, state: GameState) => {
@@ -196,15 +239,6 @@ export const drawPorts = (ctx: CanvasRenderingContext2D, state: GameState) => {
   };
 
   for (const tower of state.towers) {
-    const ppx = tower.x * CELL_SIZE, ppy = tower.y * CELL_SIZE;
-    const ptw = tower.width * CELL_SIZE, pth = tower.height * CELL_SIZE;
-    const pcx = ppx + ptw / 2, pcy = ppy + pth / 2;
-
-    ctx.save();
-    ctx.translate(pcx, pcy);
-    ctx.rotate(tower.rotation);
-    ctx.translate(-pcx, -pcy);
-
     for (const port of tower.ports) {
       const pos = getPortPos(tower, port);
       const off = portOutward(port.direction);
@@ -306,7 +340,6 @@ export const drawPorts = (ctx: CanvasRenderingContext2D, state: GameState) => {
       }
     }
 
-    ctx.restore();
   }
 };
 
@@ -316,6 +349,7 @@ export const drawTowers = (ctx: CanvasRenderingContext2D, state: GameState, now:
     const px = tower.x * CELL_SIZE, py = tower.y * CELL_SIZE;
     const tw = tower.width * CELL_SIZE, th = tower.height * CELL_SIZE;
     const cx = px + tw / 2, cy = py + th / 2;
+    const visual = getTowerVisualRect(tower, px, py, tw, th);
     const inset = (tower.width === 1 && tower.height === 1) ? 5 : INSET;
 
     ctx.save();
@@ -333,35 +367,35 @@ export const drawTowers = (ctx: CanvasRenderingContext2D, state: GameState, now:
     if (tower.type === 'gatling') {
       const cr = 8;
       ctx.beginPath();
-      ctx.roundRect(px + inset, py + inset, tw - inset * 2, th - inset * 2, cr);
+      ctx.roundRect(visual.px + inset, visual.py + inset, visual.tw - inset * 2, visual.th - inset * 2, cr);
       ctx.fill();
       ctx.stroke();
       ctx.strokeStyle = tColor; ctx.lineWidth = 1; ctx.globalAlpha = 0.4;
       const ventCount = 3;
-      const ventSpacing = (th - inset * 2) / (ventCount + 1);
+      const ventSpacing = (visual.th - inset * 2) / (ventCount + 1);
       for (let v = 1; v <= ventCount; v++) {
-        const vy = py + inset + v * ventSpacing;
-        ctx.beginPath(); ctx.moveTo(px + inset + 2, vy); ctx.lineTo(px + inset + 7, vy); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(px + tw - inset - 2, vy); ctx.lineTo(px + tw - inset - 7, vy); ctx.stroke();
+        const vy = visual.py + inset + v * ventSpacing;
+        ctx.beginPath(); ctx.moveTo(visual.px + inset + 2, vy); ctx.lineTo(visual.px + inset + 7, vy); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(visual.px + visual.tw - inset - 2, vy); ctx.lineTo(visual.px + visual.tw - inset - 7, vy); ctx.stroke();
       }
       ctx.globalAlpha = 1;
     } else if (tower.type === 'sniper') {
       ctx.beginPath();
-      ctx.moveTo(cx, py + inset);
-      ctx.lineTo(px + tw - inset, cy);
-      ctx.lineTo(cx, py + th - inset);
-      ctx.lineTo(px + inset, cy);
+      ctx.moveTo(cx, visual.py + inset);
+      ctx.lineTo(visual.px + visual.tw - inset, cy);
+      ctx.lineTo(cx, visual.py + visual.th - inset);
+      ctx.lineTo(visual.px + inset, cy);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
       ctx.fillStyle = tColor;
       const dotR = 1.8;
-      ctx.beginPath(); ctx.arc(cx, py + inset, dotR, 0, TWO_PI); ctx.fill();
-      ctx.beginPath(); ctx.arc(px + tw - inset, cy, dotR, 0, TWO_PI); ctx.fill();
-      ctx.beginPath(); ctx.arc(cx, py + th - inset, dotR, 0, TWO_PI); ctx.fill();
-      ctx.beginPath(); ctx.arc(px + inset, cy, dotR, 0, TWO_PI); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx, visual.py + inset, dotR, 0, TWO_PI); ctx.fill();
+      ctx.beginPath(); ctx.arc(visual.px + visual.tw - inset, cy, dotR, 0, TWO_PI); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx, visual.py + visual.th - inset, dotR, 0, TWO_PI); ctx.fill();
+      ctx.beginPath(); ctx.arc(visual.px + inset, cy, dotR, 0, TWO_PI); ctx.fill();
     } else if (tower.type === 'tesla') {
-      const hexR = Math.min(tw, th) / 2 - inset;
+      const hexR = Math.min(visual.tw, visual.th) / 2 - inset;
       ctx.beginPath();
       for (let i = 0; i < 6; i++) {
         const angle = i * Math.PI / 3 - Math.PI / 6;
@@ -373,28 +407,36 @@ export const drawTowers = (ctx: CanvasRenderingContext2D, state: GameState, now:
       ctx.fill();
       ctx.stroke();
     } else if (tower.type === 'blaster') {
-      const baseR = Math.min(tw, th) / 2 - inset - 3;
+      const baseR = Math.min(visual.tw, visual.th) / 2 - inset - 3;
       ctx.beginPath(); ctx.arc(cx, cy, baseR, 0, TWO_PI);
       ctx.fill();
       ctx.stroke();
     } else if (tower.type === 'battery' || tower.type === 'bus') {
-      const body = getLinearTowerBodyRect(px, py, tw, th, isLinearTowerLandscape(tower), getLinearTowerBodyAspectRatio(tower.type));
+      const body = getLinearTowerBodyRect(
+        visual.px, visual.py, visual.tw, visual.th,
+        getLinearTowerVisualLandscape(tower),
+        getLinearTowerBodyAspectRatio(tower.type),
+      );
       ctx.fillRect(body.x + inset, body.y + inset, body.width - inset * 2, body.height - inset * 2);
       ctx.strokeRect(body.x + inset, body.y + inset, body.width - inset * 2, body.height - inset * 2);
     } else if (tower.type === 'shield') {
       drawFootprintCells(ctx, getTowerCells(tower), inset);
     } else {
-      ctx.fillRect(px + inset, py + inset, tw - inset * 2, th - inset * 2);
-      ctx.strokeRect(px + inset, py + inset, tw - inset * 2, th - inset * 2);
+      ctx.fillRect(visual.px + inset, visual.py + inset, visual.tw - inset * 2, visual.th - inset * 2);
+      ctx.strokeRect(visual.px + inset, visual.py + inset, visual.tw - inset * 2, visual.th - inset * 2);
     }
 
     if (tower.type === 'battery' || tower.type === 'bus') {
-      const body = getLinearTowerBodyRect(px, py, tw, th, isLinearTowerLandscape(tower), getLinearTowerBodyAspectRatio(tower.type));
+      const body = getLinearTowerBodyRect(
+        visual.px, visual.py, visual.tw, visual.th,
+        getLinearTowerVisualLandscape(tower),
+        getLinearTowerBodyAspectRatio(tower.type),
+      );
       drawTowerDetails(
         ctx, tower, body.x, body.y, body.width, body.height, cx, cy, tColor, inset, now,
       );
     } else {
-      drawTowerDetails(ctx, tower, px, py, tw, th, cx, cy, tColor, inset, now);
+      drawTowerDetails(ctx, tower, visual.px, visual.py, visual.tw, visual.th, cx, cy, tColor, inset, now);
     }
 
     ctx.restore();
@@ -537,53 +579,129 @@ export const drawRotationKnob = (ctx: CanvasRenderingContext2D, state: GameState
   const tower = state.towerMap.get(rotatingTowerId);
   if (!tower) return;
 
-  const { tpx, tpy, ttw, tth, tcx, tcy, kd, kx, ky } = getRotationKnobLayout(tower);
-  const knobR = 7 * ROTATION_KNOB_SCALE;
-  const innerR = 3 * ROTATION_KNOB_SCALE;
-  const markerR = 3 * ROTATION_KNOB_SCALE;
-  const arcR = 14 * ROTATION_KNOB_SCALE;
-  const arrowLen = 5 * ROTATION_KNOB_SCALE;
+  const { tpx, tpy, ttw, tth, tcx, tcy, buttonX, buttonY, buttonWidth, buttonHeight } = getRotationKnobLayout(tower);
 
   ctx.strokeStyle = KNOB_CLR; ctx.lineWidth = 1.5;
   ctx.setLineDash([4, 4]);
   ctx.strokeRect(tpx - 2, tpy - 2, ttw + 4, tth + 4);
   ctx.setLineDash([]);
 
-  ctx.fillStyle = 'rgba(251,191,36,0.2)';
-  for (let i = 0; i < 4; i++) {
-    const sa = i * Math.PI / 2 - Math.PI / 2;
-    ctx.beginPath();
-    ctx.arc(tcx + Math.cos(sa) * kd, tcy + Math.sin(sa) * kd, markerR, 0, TWO_PI);
-    ctx.fill();
-  }
+  const buttonCx = buttonX + buttonWidth / 2;
+  const buttonCy = buttonY + buttonHeight / 2;
+  const arrowY = buttonY - 13;
+  const arrowR = 9;
+  const arrowStart = -Math.PI * 0.9;
+  const arrowEnd = Math.PI * 0.42;
 
-  ctx.strokeStyle = 'rgba(251,191,36,0.5)'; ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.moveTo(tcx, tcy); ctx.lineTo(kx, ky); ctx.stroke();
-
-  ctx.fillStyle = KNOB_CLR; ctx.shadowColor = KNOB_CLR; ctx.shadowBlur = 8;
-  ctx.beginPath(); ctx.arc(kx, ky, knobR, 0, TWO_PI); ctx.fill();
-  ctx.shadowBlur = 0;
-  ctx.fillStyle = BG_DARK;
-  ctx.beginPath(); ctx.arc(kx, ky, innerR, 0, TWO_PI); ctx.fill();
-
-  // Circular arrow icon (rotate 90°)
-  const iconR = arcR * 0.6;
-  const arcStart = -Math.PI * 0.55;
-  const arcEnd = Math.PI * 0.55;
-  ctx.strokeStyle = 'rgba(255,255,255,0.8)';
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = 'rgba(245,158,11,0.72)';
+  ctx.lineWidth = 1.6;
   ctx.beginPath();
-  ctx.arc(kx, ky, iconR, arcStart, arcEnd);
+  ctx.moveTo(buttonCx, buttonY + buttonHeight);
+  ctx.lineTo(tcx, tcy);
   ctx.stroke();
-  const ax = kx + iconR * Math.cos(arcEnd);
-  const ay = ky + iconR * Math.sin(arcEnd);
-  const aTan = arcEnd + Math.PI / 2;
-  ctx.fillStyle = 'rgba(255,255,255,0.8)';
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+  ctx.lineWidth = 2.2;
+  ctx.lineCap = 'round';
   ctx.beginPath();
-  ctx.moveTo(ax + arrowLen * Math.cos(aTan - 0.5), ay + arrowLen * Math.sin(aTan - 0.5));
-  ctx.lineTo(ax, ay);
-  ctx.lineTo(ax + arrowLen * Math.cos(aTan + 0.5), ay + arrowLen * Math.sin(aTan + 0.5));
+  ctx.arc(buttonCx, arrowY, arrowR, arrowStart, arrowEnd);
+  ctx.stroke();
+  const arrowTipX = buttonCx + arrowR * Math.cos(arrowEnd);
+  const arrowTipY = arrowY + arrowR * Math.sin(arrowEnd);
+  const arrowTan = arrowEnd + Math.PI / 2;
+  const arrowLen = 5.5;
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.beginPath();
+  ctx.moveTo(arrowTipX, arrowTipY);
+  ctx.lineTo(arrowTipX - arrowLen * Math.cos(arrowTan - 0.55), arrowTipY - arrowLen * Math.sin(arrowTan - 0.55));
+  ctx.lineTo(arrowTipX - arrowLen * Math.cos(arrowTan + 0.55), arrowTipY - arrowLen * Math.sin(arrowTan + 0.55));
+  ctx.closePath();
   ctx.fill();
+  ctx.lineCap = 'butt';
+
+  ctx.fillStyle = 'rgba(217,119,6,0.92)';
+  ctx.strokeStyle = 'rgba(245,158,11,0.9)';
+  ctx.lineWidth = 1;
+  ctx.shadowColor = 'rgba(0,0,0,0.35)';
+  ctx.shadowBlur = 10;
+  ctx.shadowOffsetY = 3;
+  ctx.beginPath();
+  ctx.roundRect(buttonX, buttonY, buttonWidth, buttonHeight, 8);
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
+  ctx.stroke();
+
+  ctx.font = 'bold 12px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText('旋转', buttonCx, buttonCy + 0.5);
+};
+
+export const drawDeleteButton = (ctx: CanvasRenderingContext2D, state: GameState, rotatingTowerId: string | null) => {
+  if (!rotatingTowerId || state.status !== 'playing' || state.gameMode === 'custom') return;
+  const tower = state.towerMap.get(rotatingTowerId);
+  if (!tower || tower.type === 'core') return;
+
+  const { buttonX, buttonY, buttonWidth, buttonHeight } = getDeleteButtonLayout(tower);
+
+  ctx.fillStyle = 'rgba(220,38,38,0.92)';
+  ctx.strokeStyle = 'rgba(248,113,113,0.9)';
+  ctx.lineWidth = 1;
+  ctx.shadowColor = 'rgba(0,0,0,0.35)';
+  ctx.shadowBlur = 10;
+  ctx.shadowOffsetY = 3;
+  ctx.beginPath();
+  ctx.roundRect(buttonX, buttonY, buttonWidth, buttonHeight, 8);
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
+  ctx.stroke();
+
+  ctx.font = 'bold 12px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#ffffff';
+  const centerY = buttonY + buttonHeight / 2;
+  const contentCx = buttonX + buttonWidth / 2;
+  const trashX = contentCx - 21;
+  const coinX = contentCx + 22;
+
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 1.6;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(trashX - 5, centerY - 5);
+  ctx.lineTo(trashX + 5, centerY - 5);
+  ctx.moveTo(trashX - 2.5, centerY - 7.5);
+  ctx.lineTo(trashX + 2.5, centerY - 7.5);
+  ctx.moveTo(trashX - 4, centerY - 3);
+  ctx.lineTo(trashX - 3, centerY + 6);
+  ctx.lineTo(trashX + 3, centerY + 6);
+  ctx.lineTo(trashX + 4, centerY - 3);
+  ctx.moveTo(trashX - 1.5, centerY - 1);
+  ctx.lineTo(trashX - 1.5, centerY + 4);
+  ctx.moveTo(trashX + 1.5, centerY - 1);
+  ctx.lineTo(trashX + 1.5, centerY + 4);
+  ctx.stroke();
+
+  ctx.fillText(String(SHOP_CONFIG.sellPrice), contentCx, centerY + 0.5);
+
+  ctx.fillStyle = 'rgba(250,204,21,0.95)';
+  ctx.strokeStyle = 'rgba(254,243,199,0.95)';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.arc(coinX, centerY, 5.2, 0, TWO_PI);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(120,53,15,0.85)';
+  ctx.font = 'bold 8px sans-serif';
+  ctx.fillText('$', coinX, centerY + 0.5);
+  ctx.lineCap = 'butt';
 };
 
 const drawCapsuleBarrel = (
