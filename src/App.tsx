@@ -107,6 +107,7 @@ export default function App() {
   const [commandSidebarOpen, setCommandSidebarOpen] = useState(true);
   const [codexTower, setCodexTower] = useState<TowerType | null>(null);
   const [locale, _setLocale] = useState<Locale>(getLocale());
+  const [monsterSubTab, setMonsterSubTab] = useState<'type' | 'static'>('type');
 
   // Mobile detection
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
@@ -228,54 +229,179 @@ export default function App() {
           </div>
         </button>
 
-        <div className="px-1">
-          <div className="text-[11px] uppercase tracking-widest text-gray-500 mb-2">{i.monsterType}</div>
-          <div className="grid grid-cols-2 gap-1.5">
-            {enemyTypes.map((type) => {
-              const isSelected = selectedMonsterType === type;
-              return (
-                <button
-                  key={type}
-                  type="button"
-                  onClick={() => {
-                    setSelectedTower(null);
-                    setSelectedMonsterType(type);
-                    setPlaceMonsterMode(true);
-                  }}
+        {isActive && (
+          <div className="flex flex-col gap-2 px-1">
+            <div className="flex gap-1">
+              <button
+                type="button"
+                onClick={() => setMonsterSubTab('type')}
+                className={`flex-1 px-2 py-1.5 rounded-md text-[11px] font-bold transition-all border ${
+                  monsterSubTab === 'type'
+                    ? 'bg-rose-500/20 text-rose-200 border-rose-500/50'
+                    : 'bg-gray-800/60 text-gray-400 border-gray-700 hover:bg-gray-700'
+                }`}
+              >
+                {i.monsterType}
+              </button>
+              <button
+                type="button"
+                onClick={() => setMonsterSubTab('static')}
+                className={`flex-1 px-2 py-1.5 rounded-md text-[11px] font-bold transition-all border ${
+                  monsterSubTab === 'static'
+                    ? 'bg-rose-500/20 text-rose-200 border-rose-500/50'
+                    : 'bg-gray-800/60 text-gray-400 border-gray-700 hover:bg-gray-700'
+                }`}
+              >
+                {i.staticMonster}
+              </button>
+            </div>
+
+            {monsterSubTab === 'type' && (
+              <div className="grid grid-cols-2 gap-1.5">
+                {enemyTypes.map((type) => {
+                  const isSelected = selectedMonsterType === type;
+                  return (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => {
+                        setSelectedTower(null);
+                        setSelectedMonsterType(type);
+                        setPlaceMonsterMode(true);
+                      }}
+                      disabled={gameState.status !== 'playing'}
+                      className={`px-2.5 py-2 rounded-md border text-xs font-bold transition-all ${
+                        isSelected
+                          ? 'border-rose-500 bg-rose-500/15 text-rose-200'
+                          : gameState.status === 'playing'
+                            ? 'border-gray-700 bg-gray-900/60 text-gray-300 hover:bg-gray-800 hover:border-gray-500'
+                            : 'border-gray-800 bg-gray-900/40 text-gray-500 cursor-not-allowed opacity-40'
+                      }`}
+                    >
+                      {i.enemyName[type]}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {monsterSubTab === 'static' && (
+              <label className={`flex items-start gap-3 px-3 py-2.5 rounded-lg border transition-all ${
+                gameState.status === 'playing'
+                  ? 'border-gray-700 bg-gray-900/50 text-gray-200'
+                  : 'border-gray-800 bg-gray-900/40 text-gray-500 opacity-40'
+              }`}>
+                <input
+                  type="checkbox"
+                  checked={staticMonster}
+                  onChange={(e) => setStaticMonster(e.target.checked)}
                   disabled={gameState.status !== 'playing'}
-                  className={`px-2.5 py-2 rounded-md border text-xs font-bold transition-all ${
-                    isSelected
-                      ? 'border-rose-500 bg-rose-500/15 text-rose-200'
-                      : gameState.status === 'playing'
-                        ? 'border-gray-700 bg-gray-900/60 text-gray-300 hover:bg-gray-800 hover:border-gray-500'
-                        : 'border-gray-800 bg-gray-900/40 text-gray-500 cursor-not-allowed opacity-40'
-                  }`}
-                >
-                  {i.enemyName[type]}
-                </button>
-              );
-            })}
+                  className="mt-0.5 h-4 w-4 rounded border-gray-600 bg-gray-800 text-rose-500 focus:ring-rose-500"
+                />
+                <div className="min-w-0">
+                  <div className="text-sm font-bold leading-tight">{i.staticMonster}</div>
+                  <div className="text-xs text-gray-400 leading-relaxed">{i.staticMonsterHint}</div>
+                </div>
+              </label>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderShopButtons = (closeSidebar = false, topMargin = true) => {
+    const handleBuy = (type: 'tower' | 'infra' | 'advanced' | 'command') => {
+      buyShopPack(type);
+      if (closeSidebar) setSidebarOpen(false);
+    };
+    const isCustom = gameState.gameMode === 'custom';
+    const canBuy = (price: number) => gameState.status === 'playing' && (isCustom || gameState.gold >= price);
+    return (
+      <>
+        <div className={`text-xs font-bold uppercase tracking-widest text-gray-500 px-1 py-1.5 ${topMargin ? 'mt-2' : ''}`}>
+          <div className="flex items-center gap-1.5">
+            <ShoppingBag size={12} />
+            {i.shop}
           </div>
         </div>
-
-        <label className={`flex items-start gap-3 px-3 py-2.5 rounded-lg border transition-all ${
-          gameState.status === 'playing'
-            ? 'border-gray-700 bg-gray-900/50 text-gray-200'
-            : 'border-gray-800 bg-gray-900/40 text-gray-500 opacity-40'
-        }`}>
-          <input
-            type="checkbox"
-            checked={staticMonster}
-            onChange={(e) => setStaticMonster(e.target.checked)}
-            disabled={gameState.status !== 'playing'}
-            className="mt-0.5 h-4 w-4 rounded border-gray-600 bg-gray-800 text-rose-500 focus:ring-rose-500"
-          />
-          <div className="min-w-0">
-            <div className="text-sm font-bold leading-tight">{i.staticMonster}</div>
-            <div className="text-xs text-gray-400 leading-relaxed">{i.staticMonsterHint}</div>
+        <button
+          type="button"
+          onClick={() => handleBuy('tower')}
+          disabled={!canBuy(SHOP_CONFIG.towerPackPrice)}
+          className={`flex items-center gap-2.5 px-3 py-3 rounded-lg border transition-all ${
+            canBuy(SHOP_CONFIG.towerPackPrice)
+              ? 'border-yellow-700/70 bg-yellow-500/10 text-yellow-200 hover:bg-yellow-500/15 hover:border-yellow-500/70'
+              : 'border-gray-800 bg-gray-900/50 text-gray-500 cursor-not-allowed opacity-40'
+          }`}
+        >
+          <div className="shrink-0 text-yellow-400"><Crosshair size={20} /></div>
+          <div className="flex flex-col items-start min-w-0 flex-1">
+            <span className="text-sm font-bold leading-tight">{i.towerPack}</span>
+            <span className="text-xs text-gray-400 leading-tight">{i.towerPackDesc}</span>
           </div>
-        </label>
-      </div>
+          <div className="flex items-center gap-1 text-yellow-400 text-xs font-bold shrink-0">
+            <Coins size={12} />{SHOP_CONFIG.towerPackPrice}
+          </div>
+        </button>
+        <button
+          type="button"
+          onClick={() => handleBuy('infra')}
+          disabled={!canBuy(SHOP_CONFIG.infraPackPrice)}
+          className={`flex items-center gap-2.5 px-3 py-3 rounded-lg border transition-all ${
+            canBuy(SHOP_CONFIG.infraPackPrice)
+              ? 'border-yellow-700/70 bg-yellow-500/10 text-yellow-200 hover:bg-yellow-500/15 hover:border-yellow-500/70'
+              : 'border-gray-800 bg-gray-900/50 text-gray-500 cursor-not-allowed opacity-40'
+          }`}
+        >
+          <div className="shrink-0 text-yellow-400"><Zap size={20} /></div>
+          <div className="flex flex-col items-start min-w-0 flex-1">
+            <span className="text-sm font-bold leading-tight">{i.infraPack}</span>
+            <span className="text-xs text-gray-400 leading-tight">{i.infraPackDesc}</span>
+          </div>
+          <div className="flex items-center gap-1 text-yellow-400 text-xs font-bold shrink-0">
+            <Coins size={12} />{SHOP_CONFIG.infraPackPrice}
+          </div>
+        </button>
+        <button
+          type="button"
+          onClick={() => handleBuy('advanced')}
+          disabled={!canBuy(SHOP_CONFIG.advancedPackPrice)}
+          className={`flex items-center gap-2.5 px-3 py-3 rounded-lg border transition-all ${
+            canBuy(SHOP_CONFIG.advancedPackPrice)
+              ? 'border-rose-700/70 bg-rose-500/10 text-rose-200 hover:bg-rose-500/15 hover:border-rose-500/70'
+              : 'border-gray-800 bg-gray-900/50 text-gray-500 cursor-not-allowed opacity-40'
+          }`}
+        >
+          <div className="shrink-0 text-rose-400"><Rocket size={20} /></div>
+          <div className="flex flex-col items-start min-w-0 flex-1">
+            <span className="text-sm font-bold leading-tight">{i.advancedPack}</span>
+            <span className="text-xs text-gray-400 leading-tight">{i.advancedPackDesc}</span>
+          </div>
+          <div className="flex items-center gap-1 text-yellow-400 text-xs font-bold shrink-0">
+            <Coins size={12} />{SHOP_CONFIG.advancedPackPrice}
+          </div>
+        </button>
+        <button
+          type="button"
+          onClick={() => handleBuy('command')}
+          disabled={!canBuy(SHOP_CONFIG.commandCardPackPrice)}
+          className={`flex items-center gap-2.5 px-3 py-3 rounded-lg border transition-all ${
+            canBuy(SHOP_CONFIG.commandCardPackPrice)
+              ? 'border-cyan-700/70 bg-cyan-500/10 text-cyan-100 hover:bg-cyan-500/15 hover:border-cyan-500/70'
+              : 'border-gray-800 bg-gray-900/50 text-gray-500 cursor-not-allowed opacity-40'
+          }`}
+        >
+          <div className="shrink-0 text-cyan-300"><BookOpen size={20} /></div>
+          <div className="flex flex-col items-start min-w-0 flex-1">
+            <span className="text-sm font-bold leading-tight">{i.commandCardPack}</span>
+            <span className="text-xs text-gray-400 leading-tight">{i.commandCardPackDesc}</span>
+          </div>
+          <div className="flex items-center gap-1 text-yellow-400 text-xs font-bold shrink-0">
+            <Coins size={12} />{SHOP_CONFIG.commandCardPackPrice}
+          </div>
+        </button>
+      </>
     );
   };
 
@@ -378,13 +504,11 @@ export default function App() {
           <span className="text-base sm:text-lg font-mono font-bold ml-0.5 sm:ml-1">{gameState.score}</span>
         </div>
 
-        {gameState.gameMode !== 'custom' && (
-          <div className="flex items-center gap-1 sm:gap-1.5 text-yellow-400">
-            <Coins size={14} />
-            <span className="text-xs text-gray-500 uppercase font-bold hidden sm:inline">{i.gold}</span>
-            <span className="text-base sm:text-lg font-mono font-bold ml-0.5 sm:ml-1">{gameState.gold}</span>
-          </div>
-        )}
+        <div className="flex items-center gap-1 sm:gap-1.5 text-yellow-400">
+          <Coins size={14} />
+          <span className="text-xs text-gray-500 uppercase font-bold hidden sm:inline">{i.gold}</span>
+          <span className="text-base sm:text-lg font-mono font-bold ml-0.5 sm:ml-1">{gameState.gameMode === 'custom' ? '\u221E' : gameState.gold}</span>
+        </div>
 
         {gameState.gameMode !== 'custom' && gameState.status === 'playing' && gameState.enemiesToSpawn === 0 && gameState.enemies.length === 0 && (
           <div className="flex items-center gap-1 sm:gap-3 ml-1 sm:ml-2">
@@ -444,7 +568,7 @@ export default function App() {
       {/* Main Area: Canvas + Build Panel */}
       <div className="flex-1 flex min-h-0 relative">
 
-        {(gameState.status === 'playing' || gameState.status === 'paused' || gameState.status === 'pick') && gameState.gameMode !== 'custom' && !isMobile && (
+        {(gameState.status === 'playing' || gameState.status === 'paused' || gameState.status === 'pick') && !isMobile && (
           <div className="relative shrink-0 flex">
             <button
               onClick={() => setCommandSidebarOpen(v => !v)}
@@ -900,7 +1024,7 @@ export default function App() {
           </div>
         </div>
 
-        {(gameState.status === 'playing' || gameState.status === 'paused' || gameState.status === 'pick') && gameState.gameMode !== 'custom' && isMobile && (
+        {(gameState.status === 'playing' || gameState.status === 'paused' || gameState.status === 'pick') && isMobile && (
           <>
             {(gameState.status === 'playing' || gameState.status === 'paused') && !commandSidebarOpen && (
               <button
@@ -960,6 +1084,10 @@ export default function App() {
                   </div>
                   {gameState.gameMode === 'custom' && (
                     <>
+                      {renderShopButtons(true, false)}
+                      <div className="text-xs font-bold uppercase tracking-widest text-gray-500 px-1 py-1.5">
+                        {i.inventory}
+                      </div>
                       {renderTowerButton('blaster')}
                       {renderTowerButton('gatling')}
                       {renderTowerButton('sniper')}
@@ -985,88 +1113,7 @@ export default function App() {
 
                   {gameState.gameMode !== 'custom' && (
                     <>
-                      <div className="text-xs font-bold uppercase tracking-widest text-gray-500 px-1 py-1.5 mt-2">
-                        <div className="flex items-center gap-1.5">
-                          <ShoppingBag size={12} />
-                          {i.shop}
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => { buyShopPack('tower'); setSidebarOpen(false); }}
-                        disabled={gameState.status !== 'playing' || gameState.gold < SHOP_CONFIG.towerPackPrice}
-                        className={`flex items-center gap-2.5 px-3 py-3 rounded-lg border transition-all ${
-                          gameState.status === 'playing' && gameState.gold >= SHOP_CONFIG.towerPackPrice
-                            ? 'border-yellow-700/70 bg-yellow-500/10 text-yellow-200 hover:bg-yellow-500/15 hover:border-yellow-500/70'
-                            : 'border-gray-800 bg-gray-900/50 text-gray-500 cursor-not-allowed opacity-40'
-                        }`}
-                      >
-                        <div className="shrink-0 text-yellow-400"><Crosshair size={20} /></div>
-                        <div className="flex flex-col items-start min-w-0 flex-1">
-                          <span className="text-sm font-bold leading-tight">{i.towerPack}</span>
-                          <span className="text-xs text-gray-400 leading-tight">{i.towerPackDesc}</span>
-                        </div>
-                        <div className="flex items-center gap-1 text-yellow-400 text-xs font-bold shrink-0">
-                          <Coins size={12} />{SHOP_CONFIG.towerPackPrice}
-                        </div>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { buyShopPack('infra'); setSidebarOpen(false); }}
-                        disabled={gameState.status !== 'playing' || gameState.gold < SHOP_CONFIG.infraPackPrice}
-                        className={`flex items-center gap-2.5 px-3 py-3 rounded-lg border transition-all ${
-                          gameState.status === 'playing' && gameState.gold >= SHOP_CONFIG.infraPackPrice
-                            ? 'border-yellow-700/70 bg-yellow-500/10 text-yellow-200 hover:bg-yellow-500/15 hover:border-yellow-500/70'
-                            : 'border-gray-800 bg-gray-900/50 text-gray-500 cursor-not-allowed opacity-40'
-                        }`}
-                      >
-                        <div className="shrink-0 text-yellow-400"><Zap size={20} /></div>
-                        <div className="flex flex-col items-start min-w-0 flex-1">
-                          <span className="text-sm font-bold leading-tight">{i.infraPack}</span>
-                          <span className="text-xs text-gray-400 leading-tight">{i.infraPackDesc}</span>
-                        </div>
-                        <div className="flex items-center gap-1 text-yellow-400 text-xs font-bold shrink-0">
-                          <Coins size={12} />{SHOP_CONFIG.infraPackPrice}
-                        </div>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { buyShopPack('advanced'); setSidebarOpen(false); }}
-                        disabled={gameState.status !== 'playing' || gameState.gold < SHOP_CONFIG.advancedPackPrice}
-                        className={`flex items-center gap-2.5 px-3 py-3 rounded-lg border transition-all ${
-                          gameState.status === 'playing' && gameState.gold >= SHOP_CONFIG.advancedPackPrice
-                            ? 'border-rose-700/70 bg-rose-500/10 text-rose-200 hover:bg-rose-500/15 hover:border-rose-500/70'
-                            : 'border-gray-800 bg-gray-900/50 text-gray-500 cursor-not-allowed opacity-40'
-                        }`}
-                      >
-                        <div className="shrink-0 text-rose-400"><Rocket size={20} /></div>
-                        <div className="flex flex-col items-start min-w-0 flex-1">
-                          <span className="text-sm font-bold leading-tight">{i.advancedPack}</span>
-                          <span className="text-xs text-gray-400 leading-tight">{i.advancedPackDesc}</span>
-                        </div>
-                        <div className="flex items-center gap-1 text-yellow-400 text-xs font-bold shrink-0">
-                          <Coins size={12} />{SHOP_CONFIG.advancedPackPrice}
-                        </div>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { buyShopPack('command'); setSidebarOpen(false); }}
-                        disabled={gameState.status !== 'playing' || gameState.gold < SHOP_CONFIG.commandCardPackPrice}
-                        className={`flex items-center gap-2.5 px-3 py-3 rounded-lg border transition-all ${
-                          gameState.status === 'playing' && gameState.gold >= SHOP_CONFIG.commandCardPackPrice
-                            ? 'border-cyan-700/70 bg-cyan-500/10 text-cyan-100 hover:bg-cyan-500/15 hover:border-cyan-500/70'
-                            : 'border-gray-800 bg-gray-900/50 text-gray-500 cursor-not-allowed opacity-40'
-                        }`}
-                      >
-                        <div className="shrink-0 text-cyan-300"><BookOpen size={20} /></div>
-                        <div className="flex flex-col items-start min-w-0 flex-1">
-                          <span className="text-sm font-bold leading-tight">{i.commandCardPack}</span>
-                          <span className="text-xs text-gray-400 leading-tight">{i.commandCardPackDesc}</span>
-                        </div>
-                        <div className="flex items-center gap-1 text-yellow-400 text-xs font-bold shrink-0">
-                          <Coins size={12} />{SHOP_CONFIG.commandCardPackPrice}
-                        </div>
-                      </button>
+                      {renderShopButtons(true)}
                     </>
                   )}
 
@@ -1115,6 +1162,7 @@ export default function App() {
               <div className="min-w-[236px] flex flex-col h-full">
                 {gameState.gameMode === 'custom' && (
                   <>
+                    {renderShopButtons(false, false)}
                     <div className="text-xs font-bold uppercase tracking-widest text-gray-500 px-1 py-1.5">
                       {i.inventory}
                     </div>
@@ -1143,88 +1191,7 @@ export default function App() {
 
                 {gameState.gameMode !== 'custom' && (
                   <>
-                    <div className="text-xs font-bold uppercase tracking-widest text-gray-500 px-1 py-1.5 mt-2">
-                      <div className="flex items-center gap-1.5">
-                        <ShoppingBag size={12} />
-                        {i.shop}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => buyShopPack('tower')}
-                      disabled={gameState.status !== 'playing' || gameState.gold < SHOP_CONFIG.towerPackPrice}
-                      className={`flex items-center gap-2.5 px-3 py-3 rounded-lg border transition-all ${
-                        gameState.status === 'playing' && gameState.gold >= SHOP_CONFIG.towerPackPrice
-                          ? 'border-yellow-700/70 bg-yellow-500/10 text-yellow-200 hover:bg-yellow-500/15 hover:border-yellow-500/70'
-                          : 'border-gray-800 bg-gray-900/50 text-gray-500 cursor-not-allowed opacity-40'
-                      }`}
-                    >
-                      <div className="shrink-0 text-yellow-400"><Crosshair size={20} /></div>
-                      <div className="flex flex-col items-start min-w-0 flex-1">
-                        <span className="text-sm font-bold leading-tight">{i.towerPack}</span>
-                        <span className="text-xs text-gray-400 leading-tight">{i.towerPackDesc}</span>
-                      </div>
-                      <div className="flex items-center gap-1 text-yellow-400 text-xs font-bold shrink-0">
-                        <Coins size={12} />{SHOP_CONFIG.towerPackPrice}
-                      </div>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => buyShopPack('infra')}
-                      disabled={gameState.status !== 'playing' || gameState.gold < SHOP_CONFIG.infraPackPrice}
-                      className={`flex items-center gap-2.5 px-3 py-3 rounded-lg border transition-all ${
-                        gameState.status === 'playing' && gameState.gold >= SHOP_CONFIG.infraPackPrice
-                          ? 'border-yellow-700/70 bg-yellow-500/10 text-yellow-200 hover:bg-yellow-500/15 hover:border-yellow-500/70'
-                          : 'border-gray-800 bg-gray-900/50 text-gray-500 cursor-not-allowed opacity-40'
-                      }`}
-                    >
-                      <div className="shrink-0 text-yellow-400"><Zap size={20} /></div>
-                      <div className="flex flex-col items-start min-w-0 flex-1">
-                        <span className="text-sm font-bold leading-tight">{i.infraPack}</span>
-                        <span className="text-xs text-gray-400 leading-tight">{i.infraPackDesc}</span>
-                      </div>
-                      <div className="flex items-center gap-1 text-yellow-400 text-xs font-bold shrink-0">
-                        <Coins size={12} />{SHOP_CONFIG.infraPackPrice}
-                      </div>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => buyShopPack('advanced')}
-                      disabled={gameState.status !== 'playing' || gameState.gold < SHOP_CONFIG.advancedPackPrice}
-                      className={`flex items-center gap-2.5 px-3 py-3 rounded-lg border transition-all ${
-                        gameState.status === 'playing' && gameState.gold >= SHOP_CONFIG.advancedPackPrice
-                          ? 'border-rose-700/70 bg-rose-500/10 text-rose-200 hover:bg-rose-500/15 hover:border-rose-500/70'
-                          : 'border-gray-800 bg-gray-900/50 text-gray-500 cursor-not-allowed opacity-40'
-                      }`}
-                    >
-                      <div className="shrink-0 text-rose-400"><Rocket size={20} /></div>
-                      <div className="flex flex-col items-start min-w-0 flex-1">
-                        <span className="text-sm font-bold leading-tight">{i.advancedPack}</span>
-                        <span className="text-xs text-gray-400 leading-tight">{i.advancedPackDesc}</span>
-                      </div>
-                      <div className="flex items-center gap-1 text-yellow-400 text-xs font-bold shrink-0">
-                        <Coins size={12} />{SHOP_CONFIG.advancedPackPrice}
-                      </div>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => buyShopPack('command')}
-                      disabled={gameState.status !== 'playing' || gameState.gold < SHOP_CONFIG.commandCardPackPrice}
-                      className={`flex items-center gap-2.5 px-3 py-3 rounded-lg border transition-all ${
-                        gameState.status === 'playing' && gameState.gold >= SHOP_CONFIG.commandCardPackPrice
-                          ? 'border-cyan-700/70 bg-cyan-500/10 text-cyan-100 hover:bg-cyan-500/15 hover:border-cyan-500/70'
-                          : 'border-gray-800 bg-gray-900/50 text-gray-500 cursor-not-allowed opacity-40'
-                      }`}
-                    >
-                      <div className="shrink-0 text-cyan-300"><BookOpen size={20} /></div>
-                      <div className="flex flex-col items-start min-w-0 flex-1">
-                        <span className="text-sm font-bold leading-tight">{i.commandCardPack}</span>
-                        <span className="text-xs text-gray-400 leading-tight">{i.commandCardPackDesc}</span>
-                      </div>
-                      <div className="flex items-center gap-1 text-yellow-400 text-xs font-bold shrink-0">
-                        <Coins size={12} />{SHOP_CONFIG.commandCardPackPrice}
-                      </div>
-                    </button>
+                    {renderShopButtons()}
                   </>
                 )}
 

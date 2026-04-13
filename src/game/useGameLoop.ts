@@ -198,6 +198,7 @@ export const useGameLoop = () => {
     s.status = 'playing';
     s.gameMode = 'custom';
     s.wireInventory = Infinity;
+    s.gold = Infinity;
     s.needsPick = false;
     stateRef.current = s;
     setPlaceMonsterMode(false);
@@ -290,7 +291,7 @@ export const useGameLoop = () => {
 
   const buyShopPack = (packType: 'tower' | 'infra' | 'advanced' | 'command') => {
     const state = stateRef.current;
-    if (state.status !== 'playing' || state.gameMode === 'custom') return;
+    if (state.status !== 'playing') return;
     const price =
       packType === 'tower' ? SHOP_CONFIG.towerPackPrice :
       packType === 'infra' ? SHOP_CONFIG.infraPackPrice :
