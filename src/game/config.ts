@@ -110,7 +110,7 @@ export const WEAPON_CONFIG = {
   /** 加特林 */
   gatling: {
     /** 索敌射程（px） */
-    range: 215,
+    range: 250,
     /** 单发伤害 */
     damage: 8,
     /** 每格电转换出的子弹数 */
@@ -123,10 +123,10 @@ export const WEAPON_CONFIG = {
     heatPerPulse: 0.22,
     /** 每秒按当前热量百分比散热（0~1） */
     heatDecayPct: 0.6,
-    /** 冷却时的最小散射角（rad，约 2°） */
-    minSpread: 0.04,
-    /** 最大热量时的最大散射角（rad，约 20°） */
-    maxSpread: 0.35,
+    /** 冷却时的最小散射角（rad，约 6°） */
+    minSpread: 0.10,
+    /** 最大热量时的最大散射角（rad，约 34°） */
+    maxSpread: 0.60,
     /** 子弹飞行速度（px/s） */
     bulletSpeed: 280,
   },
