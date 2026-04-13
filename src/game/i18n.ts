@@ -59,10 +59,14 @@ export interface I18nStrings {
   infraPackDesc: string;
   advancedPack: string;
   advancedPackDesc: string;
+  commandCardPack: string;
+  commandCardPackDesc: string;
   sell: string;
   notEnoughGold: string;
   shopPickTitle: string;
   shopPickDescription: string;
+  commandCardPickTitle: string;
+  commandCardPickDescription: string;
 
   // Wave
   startNextWave: string;
@@ -71,6 +75,7 @@ export interface I18nStrings {
   noWires: string;
   autoDeployFailed: string;
   coreCannotMove: string;
+  commandCardCannotUse: string;
 
   // Pick stats bar
   statHp: string;
@@ -93,6 +98,10 @@ export interface I18nStrings {
 
   // Tower names
   towerName: Record<string, string>;
+  commandCard: string;
+  emptyCommandCards: string;
+  commandCardName: Record<string, string>;
+  commandCardDesc: Record<string, string>;
   enemyName: Record<string, string>;
 
   // Tower descriptions (for tooltip & pick cards)
@@ -160,15 +169,20 @@ const en: I18nStrings = {
   infraPackDesc: 'Pick 1 of 3 infra items',
   advancedPack: 'Advanced Pack',
   advancedPackDesc: 'Random advanced machine',
+  commandCardPack: 'Command Pack',
+  commandCardPackDesc: 'Pick 1 of 3 command cards',
   sell: 'Sell',
   notEnoughGold: 'Not enough gold!',
   shopPickTitle: 'SHOP PURCHASE',
   shopPickDescription: 'Choose one item from the pack',
+  commandCardPickTitle: 'COMMAND PACK',
+  commandCardPickDescription: 'Choose one command card',
 
   startNextWave: 'Start Next Wave',
   noWires: 'No wires available!',
   autoDeployFailed: 'No open space near the Core for this tower.',
   coreCannotMove: 'Core cannot be moved or rotated!',
+  commandCardCannotUse: 'Cannot use command card',
   statHp: 'HP',
   statRange: 'Range',
   statAtk: 'Atk',
@@ -213,6 +227,29 @@ const en: I18nStrings = {
     big_generator: 'Big Generator',
     repair_drone: 'Repair Drone',
     core: 'Core',
+  },
+
+  commandCard: 'Command Cards',
+  emptyCommandCards: 'No command cards',
+  commandCardName: {
+    airstrike: 'Airstrike',
+    add_input: 'Add Input',
+    add_output: 'Add Output',
+    self_power: 'Self Power',
+    range_boost: 'Range Boost',
+    core_power_boost: 'Core Power Boost',
+    core_turret_unlock: 'Core Turret',
+    core_shield_unlock: 'Core Shield',
+  },
+  commandCardDesc: {
+    airstrike: 'Strike a target area.',
+    add_input: 'Add one input port to a machine.',
+    add_output: 'Add one output port to a machine.',
+    self_power: 'Give a machine 1 self-generated power every 2 seconds.',
+    range_boost: 'Increase a machine attack range by 20%.',
+    core_power_boost: 'Core dispatches 1 extra power pulse.',
+    core_turret_unlock: 'Core gains a basic turret.',
+    core_shield_unlock: 'Core gains a basic shield.',
   },
 
   enemyName: {
@@ -284,6 +321,14 @@ const en: I18nStrings = {
     'repair_drone_1': 'Repair Drone',
     'wire_3': 'Wire x3',
     'wire_5': 'Wire x5',
+    'airstrike_1': 'Airstrike',
+    'add_input_1': 'Add Input',
+    'add_output_1': 'Add Output',
+    'self_power_1': 'Self Power',
+    'range_boost_1': 'Range Boost',
+    'core_power_boost_1': 'Core Power Boost',
+    'core_turret_unlock_1': 'Core Turret',
+    'core_shield_unlock_1': 'Core Shield',
   },
 
   pickDesc: {
@@ -301,6 +346,14 @@ const en: I18nStrings = {
     'repair_drone_1': 'Repairs buildings, attacks when idle',
     'wire_3': 'Power line connectors',
     'wire_5': 'Large bundle of power lines',
+    'airstrike_1': 'Strike a target area',
+    'add_input_1': 'Add one input port',
+    'add_output_1': 'Add one output port',
+    'self_power_1': 'Generate power on one machine',
+    'range_boost_1': 'Increase one machine range',
+    'core_power_boost_1': 'Increase Core power output',
+    'core_turret_unlock_1': 'Add basic Core firepower',
+    'core_shield_unlock_1': 'Add a basic Core shield',
   },
 };
 
@@ -353,15 +406,20 @@ const zh: I18nStrings = {
   infraPackDesc: '获得一次只含基建的三选一',
   advancedPack: '高级卡包',
   advancedPackDesc: '随机获得一台高级机器',
+  commandCardPack: '指令卡包',
+  commandCardPackDesc: '获得一次指令卡三选一',
   sell: '出售',
   notEnoughGold: '金币不足！',
   shopPickTitle: '商店购买',
   shopPickDescription: '从卡包中选择一项',
+  commandCardPickTitle: '指令卡包',
+  commandCardPickDescription: '选择一张指令卡',
 
   startNextWave: '提前开始下一波',
   noWires: '没有可用的线缆！',
   autoDeployFailed: '主基地附近没有可部署这座防御塔的空地。',
   coreCannotMove: '主基地无法拖动和旋转！',
+  commandCardCannotUse: '无法使用指令卡',
   statHp: '血量',
   statRange: '射程',
   statAtk: '攻击',
@@ -406,6 +464,29 @@ const zh: I18nStrings = {
     big_generator: '大发电机',
     repair_drone: '维修无人机',
     core: '核心',
+  },
+
+  commandCard: '指令卡',
+  emptyCommandCards: '暂无指令卡',
+  commandCardName: {
+    airstrike: '空袭',
+    add_input: '增加输入口',
+    add_output: '增加输出口',
+    self_power: '自发电',
+    range_boost: '射程增加',
+    core_power_boost: '发电量提升',
+    core_turret_unlock: '增加炮台功能',
+    core_shield_unlock: '增加护盾功能',
+  },
+  commandCardDesc: {
+    airstrike: '对目标区域进行空袭打击。',
+    add_input: '为一台机器增加 1 个输入口。',
+    add_output: '为一台机器增加 1 个输出口。',
+    self_power: '使一台机器每 2 秒自发 1 格电。',
+    range_boost: '使一台攻击机器射程提升 20%。',
+    core_power_boost: '主基地每次发电额外发出 1 个脉冲。',
+    core_turret_unlock: '为主基地增加基础炮台功能。',
+    core_shield_unlock: '为主基地增加基础护盾功能。',
   },
 
   enemyName: {
@@ -477,6 +558,14 @@ const zh: I18nStrings = {
     'repair_drone_1': '维修无人机',
     'wire_3': '线缆 x3',
     'wire_5': '线缆 x5',
+    'airstrike_1': '空袭',
+    'add_input_1': '增加输入口',
+    'add_output_1': '增加输出口',
+    'self_power_1': '自发电',
+    'range_boost_1': '射程增加',
+    'core_power_boost_1': '发电量提升',
+    'core_turret_unlock_1': '增加炮台功能',
+    'core_shield_unlock_1': '增加护盾功能',
   },
 
   pickDesc: {
@@ -494,6 +583,14 @@ const zh: I18nStrings = {
     'repair_drone_1': '维修建筑，空闲时攻击敌人',
     'wire_3': '电力线缆连接器',
     'wire_5': '大捆电力线缆',
+    'airstrike_1': '对目标区域进行打击',
+    'add_input_1': '增加一个机器输入口',
+    'add_output_1': '增加一个机器输出口',
+    'self_power_1': '让一台机器自行发电',
+    'range_boost_1': '提升一台机器的射程',
+    'core_power_boost_1': '提升主基地发电量',
+    'core_turret_unlock_1': '让主基地获得基础炮台',
+    'core_shield_unlock_1': '让主基地获得基础护盾',
   },
 };
 
@@ -508,5 +605,6 @@ export const t = (): I18nStrings => locales[currentLocale];
 /** Helper to get pick key from pool entry */
 export const pickKey = (kind: string, towerType?: string, count?: number): string => {
   if (kind === 'wire') return `wire_${count}`;
+  if (kind === 'command_card') return `${towerType}_${count}`;
   return `${towerType}_${count}`;
 };

@@ -4,6 +4,7 @@ import {
   ShieldBreakEffect,
   Tower,
   TOWER_STATS,
+  getTowerRange,
 } from './types';
 import {
   createExplosion,
@@ -20,6 +21,7 @@ import {
 import { closestPointOnTower } from './collider';
 import {
   ENEMY_AI_CONFIG,
+  COMMAND_CARD_CONFIG,
   ENEMY_SCALING,
   GLOBAL_CONFIG,
   SCORE_CONFIG,
@@ -100,6 +102,11 @@ const {
   repairRange: REPAIR_DRONE_REPAIR_RANGE,
 } = WEAPON_CONFIG.repairDrone;
 const SNIPER_AIM_THRESHOLD = 0.05;
+const SELF_POWER_INTERVAL = COMMAND_CARD_CONFIG.self_power.selfPowerInterval ?? 2;
+const SELF_POWER_AMOUNT = COMMAND_CARD_CONFIG.self_power.selfPowerAmount ?? 1;
+const CORE_TURRET_RANGE = COMMAND_CARD_CONFIG.core_turret_unlock.coreTurretRange ?? 220;
+const CORE_TURRET_DAMAGE = COMMAND_CARD_CONFIG.core_turret_unlock.coreTurretDamage ?? 30;
+const CORE_TURRET_COOLDOWN = COMMAND_CARD_CONFIG.core_turret_unlock.coreTurretCooldown ?? 1200;
 
 const applyDamageToEnemy = (
   state: GameState,
@@ -172,7 +179,7 @@ const fireGatlingShot = (
     damage: GATLING_DAMAGE,
     angle: spreadAngle,
     traveled: 0,
-    maxRange: GATLING_BULLET_RANGE,
+    maxRange: GATLING_BULLET_RANGE * (tower.rangeMultiplier ?? 1),
     color: '#f59e0b',
     size: 2,
   });
@@ -238,7 +245,11 @@ const updatePowerSystems = (state: GameState, dt: number, now: number) => {
   if (state.powerTimer >= POWER_INTERVAL) {
     state.powerTimer -= POWER_INTERVAL;
     for (const tower of state.towers) {
-      if (tower.type === 'core' || (tower.type === 'generator' && tower.powered)) {
+      if (tower.type === 'core') {
+        const pulseCount = 1 + (tower.corePowerBonus ?? 0);
+        for (let pulse = 0; pulse < pulseCount; pulse++) dispatchPulse(state, tower);
+        changed = true;
+      } else if (tower.type === 'generator' && tower.powered) {
         dispatchPulse(state, tower);
         changed = true;
       } else if (tower.type === 'big_generator' && tower.powered) {
@@ -246,6 +257,29 @@ const updatePowerSystems = (state: GameState, dt: number, now: number) => {
         changed = true;
       }
     }
+  }
+
+  for (const tower of state.towers) {
+    const selfPowerLevel = tower.selfPowerLevel ?? 0;
+    if (selfPowerLevel <= 0) continue;
+
+    tower.selfPowerTimer = (tower.selfPowerTimer ?? 0) + dt;
+    if (tower.selfPowerTimer < SELF_POWER_INTERVAL) {
+      continue;
+    }
+
+    tower.selfPowerTimer -= SELF_POWER_INTERVAL;
+    const amount = SELF_POWER_AMOUNT * selfPowerLevel;
+    if (tower.type === 'gatling') {
+      if (!tower.overloaded) {
+        tower.gatlingAmmo += GATLING_BULLETS_PER_POWER * amount;
+        tower.heat = Math.min(1, tower.heat + GATLING_HEAT_PER_PULSE * amount);
+        if (tower.heat >= 1) tower.overloaded = true;
+      }
+    } else if (tower.maxPower > 0) {
+      tower.storedPower = Math.min(tower.maxPower, tower.storedPower + amount);
+    }
+    changed = true;
   }
 
   for (const tower of state.towers) {
@@ -391,11 +425,12 @@ const updateCombatTowers = (state: GameState, dt: number, now: number) => {
     }
 
     const range: number =
-      tower.type === 'sniper' ? SNIPER_RANGE :
+      getTowerRange(tower) ??
+      (tower.type === 'sniper' ? SNIPER_RANGE :
       tower.type === 'gatling' ? GATLING_RANGE :
       tower.type === 'missile' ? MISSILE_RANGE :
       tower.type === 'repair_drone' ? REPAIR_DRONE_ATTACK_RANGE :
-      BLASTER_RANGE;
+      BLASTER_RANGE);
 
     let bestDistance = range;
     let targetX = 0;
@@ -532,7 +567,7 @@ const updateCombatTowers = (state: GameState, dt: number, now: number) => {
       damage: SNIPER_DAMAGE,
       angle: tower.barrelAngle,
       traveled: 0,
-      maxRange: SNIPER_MAX_RANGE,
+      maxRange: SNIPER_MAX_RANGE * (tower.rangeMultiplier ?? 1),
       piercing: true,
       piercedIds: [],
       color: '#a78bfa',
@@ -549,7 +584,7 @@ const updateCombatTowers = (state: GameState, dt: number, now: number) => {
 
     const baseX = (tower.x + tower.width / 2) * GLOBAL_CONFIG.cellSize;
     const baseY = (tower.y + tower.height / 2) * GLOBAL_CONFIG.cellSize;
-    let firstEnemy = findNearestEnemy(state.enemies, baseX, baseY, TESLA_RANGE);
+    let firstEnemy = findNearestEnemy(state.enemies, baseX, baseY, getTowerRange(tower) ?? TESLA_RANGE);
     if (!firstEnemy) continue;
 
     const power = tower.storedPower;
@@ -575,6 +610,30 @@ const updateCombatTowers = (state: GameState, dt: number, now: number) => {
     }
 
     tower.lastActionTime = now;
+    changed = true;
+  }
+
+  for (const tower of state.towers) {
+    if (tower.type !== 'core' || !tower.coreTurretUnlocked) continue;
+    if (now - (tower.coreTurretLastShot ?? 0) <= CORE_TURRET_COOLDOWN) continue;
+
+    const baseX = (tower.x + tower.width / 2) * GLOBAL_CONFIG.cellSize;
+    const baseY = (tower.y + tower.height / 2) * GLOBAL_CONFIG.cellSize;
+    const target = findNearestEnemy(state.enemies, baseX, baseY, CORE_TURRET_RANGE);
+    if (!target) continue;
+
+    state.projectiles.push({
+      id: genId(),
+      x: baseX,
+      y: baseY,
+      targetId: target.id,
+      speed: BLASTER_BULLET_SPEED,
+      damage: CORE_TURRET_DAMAGE,
+      sourceTowerId: tower.id,
+      color: '#93c5fd',
+      size: 3,
+    });
+    tower.coreTurretLastShot = now;
     changed = true;
   }
 

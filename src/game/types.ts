@@ -2,13 +2,14 @@ import { GLOBAL_CONFIG, TOWER_CONFIG, WEAPON_CONFIG } from './config';
 
 export type Position = { x: number; y: number };
 export type TowerType = 'core' | 'blaster' | 'gatling' | 'sniper' | 'tesla' | 'generator' | 'shield' | 'battery' | 'bus' | 'missile' | 'big_generator' | 'repair_drone';
+export type CommandCardType = 'airstrike' | 'add_input' | 'add_output' | 'self_power' | 'range_boost' | 'core_power_boost' | 'core_turret_unlock' | 'core_shield_unlock';
 export type GameMode = 'normal' | 'custom';
 export type PortDirection = 'top' | 'right' | 'bottom' | 'left';
 export type PortType = 'input' | 'output';
 export type GameStatus = 'menu' | 'playing' | 'paused' | 'pick' | 'gameover';
 
 /** Pick overlay: normal random pool vs. fixed boss-wave bonus vs. shop purchases */
-export type PickUiPhase = 'standard' | 'boss_bonus' | 'shop_tower' | 'shop_infra';
+export type PickUiPhase = 'standard' | 'boss_bonus' | 'shop_tower' | 'shop_infra' | 'shop_command';
 export type EnemyType = 'scout' | 'grunt' | 'tank' | 'saboteur' | 'overlord';
 
 export interface Port {
@@ -77,6 +78,12 @@ export interface Tower {
   overloaded: boolean;   // gatling overload lockout until fully cooled
   gatlingAmmo: number;   // queued bullets converted from incoming power
   sniperAimSince?: number; // sniper: time (performance.now) when barrel locked on target
+  selfPowerLevel?: number;
+  selfPowerTimer?: number;
+  rangeMultiplier?: number;
+  corePowerBonus?: number;
+  coreTurretUnlocked?: boolean;
+  coreTurretLastShot?: number;
   collider: Collider;     // collision shape (regenerated on rotation)
 }
 
@@ -172,8 +179,9 @@ export interface IncomingDrop {
 
 export interface PickOption {
   id: string;
-  kind: 'tower' | 'wire';
+  kind: 'tower' | 'wire' | 'command_card';
   towerType?: TowerType;
+  commandCardType?: CommandCardType;
   count: number;
   label: string;
   description: string;
@@ -187,6 +195,7 @@ export interface GameState {
   wireInventory: number;
   gold: number;
   towerInventory: Record<string, number>;
+  commandCardInventory: Record<string, number>;
   pickOptions: PickOption[];
   /** After clearing a boss wave, show one extra fixed 3-choice after the normal pick */
   bossBonusPickQueued: boolean;
@@ -246,4 +255,11 @@ export const TURRET_RANGE: Partial<Record<TowerType, number>> = {
   tesla: WEAPON_CONFIG.tesla.range,
   missile: WEAPON_CONFIG.missile.range,
   repair_drone: WEAPON_CONFIG.repairDrone.attackRange,
+};
+
+export const getTowerRange = (tower: Tower | TowerType): number | undefined => {
+  const type = typeof tower === 'string' ? tower : tower.type;
+  const base = TURRET_RANGE[type];
+  if (base == null) return undefined;
+  return typeof tower === 'string' ? base : base * (tower.rangeMultiplier ?? 1);
 };

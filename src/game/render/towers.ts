@@ -1,4 +1,4 @@
-import { GameState, Tower, TowerType, CELL_SIZE, HALF_CELL, TOWER_STATS, TURRET_RANGE } from '../types';
+import { GameState, Tower, TowerType, CELL_SIZE, HALF_CELL, TOWER_STATS, getTowerRange } from '../types';
 import { getPortPos, isPortAccessible } from '../engine';
 import { getLinearTowerBodyAspectRatio, getLinearTowerBodyRect } from '../linearTowerGeometry';
 import { SHOP_CONFIG } from '../config';
@@ -590,7 +590,7 @@ export const drawRangePreview = (
   rotatingTowerId: string | null,
 ) => {
   if (hoverPos && selectedTower && state.status === 'playing') {
-    const range = TURRET_RANGE[selectedTower];
+    const range = getTowerRange(selectedTower);
     if (range) {
       const stats = TOWER_STATS[selectedTower];
       const rcx = (hoverPos.x + stats.width / 2) * CELL_SIZE;
@@ -601,7 +601,7 @@ export const drawRangePreview = (
   if (rotatingTowerId) {
     const rt = state.towerMap.get(rotatingTowerId);
     if (rt) {
-      const range = TURRET_RANGE[rt.type];
+      const range = getTowerRange(rt);
       if (range) {
         const rcx = (rt.x + rt.width / 2) * CELL_SIZE;
         const rcy = (rt.y + rt.height / 2) * CELL_SIZE;

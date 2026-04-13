@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Battery, Zap, Crosshair, Activity, Play, RotateCcw, Pause, Hexagon, Cable, Wrench, ChevronRight, ChevronLeft, Flame, Focus, Radio, GitMerge, Globe, LogOut, BookOpen, X, Keyboard, Menu, Eye, EyeOff, ShoppingBag, Coins, Rocket, Bot } from 'lucide-react';
+import { Battery, Zap, Crosshair, Activity, Play, RotateCcw, Pause, Hexagon, Cable, Wrench, ChevronRight, ChevronLeft, Flame, Focus, Radio, GitMerge, Globe, LogOut, BookOpen, X, Keyboard, Menu, Eye, EyeOff, ShoppingBag, Coins, Rocket, Bot, Bomb, Plus, Power, Shield } from 'lucide-react';
 import { useGameLoop } from './game/useGameLoop';
-import { TOWER_STATS, TowerType, PickOption, EnemyType } from './game/types';
+import { TOWER_STATS, TowerType, PickOption, EnemyType, CommandCardType } from './game/types';
 import { t, getLocale, setLocale, Locale } from './game/i18n';
-import { GLOBAL_CONFIG, TIPS_CONFIG, TOWER_CONFIG, WEAPON_CONFIG, SHOP_CONFIG } from './game/config';
+import { COMMAND_CARD_CONFIG, GLOBAL_CONFIG, TIPS_CONFIG, TOWER_CONFIG, WEAPON_CONFIG, SHOP_CONFIG } from './game/config';
 
 const TowerIcon = ({ type, size = 22 }: { type: string; size?: number }) => {
   const icons: Record<string, React.ComponentType<{ size: number }>> = {
@@ -15,8 +15,24 @@ const TowerIcon = ({ type, size = 22 }: { type: string; size?: number }) => {
   return Icon ? <Icon size={size} /> : null;
 };
 
+const CommandCardIcon = ({ type, size = 22 }: { type: CommandCardType; size?: number }) => {
+  const icons: Record<CommandCardType, React.ComponentType<{ size: number }>> = {
+    airstrike: Bomb,
+    add_input: Plus,
+    add_output: Plus,
+    self_power: Power,
+    range_boost: Focus,
+    core_power_boost: Zap,
+    core_turret_unlock: Crosshair,
+    core_shield_unlock: Shield,
+  };
+  const Icon = icons[type];
+  return <Icon size={size} />;
+};
+
 const getPickColor = (opt: PickOption) => {
   if (opt.kind === 'wire') return '#60a5fa';
+  if (opt.kind === 'command_card' && opt.commandCardType) return COMMAND_CARD_CONFIG[opt.commandCardType].color;
   return TOWER_STATS[opt.towerType!]?.color ?? '#6b7280';
 };
 
@@ -82,9 +98,13 @@ export default function App() {
     handleCanvasTouchStart,
     handleCanvasTouchMove,
     handleCanvasTouchEnd,
+    startCommandCardDrag,
+    useCommandCardOnCore,
+    commandCardDragLine,
   } = useGameLoop();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [commandSidebarOpen, setCommandSidebarOpen] = useState(true);
   const [codexTower, setCodexTower] = useState<TowerType | null>(null);
   const [locale, _setLocale] = useState<Locale>(getLocale());
 
@@ -99,6 +119,7 @@ export default function App() {
   // On mobile, sidebar starts closed; on mobile the sidebar is an overlay
   useEffect(() => {
     if (isMobile && gameState.gameMode === 'custom') setSidebarOpen(false);
+    if (isMobile) setCommandSidebarOpen(false);
   }, [isMobile, gameState.gameMode]);
 
   const toggleLocale = () => {
@@ -258,6 +279,72 @@ export default function App() {
     );
   };
 
+  const commandCards = (Object.entries(gameState.commandCardInventory) as [CommandCardType, number][])
+    .flatMap(([type, count]) => Array.from({ length: count }, (_, idx) => ({ type, id: `${type}-${idx}` })));
+
+  const renderCommandCard = (type: CommandCardType, key: string) => {
+    const color = COMMAND_CARD_CONFIG[type].color;
+    const isCoreCommandCard = type === 'core_power_boost' || type === 'core_turret_unlock' || type === 'core_shield_unlock';
+    return (
+      <button
+        key={key}
+        type="button"
+        onClick={() => {
+          if (isCoreCommandCard && gameState.status === 'playing') useCommandCardOnCore(type);
+        }}
+        onPointerDown={(event) => {
+          if (gameState.status !== 'playing') return;
+          if (isCoreCommandCard) return;
+          event.preventDefault();
+          event.currentTarget.setPointerCapture?.(event.pointerId);
+          const rect = event.currentTarget.getBoundingClientRect();
+          startCommandCardDrag(type, {
+            x: rect.left + rect.width / 2,
+            y: rect.top + rect.height / 2,
+          });
+        }}
+        disabled={gameState.status !== 'playing'}
+        className={`group relative aspect-[3/4] w-full rounded-lg border p-3 text-left transition-all active:scale-95 ${
+          gameState.status === 'playing'
+            ? `bg-gray-900/90 hover:bg-gray-800/95 ${isCoreCommandCard ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing'}`
+            : 'bg-gray-900/40 opacity-60 cursor-not-allowed'
+        }`}
+        style={{ borderColor: color + '66', boxShadow: `inset 0 0 18px ${color}1f` }}
+        title={i.commandCardDesc[type]}
+      >
+        <div className="flex h-full flex-col justify-between">
+          <div className="flex items-start justify-between gap-2">
+            <div className="rounded-lg border p-2" style={{ borderColor: color + '55', color, backgroundColor: color + '18' }}>
+              <CommandCardIcon type={type} size={22} />
+            </div>
+            <div className="text-[10px] font-black uppercase tracking-widest" style={{ color }}>{i.commandCard}</div>
+          </div>
+          <div className="min-w-0">
+            <div className="text-sm font-black leading-tight text-white">{i.commandCardName[type]}</div>
+            <div className="mt-1 text-[11px] leading-snug text-gray-400">{i.commandCardDesc[type]}</div>
+          </div>
+        </div>
+      </button>
+    );
+  };
+
+  const renderCommandCardPanelContents = () => (
+    <div className="min-w-[172px] flex flex-col gap-2 h-full">
+      <div className="text-xs font-bold uppercase tracking-widest text-gray-500 px-1 py-1.5">
+        {i.commandCard}
+      </div>
+      {commandCards.length > 0 ? (
+        <div className="grid grid-cols-1 gap-2">
+          {commandCards.map(card => renderCommandCard(card.type, card.id))}
+        </div>
+      ) : (
+        <div className="rounded-lg border border-gray-800 bg-gray-900/55 px-3 py-4 text-center text-xs font-bold text-gray-500">
+          {i.emptyCommandCards}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="h-screen bg-gray-950 text-gray-100 font-sans flex flex-col overflow-hidden">
 
@@ -356,6 +443,25 @@ export default function App() {
 
       {/* Main Area: Canvas + Build Panel */}
       <div className="flex-1 flex min-h-0 relative">
+
+        {(gameState.status === 'playing' || gameState.status === 'paused' || gameState.status === 'pick') && gameState.gameMode !== 'custom' && !isMobile && (
+          <div className="relative shrink-0 flex">
+            <button
+              onClick={() => setCommandSidebarOpen(v => !v)}
+              className="absolute -right-9 top-1/2 -translate-y-1/2 z-10 w-9 h-16 bg-gray-800 hover:bg-gray-700 border border-gray-700 border-l-0 rounded-r-lg flex items-center justify-center text-gray-400 hover:text-white transition-colors"
+              title={commandSidebarOpen ? i.hidePanel : i.showPanel}
+            >
+              {commandSidebarOpen ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
+            </button>
+            <div
+              className={`bg-gray-900/80 border-r border-gray-800 p-3.5 flex flex-col gap-2.5 overflow-y-auto overflow-x-hidden transition-all duration-300 ease-in-out ${
+                commandSidebarOpen ? 'w-[196px] opacity-100' : 'w-0 opacity-0 p-0 border-r-0'
+              }`}
+            >
+              {renderCommandCardPanelContents()}
+            </div>
+          </div>
+        )}
 
         {/* Canvas Area */}
         <div className="flex-1 min-w-0 p-1 sm:p-2">
@@ -468,7 +574,12 @@ export default function App() {
                 </div>
                 {!pickOverlayHidden && (
                 <div className="absolute inset-0 bg-gray-950/85 backdrop-blur-sm flex flex-col items-center justify-center p-4 sm:p-8 text-center overflow-y-auto">
-                {gameState.pickUiPhase === 'shop_tower' || gameState.pickUiPhase === 'shop_infra' ? (
+                {gameState.pickUiPhase === 'shop_command' ? (
+                  <>
+                    <h2 className="text-2xl sm:text-3xl font-black mb-1 text-cyan-300 tracking-tight">{i.commandCardPickTitle}</h2>
+                    <p className="text-gray-400 text-xs sm:text-sm mb-4 sm:mb-6 max-w-md leading-relaxed px-2">{i.commandCardPickDescription}</p>
+                  </>
+                ) : gameState.pickUiPhase === 'shop_tower' || gameState.pickUiPhase === 'shop_infra' ? (
                   <>
                     <h2 className="text-2xl sm:text-3xl font-black mb-1 text-yellow-400 tracking-tight">{i.shopPickTitle}</h2>
                     <p className="text-gray-400 text-xs sm:text-sm mb-4 sm:mb-6 max-w-md leading-relaxed px-2">{i.shopPickDescription}</p>
@@ -525,7 +636,7 @@ export default function App() {
                             className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center text-white shrink-0"
                             style={{ backgroundColor: color + '22', color }}
                           >
-                            {opt.kind === 'wire' ? <Cable size={20} /> : <TowerIcon type={opt.towerType!} size={20} />}
+                            {opt.kind === 'wire' ? <Cable size={20} /> : opt.kind === 'command_card' && opt.commandCardType ? <CommandCardIcon type={opt.commandCardType} size={20} /> : <TowerIcon type={opt.towerType!} size={20} />}
                           </div>
                           <div className="flex flex-col items-start sm:items-center min-w-0">
                             <div className="text-sm font-bold text-white">{opt.label}</div>
@@ -789,6 +900,37 @@ export default function App() {
           </div>
         </div>
 
+        {(gameState.status === 'playing' || gameState.status === 'paused' || gameState.status === 'pick') && gameState.gameMode !== 'custom' && isMobile && (
+          <>
+            {(gameState.status === 'playing' || gameState.status === 'paused') && !commandSidebarOpen && (
+              <button
+                onClick={() => setCommandSidebarOpen(true)}
+                className="absolute bottom-3 left-3 z-30 w-12 h-12 bg-gray-800/90 backdrop-blur-sm hover:bg-gray-700 rounded-full border border-gray-600 flex items-center justify-center text-gray-300 shadow-lg active:scale-95 transition-transform"
+                title={i.commandCard}
+              >
+                <BookOpen size={20} />
+              </button>
+            )}
+            {commandSidebarOpen && (
+              <div className="absolute inset-0 z-40 flex" onClick={() => setCommandSidebarOpen(false)}>
+                <div
+                  className="w-[210px] bg-gray-900/95 backdrop-blur-md border-r border-gray-800 p-3 flex flex-col gap-2 overflow-y-auto animate-[slideInLeft_0.2s_ease-out]"
+                  onClick={e => e.stopPropagation()}
+                >
+                  <div className="flex items-center justify-between px-1 py-1">
+                    <span className="text-xs font-bold uppercase tracking-widest text-gray-500">{i.commandCard}</span>
+                    <button onClick={() => setCommandSidebarOpen(false)} className="p-1 rounded hover:bg-gray-700 text-gray-500 hover:text-gray-300 transition-colors">
+                      <X size={16} />
+                    </button>
+                  </div>
+                  {renderCommandCardPanelContents()}
+                </div>
+                <div className="flex-1" />
+              </div>
+            )}
+          </>
+        )}
+
         {/* Sidebar toggle + panel */}
         {(gameState.status === 'playing' || gameState.status === 'paused' || gameState.status === 'pick') && (isMobile ? (
           <>
@@ -904,6 +1046,25 @@ export default function App() {
                         </div>
                         <div className="flex items-center gap-1 text-yellow-400 text-xs font-bold shrink-0">
                           <Coins size={12} />{SHOP_CONFIG.advancedPackPrice}
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { buyShopPack('command'); setSidebarOpen(false); }}
+                        disabled={gameState.status !== 'playing' || gameState.gold < SHOP_CONFIG.commandCardPackPrice}
+                        className={`flex items-center gap-2.5 px-3 py-3 rounded-lg border transition-all ${
+                          gameState.status === 'playing' && gameState.gold >= SHOP_CONFIG.commandCardPackPrice
+                            ? 'border-cyan-700/70 bg-cyan-500/10 text-cyan-100 hover:bg-cyan-500/15 hover:border-cyan-500/70'
+                            : 'border-gray-800 bg-gray-900/50 text-gray-500 cursor-not-allowed opacity-40'
+                        }`}
+                      >
+                        <div className="shrink-0 text-cyan-300"><BookOpen size={20} /></div>
+                        <div className="flex flex-col items-start min-w-0 flex-1">
+                          <span className="text-sm font-bold leading-tight">{i.commandCardPack}</span>
+                          <span className="text-xs text-gray-400 leading-tight">{i.commandCardPackDesc}</span>
+                        </div>
+                        <div className="flex items-center gap-1 text-yellow-400 text-xs font-bold shrink-0">
+                          <Coins size={12} />{SHOP_CONFIG.commandCardPackPrice}
                         </div>
                       </button>
                     </>
@@ -1045,6 +1206,25 @@ export default function App() {
                         <Coins size={12} />{SHOP_CONFIG.advancedPackPrice}
                       </div>
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => buyShopPack('command')}
+                      disabled={gameState.status !== 'playing' || gameState.gold < SHOP_CONFIG.commandCardPackPrice}
+                      className={`flex items-center gap-2.5 px-3 py-3 rounded-lg border transition-all ${
+                        gameState.status === 'playing' && gameState.gold >= SHOP_CONFIG.commandCardPackPrice
+                          ? 'border-cyan-700/70 bg-cyan-500/10 text-cyan-100 hover:bg-cyan-500/15 hover:border-cyan-500/70'
+                          : 'border-gray-800 bg-gray-900/50 text-gray-500 cursor-not-allowed opacity-40'
+                      }`}
+                    >
+                      <div className="shrink-0 text-cyan-300"><BookOpen size={20} /></div>
+                      <div className="flex flex-col items-start min-w-0 flex-1">
+                        <span className="text-sm font-bold leading-tight">{i.commandCardPack}</span>
+                        <span className="text-xs text-gray-400 leading-tight">{i.commandCardPackDesc}</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-yellow-400 text-xs font-bold shrink-0">
+                        <Coins size={12} />{SHOP_CONFIG.commandCardPackPrice}
+                      </div>
+                    </button>
                   </>
                 )}
 
@@ -1075,6 +1255,21 @@ export default function App() {
           </div>
         ))}
       </div>
+
+      {commandCardDragLine && (
+        <svg className="fixed inset-0 z-[90] pointer-events-none" width="100%" height="100%">
+          <line
+            x1={commandCardDragLine.start.x}
+            y1={commandCardDragLine.start.y}
+            x2={commandCardDragLine.end.x}
+            y2={commandCardDragLine.end.y}
+            stroke={COMMAND_CARD_CONFIG[commandCardDragLine.cardType].color}
+            strokeWidth="3"
+            strokeDasharray="8 8"
+            strokeLinecap="round"
+          />
+        </svg>
+      )}
 
       {/* Machine codex modal */}
       {codexTower && (

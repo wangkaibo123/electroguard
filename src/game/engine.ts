@@ -1,10 +1,10 @@
 import {
-  GameState, Tower, TowerType, Position, Port, PortDirection, PortType, Wire, PickOption, EnemyType,
+  GameState, Tower, TowerType, CommandCardType, Position, Port, PortDirection, PortType, Wire, PickOption, EnemyType,
   PickUiPhase,
   GRID_WIDTH, GRID_HEIGHT, CELL_SIZE, HALF_CELL, TOWER_STATS, CANVAS_WIDTH, CANVAS_HEIGHT, WIRE_MAX_HP,
 } from './types';
 import { t, pickKey } from './i18n';
-import { GLOBAL_CONFIG, ENEMY_CONFIG, ENEMY_SCALING, STARTING_INVENTORY, PICK_POOL_CONFIG, WEAPON_CONFIG } from './config';
+import { GLOBAL_CONFIG, ENEMY_CONFIG, ENEMY_SCALING, STARTING_INVENTORY, PICK_POOL_CONFIG, WEAPON_CONFIG, COMMAND_CARD_CONFIG, SHOP_CONFIG } from './config';
 import { makeTowerCollider, makeEnemyCollider } from './collider';
 import { getLinearTowerBodyAspectRatio, getLinearTowerBodyRect } from './linearTowerGeometry';
 import { footprintsOverlap, getTowerCells, getTowerFootprintCells } from './footprint';
@@ -513,6 +513,30 @@ export const generateAdvancedPickOptions = (): PickOption[] => {
   }];
 };
 
+export const generateCommandCardPickOptions = (): PickOption[] => {
+  const loc = t();
+  const remaining = Object.keys(COMMAND_CARD_CONFIG) as CommandCardType[];
+  const picked: CommandCardType[] = [];
+
+  for (let n = 0; n < PICK_POOL_CONFIG.pickCount && remaining.length > 0; n++) {
+    const idx = (Math.random() * remaining.length) | 0;
+    picked.push(remaining[idx]);
+    remaining.splice(idx, 1);
+  }
+
+  return picked.map(commandCardType => {
+    const k = pickKey('command_card', commandCardType, 1);
+    return {
+      kind: 'command_card',
+      commandCardType,
+      count: 1,
+      id: genId(),
+      label: loc.pickLabel[k] ?? loc.commandCardName[commandCardType] ?? commandCardType,
+      description: loc.pickDesc[k] ?? loc.commandCardDesc[commandCardType] ?? '',
+    };
+  });
+};
+
 /** Fixed bonus 3-choice after clearing a boss wave: wire → generator → shield (display order). */
 export const generateBossBonusPickOptions = (): PickOption[] => {
   const loc = t();
@@ -565,8 +589,9 @@ export const createInitialState = (): GameState => {
     wave: 0,
     powerTimer: 0,
     wireInventory: STARTING_INVENTORY.wires,
-    gold: 0,
+    gold: SHOP_CONFIG.startingGold,
     towerInventory: { ...STARTING_INVENTORY.towers },
+    commandCardInventory: {},
     pickOptions: [],
     bossBonusPickQueued: false,
     pendingBossBonusPick: false,
@@ -602,6 +627,10 @@ export const updatePowerGrid = (state: GameState) => {
       const t = state.towerMap.get(nextId);
       if (t) t.powered = true;
     }
+  }
+
+  for (const t of state.towers) {
+    if ((t.selfPowerLevel ?? 0) > 0) t.powered = true;
   }
 };
 

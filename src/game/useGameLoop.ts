@@ -1,8 +1,8 @@
 ﻿import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  GameState, TowerType, Port, Wire, CELL_SIZE, GRID_WIDTH, GRID_HEIGHT, EnemyType,
+  GameState, TowerType, CommandCardType, Port, Wire, CELL_SIZE, GRID_WIDTH, GRID_HEIGHT, EnemyType,
   TOWER_STATS, CANVAS_WIDTH, CANVAS_HEIGHT, WIRE_MAX_HP,
-  Camera, VIEWPORT_WIDTH, VIEWPORT_HEIGHT,
+  Camera, VIEWPORT_WIDTH, VIEWPORT_HEIGHT, getTowerRange,
 } from './types';
 import {
   createInitialState, updatePowerGrid, getPortPos, getPortCell, findWirePath,
@@ -10,10 +10,11 @@ import {
   collidesWithWires, repathConnectedWires, genId, generatePickOptions, spawnEnemyAt,
   canDirectLinkPorts, isPortAccessible,
   generateTowerOnlyPickOptions, generateInfraOnlyPickOptions, rebuildTowerMap,
-  generateAdvancedPickOptions,
+  generateAdvancedPickOptions, generateCommandCardPickOptions, syncDirectPortLinks,
+  createExplosion,
 } from './engine';
 import { renderGame } from './renderer';
-import { GLOBAL_CONFIG, SHOP_CONFIG } from './config';
+import { COMMAND_CARD_CONFIG, GLOBAL_CONFIG, SCORE_CONFIG, SHOP_CONFIG } from './config';
 import { t } from './i18n';
 import { addTowerToState, createTowerAt } from './towerFactory';
 import { findAutoPlacementNearCore } from './placement';
@@ -75,6 +76,11 @@ export const useGameLoop = () => {
   const dragOrigPosRef = useRef<{ x: number; y: number } | null>(null);
   const dragOrigWiresRef = useRef<Wire[] | null>(null);
   const dragOrigInventoryRef = useRef<number>(0);
+  const [commandCardDragLine, setCommandCardDragLine] = useState<{
+    cardType: CommandCardType;
+    start: { x: number; y: number };
+    end: { x: number; y: number };
+  } | null>(null);
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -242,9 +248,12 @@ export const useGameLoop = () => {
       }
     } else if (option.kind === 'wire') {
       state.wireInventory += option.count;
+    } else if (option.kind === 'command_card' && option.commandCardType) {
+      state.commandCardInventory[option.commandCardType] =
+        (state.commandCardInventory[option.commandCardType] ?? 0) + option.count;
     }
 
-    const isShopPick = state.pickUiPhase === 'shop_tower' || state.pickUiPhase === 'shop_infra';
+    const isShopPick = state.pickUiPhase === 'shop_tower' || state.pickUiPhase === 'shop_infra' || state.pickUiPhase === 'shop_command';
 
     state.pickOptions = [];
     state.status = 'playing';
@@ -278,12 +287,13 @@ export const useGameLoop = () => {
     sync();
   };
 
-  const buyShopPack = (packType: 'tower' | 'infra' | 'advanced') => {
+  const buyShopPack = (packType: 'tower' | 'infra' | 'advanced' | 'command') => {
     const state = stateRef.current;
     if (state.status !== 'playing' || state.gameMode === 'custom') return;
     const price =
       packType === 'tower' ? SHOP_CONFIG.towerPackPrice :
       packType === 'infra' ? SHOP_CONFIG.infraPackPrice :
+      packType === 'command' ? SHOP_CONFIG.commandCardPackPrice :
       SHOP_CONFIG.advancedPackPrice;
     if (state.gold < price) {
       showToast(t().notEnoughGold);
@@ -305,9 +315,11 @@ export const useGameLoop = () => {
     }
     state.pickOptions =
       packType === 'tower' ? generateTowerOnlyPickOptions() :
+      packType === 'command' ? generateCommandCardPickOptions() :
       generateInfraOnlyPickOptions();
     state.pickUiPhase =
       packType === 'tower' ? 'shop_tower' :
+      packType === 'command' ? 'shop_command' :
       'shop_infra';
     state.pendingBossBonusPick = false;
     state.bossBonusPickQueued = false;
@@ -464,6 +476,13 @@ export const useGameLoop = () => {
     return toWorld(clientX - rect.left, clientY - rect.top);
   };
 
+  const getCanvasClientPoint = (clientX: number, clientY: number) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return null;
+    if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) return null;
+    return { sx: clientX - rect.left, sy: clientY - rect.top };
+  };
+
   const clampCamera = (cam: Camera) => {
     const vp = viewportRef.current;
     const viewW = vp.width / cam.zoom;
@@ -472,6 +491,139 @@ export const useGameLoop = () => {
     const maxY = Math.max(0, CANVAS_HEIGHT - viewH);
     cam.x = Math.max(0, Math.min(cam.x, maxX));
     cam.y = Math.max(0, Math.min(cam.y, maxY));
+  };
+
+  const findTowerAtWorldPoint = (state: GameState, wx: number, wy: number) => {
+    for (const tower of state.towers) {
+      if (isWorldPointInTowerFootprint(tower, wx, wy)) return tower;
+    }
+    return null;
+  };
+
+  const addMachinePort = (state: GameState, tower: GameState['towers'][number], portType: 'input' | 'output') => {
+    if (tower.type === 'core') return false;
+    const directions = ['top', 'right', 'bottom', 'left'] as const;
+    const offsets = [1 / 6, 1 / 3, 1 / 2, 2 / 3, 5 / 6];
+    for (const sideOffset of offsets) {
+      for (const direction of directions) {
+        const hasSameSpot = tower.ports.some(port =>
+          port.portType === portType &&
+          port.direction === direction &&
+          Math.abs((port.sideOffset ?? 0.5) - sideOffset) < 0.01,
+        );
+        if (hasSameSpot) continue;
+        const port = { id: genId(), direction, portType, sideOffset };
+        if (!isPortAccessible(state, tower, port)) continue;
+        tower.ports.push(port);
+        if (!syncDirectPortLinks(state, { towerId: tower.id, createSpark: true })) {
+          updatePowerGrid(state);
+        }
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const damageEnemyFromCommand = (state: GameState, enemy: GameState['enemies'][number], damage: number) => {
+    let remainingDamage = damage;
+    if (enemy.shieldAbsorb > 0) {
+      const absorbed = Math.min(enemy.shieldAbsorb, remainingDamage);
+      enemy.shieldAbsorb -= absorbed;
+      remainingDamage -= absorbed;
+    }
+    enemy.hp -= remainingDamage;
+    createExplosion(state, enemy.x, enemy.y, enemy.color, enemy.hp <= 0 ? 12 : 5);
+    if (enemy.hp > 0) return;
+    state.score += SCORE_CONFIG[enemy.enemyType] ?? SCORE_CONFIG.default;
+  };
+
+  const applyCommandCardAtWorld = (cardType: CommandCardType, wx: number, wy: number) => {
+    const state = stateRef.current;
+    if (state.status !== 'playing') return false;
+    if ((state.commandCardInventory[cardType] ?? 0) <= 0) return false;
+    if (wx < 0 || wy < 0 || wx > CANVAS_WIDTH || wy > CANVAS_HEIGHT) return false;
+
+    const targetTower = findTowerAtWorldPoint(state, wx, wy);
+    let used = false;
+
+    if (cardType === 'airstrike') {
+      const cfg = COMMAND_CARD_CONFIG.airstrike;
+      const radius = cfg.airstrikeRadius ?? 90;
+      const damage = cfg.airstrikeDamage ?? 160;
+      for (const enemy of state.enemies) {
+        if (Math.hypot(enemy.x - wx, enemy.y - wy) <= radius + enemy.radius) {
+          damageEnemyFromCommand(state, enemy, damage);
+          used = true;
+        }
+      }
+      createExplosion(state, wx, wy, cfg.color, 24);
+      state.enemies = state.enemies.filter(enemy => enemy.hp > 0);
+      used = true;
+    } else if (cardType === 'add_input' || cardType === 'add_output') {
+      if (!targetTower || targetTower.type === 'core') return false;
+      used = addMachinePort(state, targetTower, cardType === 'add_input' ? 'input' : 'output');
+    } else if (cardType === 'self_power') {
+      if (!targetTower || targetTower.type === 'core') return false;
+      targetTower.selfPowerLevel = (targetTower.selfPowerLevel ?? 0) + 1;
+      targetTower.selfPowerTimer = 0;
+      updatePowerGrid(state);
+      used = true;
+    } else if (cardType === 'range_boost') {
+      if (!targetTower || targetTower.type === 'core' || getTowerRange(targetTower) == null) return false;
+      targetTower.rangeMultiplier = (targetTower.rangeMultiplier ?? 1) + (COMMAND_CARD_CONFIG.range_boost.rangeBoostMultiplier ?? 0.2);
+      used = true;
+    } else if (cardType === 'core_power_boost') {
+      if (!targetTower || targetTower.type !== 'core') return false;
+      targetTower.corePowerBonus = (targetTower.corePowerBonus ?? 0) + (COMMAND_CARD_CONFIG.core_power_boost.corePowerBonus ?? 1);
+      used = true;
+    } else if (cardType === 'core_turret_unlock') {
+      if (!targetTower || targetTower.type !== 'core' || targetTower.coreTurretUnlocked) return false;
+      targetTower.coreTurretUnlocked = true;
+      targetTower.coreTurretLastShot = 0;
+      used = true;
+    } else if (cardType === 'core_shield_unlock') {
+      if (!targetTower || targetTower.type !== 'core' || targetTower.maxShieldHp > 0) return false;
+      targetTower.maxShieldHp = COMMAND_CARD_CONFIG.core_shield_unlock.coreShieldHp ?? 200;
+      targetTower.shieldHp = targetTower.maxShieldHp;
+      targetTower.shieldRadius = COMMAND_CARD_CONFIG.core_shield_unlock.coreShieldRadius ?? 160;
+      used = true;
+    }
+
+    if (!used) return false;
+    state.commandCardInventory[cardType] = Math.max(0, (state.commandCardInventory[cardType] ?? 0) - 1);
+    sync();
+    return true;
+  };
+
+  const commitCommandCardDrag = (cardType: CommandCardType, clientX: number, clientY: number) => {
+    const point = getCanvasClientPoint(clientX, clientY);
+    if (!point) {
+      showToast(t().commandCardCannotUse);
+      return;
+    }
+    const { wx, wy } = toWorld(point.sx, point.sy);
+    if (!applyCommandCardAtWorld(cardType, wx, wy)) {
+      showToast(t().commandCardCannotUse);
+    }
+  };
+
+  const startCommandCardDrag = (cardType: CommandCardType, sourceClientPos: { x: number; y: number }) => {
+    if (stateRef.current.status !== 'playing' || (stateRef.current.commandCardInventory[cardType] ?? 0) <= 0) return;
+    setCommandCardDragLine({ cardType, start: sourceClientPos, end: sourceClientPos });
+  };
+
+  const useCommandCardOnCore = (cardType: CommandCardType) => {
+    const state = stateRef.current;
+    const core = state.towers.find(tower => tower.type === 'core');
+    if (!core) {
+      showToast(t().commandCardCannotUse);
+      return;
+    }
+    const wx = (core.x + core.width / 2) * CELL_SIZE;
+    const wy = (core.y + core.height / 2) * CELL_SIZE;
+    if (!applyCommandCardAtWorld(cardType, wx, wy)) {
+      showToast(t().commandCardCannotUse);
+    }
   };
 
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -1154,9 +1306,37 @@ export const useGameLoop = () => {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
+  useEffect(() => {
+    if (!commandCardDragLine) return;
+
+    const onPointerMove = (event: PointerEvent) => {
+      setCommandCardDragLine(current => current
+        ? { ...current, end: { x: event.clientX, y: event.clientY } }
+        : current,
+      );
+    };
+    const onPointerUp = (event: PointerEvent) => {
+      const cardType = commandCardDragLine.cardType;
+      setCommandCardDragLine(null);
+      commitCommandCardDrag(cardType, event.clientX, event.clientY);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setCommandCardDragLine(null);
+    };
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp, { once: true });
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [commandCardDragLine]);
+
   return {
     canvasRef, cameraRef, gameState, startGame, startCustomGame, togglePause, returnToMenu, handlePick,
-    openCustomPick, buyShopPack, sellTower, rotatingTowerId,
+    openCustomPick, buyShopPack, sellTower, rotatingTowerId, startCommandCardDrag, useCommandCardOnCore, commandCardDragLine,
     selectedTower, setSelectedTower, placeMonsterMode, setPlaceMonsterMode, skipToNextWave, toastMessage,
     selectedMonsterType, setSelectedMonsterType, staticMonster, setStaticMonster,
     handleCanvasMouseDown, handleCanvasMouseMove, handleCanvasMouseUp, handleCanvasMouseLeave,
