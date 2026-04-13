@@ -110,7 +110,7 @@ export const WEAPON_CONFIG = {
   /** 加特林 */
   gatling: {
     /** 索敌射程（px） */
-    range: 195,
+    range: 215,
     /** 单发伤害 */
     damage: 8,
     /** 每格电转换出的子弹数 */
