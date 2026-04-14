@@ -1,4 +1,4 @@
-import type { TowerType, EnemyType, CommandCardType } from './types';
+import type { TowerType, EnemyType, CommandCardType, BaseUpgradeType } from './types';
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  游戏配置表  —  所有影响游戏平衡的数值集中在此文件
@@ -279,6 +279,9 @@ export const SHOP_CONFIG = {
   infraPackPrice: 50,
   advancedPackPrice: 100,
   commandCardPackPrice: 50,
+  baseUpgradePackPrice: 50,
+  initialRefreshCost: 2,
+  refreshCostIncrease: 2,
   sellPrice: 5,
 } as const;
 
@@ -289,6 +292,16 @@ export const COMMAND_CARD_CONFIG: Record<CommandCardType, {
   selfPowerInterval?: number;
   selfPowerAmount?: number;
   rangeBoostMultiplier?: number;
+}> = {
+  airstrike: { color: '#fb7185', airstrikeRadius: 90, airstrikeDamage: 160 },
+  add_input: { color: '#34d399' },
+  add_output: { color: '#38bdf8' },
+  self_power: { color: '#facc15', selfPowerInterval: 2, selfPowerAmount: 1 },
+  range_boost: { color: '#a78bfa', rangeBoostMultiplier: 0.2 },
+} as const;
+
+export const BASE_UPGRADE_CONFIG: Record<BaseUpgradeType, {
+  color: string;
   corePowerBonus?: number;
   coreTurretRange?: number;
   coreTurretDamage?: number;
@@ -296,11 +309,6 @@ export const COMMAND_CARD_CONFIG: Record<CommandCardType, {
   coreShieldHp?: number;
   coreShieldRadius?: number;
 }> = {
-  airstrike: { color: '#fb7185', airstrikeRadius: 90, airstrikeDamage: 160 },
-  add_input: { color: '#34d399' },
-  add_output: { color: '#38bdf8' },
-  self_power: { color: '#facc15', selfPowerInterval: 2, selfPowerAmount: 1 },
-  range_boost: { color: '#a78bfa', rangeBoostMultiplier: 0.2 },
   core_power_boost: { color: '#60a5fa', corePowerBonus: 1 },
   core_turret_unlock: { color: '#f87171', coreTurretRange: 220, coreTurretDamage: 30, coreTurretCooldown: 1200 },
   core_shield_unlock: { color: '#22d3ee', coreShieldHp: 200, coreShieldRadius: 160 },

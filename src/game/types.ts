@@ -2,14 +2,16 @@ import { GLOBAL_CONFIG, TOWER_CONFIG, WEAPON_CONFIG } from './config';
 
 export type Position = { x: number; y: number };
 export type TowerType = 'core' | 'blaster' | 'gatling' | 'sniper' | 'tesla' | 'generator' | 'shield' | 'battery' | 'bus' | 'missile' | 'big_generator' | 'repair_drone';
-export type CommandCardType = 'airstrike' | 'add_input' | 'add_output' | 'self_power' | 'range_boost' | 'core_power_boost' | 'core_turret_unlock' | 'core_shield_unlock';
+export type CommandCardType = 'airstrike' | 'add_input' | 'add_output' | 'self_power' | 'range_boost';
+export type BaseUpgradeType = 'core_power_boost' | 'core_turret_unlock' | 'core_shield_unlock';
 export type GameMode = 'normal' | 'custom';
 export type PortDirection = 'top' | 'right' | 'bottom' | 'left';
 export type PortType = 'input' | 'output';
 export type GameStatus = 'menu' | 'playing' | 'paused' | 'pick' | 'gameover';
+export type ShopPackType = 'tower' | 'infra' | 'advanced' | 'command' | 'base_upgrade';
 
 /** Pick overlay: normal random pool vs. fixed boss-wave bonus vs. shop purchases */
-export type PickUiPhase = 'standard' | 'boss_bonus' | 'shop_tower' | 'shop_infra' | 'shop_command';
+export type PickUiPhase = 'standard' | 'boss_bonus' | 'shop_tower' | 'shop_infra' | 'shop_command' | 'shop_base_upgrade';
 export type EnemyType = 'scout' | 'grunt' | 'tank' | 'saboteur' | 'overlord';
 
 export interface Port {
@@ -180,9 +182,10 @@ export interface IncomingDrop {
 
 export interface PickOption {
   id: string;
-  kind: 'tower' | 'wire' | 'command_card';
+  kind: 'tower' | 'wire' | 'command_card' | 'base_upgrade';
   towerType?: TowerType;
   commandCardType?: CommandCardType;
+  baseUpgradeType?: BaseUpgradeType;
   count: number;
   label: string;
   description: string;
@@ -195,6 +198,8 @@ export interface GameState {
   powerTimer: number;
   wireInventory: number;
   gold: number;
+  shopOffers: ShopPackType[];
+  shopRefreshCost: number;
   towerInventory: Record<string, number>;
   commandCardInventory: Record<string, number>;
   pickOptions: PickOption[];

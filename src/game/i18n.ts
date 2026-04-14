@@ -53,6 +53,8 @@ export interface I18nStrings {
   // Shop & Gold
   gold: string;
   shop: string;
+  refreshShop: string;
+  refreshShopDesc: (cost: number) => string;
   towerPack: string;
   towerPackDesc: string;
   infraPack: string;
@@ -61,12 +63,16 @@ export interface I18nStrings {
   advancedPackDesc: string;
   commandCardPack: string;
   commandCardPackDesc: string;
+  baseUpgradePack: string;
+  baseUpgradePackDesc: string;
   sell: string;
   notEnoughGold: string;
   shopPickTitle: string;
   shopPickDescription: string;
   commandCardPickTitle: string;
   commandCardPickDescription: string;
+  baseUpgradePickTitle: string;
+  baseUpgradePickDescription: string;
 
   // Wave
   startNextWave: string;
@@ -76,6 +82,7 @@ export interface I18nStrings {
   autoDeployFailed: string;
   coreCannotMove: string;
   commandCardCannotUse: string;
+  baseUpgradeCannotUse: string;
 
   // Pick stats bar
   statHp: string;
@@ -102,6 +109,8 @@ export interface I18nStrings {
   emptyCommandCards: string;
   commandCardName: Record<string, string>;
   commandCardDesc: Record<string, string>;
+  baseUpgradeName: Record<string, string>;
+  baseUpgradeDesc: Record<string, string>;
   enemyName: Record<string, string>;
 
   // Tower descriptions (for tooltip & pick cards)
@@ -163,6 +172,8 @@ const en: I18nStrings = {
 
   gold: 'Gold',
   shop: 'Shop',
+  refreshShop: 'Refresh',
+  refreshShopDesc: (cost: number) => `Refresh shop offers for ${cost} gold`,
   towerPack: 'Turret Pack',
   towerPackDesc: 'Pick 1 of 3 random turrets',
   infraPack: 'Infra Pack',
@@ -170,19 +181,24 @@ const en: I18nStrings = {
   advancedPack: 'Advanced Pack',
   advancedPackDesc: 'Random advanced machine',
   commandCardPack: 'Command Pack',
-  commandCardPackDesc: 'Pick 1 of 3 command cards',
+  commandCardPackDesc: 'Pick 1 of 3 non-Core command cards',
+  baseUpgradePack: 'Base Upgrade Pack',
+  baseUpgradePackDesc: 'Pick 1 of 3 Core upgrades',
   sell: 'Sell',
   notEnoughGold: 'Not enough gold!',
   shopPickTitle: 'SHOP PURCHASE',
   shopPickDescription: 'Choose one item from the pack',
   commandCardPickTitle: 'COMMAND PACK',
   commandCardPickDescription: 'Choose one command card',
+  baseUpgradePickTitle: 'BASE UPGRADE PACK',
+  baseUpgradePickDescription: 'Choose one Core upgrade',
 
   startNextWave: 'Start Next Wave',
   noWires: 'No wires available!',
   autoDeployFailed: 'No open space near the Core for this tower.',
   coreCannotMove: 'Core cannot be moved or rotated!',
   commandCardCannotUse: 'Cannot use command card',
+  baseUpgradeCannotUse: 'Cannot apply base upgrade',
   statHp: 'HP',
   statRange: 'Range',
   statAtk: 'Atk',
@@ -237,9 +253,6 @@ const en: I18nStrings = {
     add_output: 'Add Output',
     self_power: 'Self Power',
     range_boost: 'Range Boost',
-    core_power_boost: 'Core Power Boost',
-    core_turret_unlock: 'Core Turret',
-    core_shield_unlock: 'Core Shield',
   },
   commandCardDesc: {
     airstrike: 'Strike a target area.',
@@ -247,6 +260,13 @@ const en: I18nStrings = {
     add_output: 'Add one output port to a machine.',
     self_power: 'Give a machine 1 self-generated power every 2 seconds.',
     range_boost: 'Increase a machine attack range by 20%.',
+  },
+  baseUpgradeName: {
+    core_power_boost: 'Core Power Boost',
+    core_turret_unlock: 'Core Turret',
+    core_shield_unlock: 'Core Shield',
+  },
+  baseUpgradeDesc: {
     core_power_boost: 'Core dispatches 1 extra power pulse.',
     core_turret_unlock: 'Core gains a basic turret.',
     core_shield_unlock: 'Core gains a basic shield.',
@@ -400,6 +420,8 @@ const zh: I18nStrings = {
 
   gold: '金币',
   shop: '商店',
+  refreshShop: '刷新',
+  refreshShopDesc: (cost: number) => `花费 ${cost} 金币刷新商店商品`,
   towerPack: '炮塔卡包',
   towerPackDesc: '获得一次只含炮塔的三选一',
   infraPack: '基建卡包',
@@ -407,19 +429,24 @@ const zh: I18nStrings = {
   advancedPack: '高级卡包',
   advancedPackDesc: '随机获得一台高级机器',
   commandCardPack: '指令卡包',
-  commandCardPackDesc: '获得一次指令卡三选一',
+  commandCardPackDesc: '获得一次非基地指令卡三选一',
+  baseUpgradePack: '基地升级包',
+  baseUpgradePackDesc: '获得一次基地升级三选一',
   sell: '出售',
   notEnoughGold: '金币不足！',
   shopPickTitle: '商店购买',
   shopPickDescription: '从卡包中选择一项',
   commandCardPickTitle: '指令卡包',
   commandCardPickDescription: '选择一张指令卡',
+  baseUpgradePickTitle: '基地升级包',
+  baseUpgradePickDescription: '选择一项基地升级',
 
   startNextWave: '提前开始下一波',
   noWires: '没有可用的线缆！',
   autoDeployFailed: '主基地附近没有可部署这座防御塔的空地。',
   coreCannotMove: '主基地无法拖动和旋转！',
   commandCardCannotUse: '无法使用指令卡',
+  baseUpgradeCannotUse: '无法应用基地升级',
   statHp: '血量',
   statRange: '射程',
   statAtk: '攻击',
@@ -474,9 +501,6 @@ const zh: I18nStrings = {
     add_output: '增加输出口',
     self_power: '自发电',
     range_boost: '射程增加',
-    core_power_boost: '发电量提升',
-    core_turret_unlock: '增加炮台功能',
-    core_shield_unlock: '增加护盾功能',
   },
   commandCardDesc: {
     airstrike: '对目标区域进行空袭打击。',
@@ -484,6 +508,13 @@ const zh: I18nStrings = {
     add_output: '为一台机器增加 1 个输出口。',
     self_power: '使一台机器每 2 秒自发 1 格电。',
     range_boost: '使一台攻击机器射程提升 20%。',
+  },
+  baseUpgradeName: {
+    core_power_boost: '发电量提升',
+    core_turret_unlock: '增加炮台功能',
+    core_shield_unlock: '增加护盾功能',
+  },
+  baseUpgradeDesc: {
     core_power_boost: '主基地每次发电额外发出 1 个脉冲。',
     core_turret_unlock: '为主基地增加基础炮台功能。',
     core_shield_unlock: '为主基地增加基础护盾功能。',
@@ -606,5 +637,6 @@ export const t = (): I18nStrings => locales[currentLocale];
 export const pickKey = (kind: string, towerType?: string, count?: number): string => {
   if (kind === 'wire') return `wire_${count}`;
   if (kind === 'command_card') return `${towerType}_${count}`;
+  if (kind === 'base_upgrade') return `${towerType}_${count}`;
   return `${towerType}_${count}`;
 };

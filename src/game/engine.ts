@@ -1,15 +1,16 @@
 import {
-  GameState, Tower, TowerType, CommandCardType, Position, Port, PortDirection, PortType, Wire, PickOption, EnemyType,
+  GameState, Tower, TowerType, CommandCardType, BaseUpgradeType, Position, Port, PortDirection, PortType, Wire, PickOption, EnemyType, ShopPackType,
   PickUiPhase,
   GRID_WIDTH, GRID_HEIGHT, CELL_SIZE, HALF_CELL, TOWER_STATS, CANVAS_WIDTH, CANVAS_HEIGHT, WIRE_MAX_HP,
 } from './types';
 import { t, pickKey } from './i18n';
-import { GLOBAL_CONFIG, ENEMY_CONFIG, ENEMY_SCALING, STARTING_INVENTORY, PICK_POOL_CONFIG, WEAPON_CONFIG, COMMAND_CARD_CONFIG, SHOP_CONFIG } from './config';
+import { GLOBAL_CONFIG, ENEMY_CONFIG, ENEMY_SCALING, STARTING_INVENTORY, PICK_POOL_CONFIG, WEAPON_CONFIG, COMMAND_CARD_CONFIG, BASE_UPGRADE_CONFIG, SHOP_CONFIG } from './config';
 import { makeTowerCollider, makeEnemyCollider } from './collider';
 import { getLinearTowerBodyAspectRatio, getLinearTowerBodyRect } from './linearTowerGeometry';
 import { footprintsOverlap, getTowerCells, getTowerFootprintCells } from './footprint';
 
 const ENEMY_SPEED_MUL = GLOBAL_CONFIG.enemyBaseSpeedMul;
+const SHOP_PACK_TYPES: ShopPackType[] = ['tower', 'infra', 'advanced', 'command', 'base_upgrade'];
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -537,6 +538,36 @@ export const generateCommandCardPickOptions = (): PickOption[] => {
   });
 };
 
+export const generateBaseUpgradePickOptions = (): PickOption[] => {
+  const loc = t();
+  const upgradeTypes = Object.keys(BASE_UPGRADE_CONFIG) as BaseUpgradeType[];
+
+  return upgradeTypes.map(baseUpgradeType => {
+    const k = pickKey('base_upgrade', baseUpgradeType, 1);
+    return {
+      kind: 'base_upgrade',
+      baseUpgradeType,
+      count: 1,
+      id: genId(),
+      label: loc.pickLabel[k] ?? loc.baseUpgradeName[baseUpgradeType] ?? baseUpgradeType,
+      description: loc.pickDesc[k] ?? loc.baseUpgradeDesc[baseUpgradeType] ?? '',
+    };
+  });
+};
+
+export const generateShopOffers = (count = 3): ShopPackType[] => {
+  const remaining = [...SHOP_PACK_TYPES];
+  const offers: ShopPackType[] = [];
+
+  while (offers.length < count && remaining.length > 0) {
+    const idx = (Math.random() * remaining.length) | 0;
+    offers.push(remaining[idx]);
+    remaining.splice(idx, 1);
+  }
+
+  return offers;
+};
+
 /** Fixed bonus 3-choice after clearing a boss wave: wire → generator → shield (display order). */
 export const generateBossBonusPickOptions = (): PickOption[] => {
   const loc = t();
@@ -590,6 +621,8 @@ export const createInitialState = (): GameState => {
     powerTimer: 0,
     wireInventory: STARTING_INVENTORY.wires,
     gold: SHOP_CONFIG.startingGold,
+    shopOffers: generateShopOffers(),
+    shopRefreshCost: SHOP_CONFIG.initialRefreshCost,
     towerInventory: { ...STARTING_INVENTORY.towers },
     commandCardInventory: {},
     pickOptions: [],

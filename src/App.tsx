@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Battery, Zap, Crosshair, Activity, Play, RotateCcw, Pause, Hexagon, Cable, Wrench, ChevronRight, ChevronLeft, Flame, Focus, Radio, GitMerge, Globe, LogOut, BookOpen, X, Keyboard, Menu, Eye, EyeOff, ShoppingBag, Coins, Rocket, Bot, Bomb, Plus, Power, Shield } from 'lucide-react';
 import { useGameLoop } from './game/useGameLoop';
-import { TOWER_STATS, TowerType, PickOption, EnemyType, CommandCardType } from './game/types';
+import { TOWER_STATS, TowerType, PickOption, EnemyType, CommandCardType, BaseUpgradeType, ShopPackType } from './game/types';
 import { t, getLocale, setLocale, Locale } from './game/i18n';
-import { COMMAND_CARD_CONFIG, GLOBAL_CONFIG, TIPS_CONFIG, TOWER_CONFIG, WEAPON_CONFIG, SHOP_CONFIG } from './game/config';
+import { BASE_UPGRADE_CONFIG, COMMAND_CARD_CONFIG, GLOBAL_CONFIG, TIPS_CONFIG, TOWER_CONFIG, WEAPON_CONFIG, SHOP_CONFIG } from './game/config';
 
 const TowerIcon = ({ type, size = 22 }: { type: string; size?: number }) => {
   const icons: Record<string, React.ComponentType<{ size: number }>> = {
@@ -22,6 +22,13 @@ const CommandCardIcon = ({ type, size = 22 }: { type: CommandCardType; size?: nu
     add_output: Plus,
     self_power: Power,
     range_boost: Focus,
+  };
+  const Icon = icons[type];
+  return <Icon size={size} />;
+};
+
+const BaseUpgradeIcon = ({ type, size = 22 }: { type: BaseUpgradeType; size?: number }) => {
+  const icons: Record<BaseUpgradeType, React.ComponentType<{ size: number }>> = {
     core_power_boost: Zap,
     core_turret_unlock: Crosshair,
     core_shield_unlock: Shield,
@@ -33,6 +40,7 @@ const CommandCardIcon = ({ type, size = 22 }: { type: CommandCardType; size?: nu
 const getPickColor = (opt: PickOption) => {
   if (opt.kind === 'wire') return '#60a5fa';
   if (opt.kind === 'command_card' && opt.commandCardType) return COMMAND_CARD_CONFIG[opt.commandCardType].color;
+  if (opt.kind === 'base_upgrade' && opt.baseUpgradeType) return BASE_UPGRADE_CONFIG[opt.baseUpgradeType].color;
   return TOWER_STATS[opt.towerType!]?.color ?? '#6b7280';
 };
 
@@ -99,7 +107,7 @@ export default function App() {
     handleCanvasTouchMove,
     handleCanvasTouchEnd,
     startCommandCardDrag,
-    useCommandCardOnCore,
+    refreshShopOffers,
     commandCardDragLine,
   } = useGameLoop();
 
@@ -310,13 +318,75 @@ export default function App() {
     );
   };
 
+  const shopPackUi: Record<ShopPackType, {
+    label: string;
+    description: string;
+    price: number;
+    Icon: React.ComponentType<{ size: number }>;
+    colorClass: string;
+    enabledClass: string;
+    iconClass: string;
+  }> = {
+    tower: {
+      label: i.towerPack,
+      description: i.towerPackDesc,
+      price: SHOP_CONFIG.towerPackPrice,
+      Icon: Crosshair,
+      colorClass: 'text-yellow-400',
+      enabledClass: 'border-yellow-700/70 bg-yellow-500/10 text-yellow-200 hover:bg-yellow-500/15 hover:border-yellow-500/70',
+      iconClass: 'text-yellow-400',
+    },
+    infra: {
+      label: i.infraPack,
+      description: i.infraPackDesc,
+      price: SHOP_CONFIG.infraPackPrice,
+      Icon: Zap,
+      colorClass: 'text-yellow-400',
+      enabledClass: 'border-yellow-700/70 bg-yellow-500/10 text-yellow-200 hover:bg-yellow-500/15 hover:border-yellow-500/70',
+      iconClass: 'text-yellow-400',
+    },
+    advanced: {
+      label: i.advancedPack,
+      description: i.advancedPackDesc,
+      price: SHOP_CONFIG.advancedPackPrice,
+      Icon: Rocket,
+      colorClass: 'text-yellow-400',
+      enabledClass: 'border-rose-700/70 bg-rose-500/10 text-rose-200 hover:bg-rose-500/15 hover:border-rose-500/70',
+      iconClass: 'text-rose-400',
+    },
+    command: {
+      label: i.commandCardPack,
+      description: i.commandCardPackDesc,
+      price: SHOP_CONFIG.commandCardPackPrice,
+      Icon: BookOpen,
+      colorClass: 'text-yellow-400',
+      enabledClass: 'border-cyan-700/70 bg-cyan-500/10 text-cyan-100 hover:bg-cyan-500/15 hover:border-cyan-500/70',
+      iconClass: 'text-cyan-300',
+    },
+    base_upgrade: {
+      label: i.baseUpgradePack,
+      description: i.baseUpgradePackDesc,
+      price: SHOP_CONFIG.baseUpgradePackPrice,
+      Icon: Globe,
+      colorClass: 'text-yellow-400',
+      enabledClass: 'border-sky-700/70 bg-sky-500/10 text-sky-100 hover:bg-sky-500/15 hover:border-sky-500/70',
+      iconClass: 'text-sky-300',
+    },
+  };
+
   const renderShopButtons = (closeSidebar = false, topMargin = true) => {
-    const handleBuy = (type: 'tower' | 'infra' | 'advanced' | 'command') => {
+    const handleBuy = (type: ShopPackType) => {
       buyShopPack(type);
       if (closeSidebar) setSidebarOpen(false);
     };
+    const handleRefresh = () => {
+      refreshShopOffers();
+    };
     const isCustom = gameState.gameMode === 'custom';
     const canBuy = (price: number) => gameState.status === 'playing' && (isCustom || gameState.gold >= price);
+    const offers = gameState.shopOffers.length > 0 ? gameState.shopOffers : (['tower', 'infra', 'command'] as ShopPackType[]);
+    const refreshCost = gameState.shopRefreshCost ?? SHOP_CONFIG.initialRefreshCost;
+    const canRefresh = gameState.status === 'playing' && (isCustom || gameState.gold >= refreshCost);
     return (
       <>
         <div className={`text-xs font-bold uppercase tracking-widest text-gray-500 px-1 py-1.5 ${topMargin ? 'mt-2' : ''}`}>
@@ -325,102 +395,66 @@ export default function App() {
             {i.shop}
           </div>
         </div>
+        {offers.map((offer) => {
+          const pack = shopPackUi[offer];
+          const Icon = pack.Icon;
+          return (
+            <button
+              key={offer}
+              type="button"
+              onClick={() => handleBuy(offer)}
+              disabled={!canBuy(pack.price)}
+              className={`flex items-center gap-2.5 px-3 py-3 rounded-lg border transition-all ${
+                canBuy(pack.price)
+                  ? pack.enabledClass
+                  : 'border-gray-800 bg-gray-900/50 text-gray-500 cursor-not-allowed opacity-40'
+              }`}
+            >
+              <div className={`shrink-0 ${pack.iconClass}`}><Icon size={20} /></div>
+              <div className="flex flex-col items-start min-w-0 flex-1">
+                <span className="text-sm font-bold leading-tight">{pack.label}</span>
+                <span className="text-xs text-gray-400 leading-tight">{pack.description}</span>
+              </div>
+              <div className={`flex items-center gap-1 ${pack.colorClass} text-xs font-bold shrink-0`}>
+                <Coins size={12} />{pack.price}
+              </div>
+            </button>
+          );
+        })}
         <button
           type="button"
-          onClick={() => handleBuy('tower')}
-          disabled={!canBuy(SHOP_CONFIG.towerPackPrice)}
-          className={`flex items-center gap-2.5 px-3 py-3 rounded-lg border transition-all ${
-            canBuy(SHOP_CONFIG.towerPackPrice)
-              ? 'border-yellow-700/70 bg-yellow-500/10 text-yellow-200 hover:bg-yellow-500/15 hover:border-yellow-500/70'
+          onClick={handleRefresh}
+          disabled={!canRefresh}
+          className={`flex items-center justify-center gap-2.5 px-3 py-2.5 rounded-lg border text-sm font-black transition-all ${
+            canRefresh
+              ? 'border-emerald-700/70 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/15 hover:border-emerald-500/70'
               : 'border-gray-800 bg-gray-900/50 text-gray-500 cursor-not-allowed opacity-40'
           }`}
+          title={i.refreshShopDesc(refreshCost)}
         >
-          <div className="shrink-0 text-yellow-400"><Crosshair size={20} /></div>
-          <div className="flex flex-col items-start min-w-0 flex-1">
-            <span className="text-sm font-bold leading-tight">{i.towerPack}</span>
-            <span className="text-xs text-gray-400 leading-tight">{i.towerPackDesc}</span>
-          </div>
-          <div className="flex items-center gap-1 text-yellow-400 text-xs font-bold shrink-0">
-            <Coins size={12} />{SHOP_CONFIG.towerPackPrice}
-          </div>
-        </button>
-        <button
-          type="button"
-          onClick={() => handleBuy('infra')}
-          disabled={!canBuy(SHOP_CONFIG.infraPackPrice)}
-          className={`flex items-center gap-2.5 px-3 py-3 rounded-lg border transition-all ${
-            canBuy(SHOP_CONFIG.infraPackPrice)
-              ? 'border-yellow-700/70 bg-yellow-500/10 text-yellow-200 hover:bg-yellow-500/15 hover:border-yellow-500/70'
-              : 'border-gray-800 bg-gray-900/50 text-gray-500 cursor-not-allowed opacity-40'
-          }`}
-        >
-          <div className="shrink-0 text-yellow-400"><Zap size={20} /></div>
-          <div className="flex flex-col items-start min-w-0 flex-1">
-            <span className="text-sm font-bold leading-tight">{i.infraPack}</span>
-            <span className="text-xs text-gray-400 leading-tight">{i.infraPackDesc}</span>
-          </div>
-          <div className="flex items-center gap-1 text-yellow-400 text-xs font-bold shrink-0">
-            <Coins size={12} />{SHOP_CONFIG.infraPackPrice}
-          </div>
-        </button>
-        <button
-          type="button"
-          onClick={() => handleBuy('advanced')}
-          disabled={!canBuy(SHOP_CONFIG.advancedPackPrice)}
-          className={`flex items-center gap-2.5 px-3 py-3 rounded-lg border transition-all ${
-            canBuy(SHOP_CONFIG.advancedPackPrice)
-              ? 'border-rose-700/70 bg-rose-500/10 text-rose-200 hover:bg-rose-500/15 hover:border-rose-500/70'
-              : 'border-gray-800 bg-gray-900/50 text-gray-500 cursor-not-allowed opacity-40'
-          }`}
-        >
-          <div className="shrink-0 text-rose-400"><Rocket size={20} /></div>
-          <div className="flex flex-col items-start min-w-0 flex-1">
-            <span className="text-sm font-bold leading-tight">{i.advancedPack}</span>
-            <span className="text-xs text-gray-400 leading-tight">{i.advancedPackDesc}</span>
-          </div>
-          <div className="flex items-center gap-1 text-yellow-400 text-xs font-bold shrink-0">
-            <Coins size={12} />{SHOP_CONFIG.advancedPackPrice}
-          </div>
-        </button>
-        <button
-          type="button"
-          onClick={() => handleBuy('command')}
-          disabled={!canBuy(SHOP_CONFIG.commandCardPackPrice)}
-          className={`flex items-center gap-2.5 px-3 py-3 rounded-lg border transition-all ${
-            canBuy(SHOP_CONFIG.commandCardPackPrice)
-              ? 'border-cyan-700/70 bg-cyan-500/10 text-cyan-100 hover:bg-cyan-500/15 hover:border-cyan-500/70'
-              : 'border-gray-800 bg-gray-900/50 text-gray-500 cursor-not-allowed opacity-40'
-          }`}
-        >
-          <div className="shrink-0 text-cyan-300"><BookOpen size={20} /></div>
-          <div className="flex flex-col items-start min-w-0 flex-1">
-            <span className="text-sm font-bold leading-tight">{i.commandCardPack}</span>
-            <span className="text-xs text-gray-400 leading-tight">{i.commandCardPackDesc}</span>
-          </div>
-          <div className="flex items-center gap-1 text-yellow-400 text-xs font-bold shrink-0">
-            <Coins size={12} />{SHOP_CONFIG.commandCardPackPrice}
-          </div>
+          <RotateCcw size={16} />
+          <span>{i.refreshShop}</span>
+          <span className="flex items-center gap-1 text-yellow-400">
+            <Coins size={12} />{refreshCost}
+          </span>
         </button>
       </>
     );
   };
 
-  const commandCards = (Object.entries(gameState.commandCardInventory) as [CommandCardType, number][])
-    .flatMap(([type, count]) => Array.from({ length: count }, (_, idx) => ({ type, id: `${type}-${idx}` })));
+  const commandCards = gameState.gameMode === 'custom'
+    ? (Object.keys(COMMAND_CARD_CONFIG) as CommandCardType[]).map(type => ({ type, id: type }))
+    : (Object.entries(gameState.commandCardInventory) as [CommandCardType, number][])
+      .flatMap(([type, count]) => Array.from({ length: count }, (_, idx) => ({ type, id: `${type}-${idx}` })));
 
   const renderCommandCard = (type: CommandCardType, key: string) => {
     const color = COMMAND_CARD_CONFIG[type].color;
-    const isCoreCommandCard = type === 'core_power_boost' || type === 'core_turret_unlock' || type === 'core_shield_unlock';
     return (
       <button
         key={key}
         type="button"
-        onClick={() => {
-          if (isCoreCommandCard && gameState.status === 'playing') useCommandCardOnCore(type);
-        }}
         onPointerDown={(event) => {
           if (gameState.status !== 'playing') return;
-          if (isCoreCommandCard) return;
           event.preventDefault();
           event.currentTarget.setPointerCapture?.(event.pointerId);
           const rect = event.currentTarget.getBoundingClientRect();
@@ -432,7 +466,7 @@ export default function App() {
         disabled={gameState.status !== 'playing'}
         className={`group relative aspect-[5/3] w-full rounded-lg border p-3 text-left transition-all active:scale-95 ${
           gameState.status === 'playing'
-            ? `bg-gray-900/90 hover:bg-gray-800/95 ${isCoreCommandCard ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing'}`
+            ? 'bg-gray-900/90 hover:bg-gray-800/95 cursor-grab active:cursor-grabbing'
             : 'bg-gray-900/40 opacity-60 cursor-not-allowed'
         }`}
         style={{ borderColor: color + '66', boxShadow: `inset 0 0 18px ${color}1f` }}
@@ -698,7 +732,12 @@ export default function App() {
                 </div>
                 {!pickOverlayHidden && (
                 <div className="absolute inset-0 bg-gray-950/85 backdrop-blur-sm flex flex-col items-center justify-center p-4 sm:p-8 text-center overflow-y-auto">
-                {gameState.pickUiPhase === 'shop_command' ? (
+                {gameState.pickUiPhase === 'shop_base_upgrade' ? (
+                  <>
+                    <h2 className="text-2xl sm:text-3xl font-black mb-1 text-sky-300 tracking-tight">{i.baseUpgradePickTitle}</h2>
+                    <p className="text-gray-400 text-xs sm:text-sm mb-4 sm:mb-6 max-w-md leading-relaxed px-2">{i.baseUpgradePickDescription}</p>
+                  </>
+                ) : gameState.pickUiPhase === 'shop_command' ? (
                   <>
                     <h2 className="text-2xl sm:text-3xl font-black mb-1 text-cyan-300 tracking-tight">{i.commandCardPickTitle}</h2>
                     <p className="text-gray-400 text-xs sm:text-sm mb-4 sm:mb-6 max-w-md leading-relaxed px-2">{i.commandCardPickDescription}</p>
@@ -760,7 +799,13 @@ export default function App() {
                             className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center text-white shrink-0"
                             style={{ backgroundColor: color + '22', color }}
                           >
-                            {opt.kind === 'wire' ? <Cable size={20} /> : opt.kind === 'command_card' && opt.commandCardType ? <CommandCardIcon type={opt.commandCardType} size={20} /> : <TowerIcon type={opt.towerType!} size={20} />}
+                            {opt.kind === 'wire'
+                              ? <Cable size={20} />
+                              : opt.kind === 'command_card' && opt.commandCardType
+                                ? <CommandCardIcon type={opt.commandCardType} size={20} />
+                                : opt.kind === 'base_upgrade' && opt.baseUpgradeType
+                                  ? <BaseUpgradeIcon type={opt.baseUpgradeType} size={20} />
+                                  : <TowerIcon type={opt.towerType!} size={20} />}
                           </div>
                           <div className="flex flex-col items-start sm:items-center min-w-0">
                             <div className="text-sm font-bold text-white">{opt.label}</div>

@@ -21,6 +21,7 @@ import {
 import { closestPointOnTower } from './collider';
 import {
   ENEMY_AI_CONFIG,
+  BASE_UPGRADE_CONFIG,
   COMMAND_CARD_CONFIG,
   ENEMY_SCALING,
   GLOBAL_CONFIG,
@@ -104,9 +105,9 @@ const {
 const SNIPER_AIM_THRESHOLD = 0.05;
 const SELF_POWER_INTERVAL = COMMAND_CARD_CONFIG.self_power.selfPowerInterval ?? 2;
 const SELF_POWER_AMOUNT = COMMAND_CARD_CONFIG.self_power.selfPowerAmount ?? 1;
-const CORE_TURRET_RANGE = COMMAND_CARD_CONFIG.core_turret_unlock.coreTurretRange ?? 220;
-const CORE_TURRET_DAMAGE = COMMAND_CARD_CONFIG.core_turret_unlock.coreTurretDamage ?? 30;
-const CORE_TURRET_COOLDOWN = COMMAND_CARD_CONFIG.core_turret_unlock.coreTurretCooldown ?? 1200;
+const CORE_TURRET_RANGE = BASE_UPGRADE_CONFIG.core_turret_unlock.coreTurretRange ?? 220;
+const CORE_TURRET_DAMAGE = BASE_UPGRADE_CONFIG.core_turret_unlock.coreTurretDamage ?? 30;
+const CORE_TURRET_COOLDOWN = BASE_UPGRADE_CONFIG.core_turret_unlock.coreTurretCooldown ?? 1200;
 
 const applyDamageToEnemy = (
   state: GameState,

@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  GameState, TowerType, CommandCardType, Port, Wire, CELL_SIZE, GRID_WIDTH, GRID_HEIGHT, EnemyType,
+  GameState, TowerType, CommandCardType, BaseUpgradeType, ShopPackType, Port, Wire, CELL_SIZE, GRID_WIDTH, GRID_HEIGHT, EnemyType, PortDirection,
   TOWER_STATS, CANVAS_WIDTH, CANVAS_HEIGHT, WIRE_MAX_HP,
   Camera, VIEWPORT_WIDTH, VIEWPORT_HEIGHT, getTowerRange,
 } from './types';
@@ -10,11 +10,11 @@ import {
   collidesWithWires, repathConnectedWires, genId, generatePickOptions, spawnEnemyAt,
   canDirectLinkPorts, isPortAccessible,
   generateTowerOnlyPickOptions, generateInfraOnlyPickOptions, rebuildTowerMap,
-  generateAdvancedPickOptions, generateCommandCardPickOptions, syncDirectPortLinks,
+  generateAdvancedPickOptions, generateCommandCardPickOptions, generateBaseUpgradePickOptions, generateShopOffers, syncDirectPortLinks,
   createExplosion,
 } from './engine';
 import { renderGame } from './renderer';
-import { COMMAND_CARD_CONFIG, GLOBAL_CONFIG, SCORE_CONFIG, SHOP_CONFIG } from './config';
+import { BASE_UPGRADE_CONFIG, COMMAND_CARD_CONFIG, GLOBAL_CONFIG, SCORE_CONFIG, SHOP_CONFIG } from './config';
 import { t } from './i18n';
 import { addTowerToState, createTowerAt } from './towerFactory';
 import { findAutoPlacementNearCore } from './placement';
@@ -24,6 +24,8 @@ import { isWorldPointInTowerFootprint } from './footprint';
 
 const { maxZoom: MAX_ZOOM, waveDelay: WAVE_DELAY } = GLOBAL_CONFIG;
 const MAX_MACHINE_COMMAND_UPGRADES = 3;
+const PORT_DIRECTIONS: PortDirection[] = ['top', 'right', 'bottom', 'left'];
+const COMMAND_CARD_TYPES = Object.keys(COMMAND_CARD_CONFIG) as CommandCardType[];
 
 export const useGameLoop = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -199,6 +201,7 @@ export const useGameLoop = () => {
     s.gameMode = 'custom';
     s.wireInventory = Infinity;
     s.gold = Infinity;
+    s.commandCardInventory = Object.fromEntries(COMMAND_CARD_TYPES.map(type => [type, 1]));
     s.needsPick = false;
     stateRef.current = s;
     setPlaceMonsterMode(false);
@@ -236,6 +239,31 @@ export const useGameLoop = () => {
     return true;
   };
 
+  const applyBaseUpgradeToCore = (state: GameState, upgradeType: BaseUpgradeType) => {
+    const core = state.towers.find(tower => tower.type === 'core');
+    if (!core) return false;
+
+    if (upgradeType === 'core_power_boost') {
+      core.corePowerBonus = (core.corePowerBonus ?? 0) + (BASE_UPGRADE_CONFIG.core_power_boost.corePowerBonus ?? 1);
+      return true;
+    }
+    if (upgradeType === 'core_turret_unlock') {
+      if (core.coreTurretUnlocked) return false;
+      core.coreTurretUnlocked = true;
+      core.coreTurretLastShot = 0;
+      return true;
+    }
+    if (upgradeType === 'core_shield_unlock') {
+      if (core.maxShieldHp > 0) return false;
+      core.maxShieldHp = BASE_UPGRADE_CONFIG.core_shield_unlock.coreShieldHp ?? 200;
+      core.shieldHp = core.maxShieldHp;
+      core.shieldRadius = BASE_UPGRADE_CONFIG.core_shield_unlock.coreShieldRadius ?? 160;
+      return true;
+    }
+
+    return false;
+  };
+
   const handlePick = (optionId: string, sourceClientPos?: { x: number; y: number }) => {
     const state = stateRef.current;
     const option = state.pickOptions.find(o => o.id === optionId);
@@ -253,9 +281,14 @@ export const useGameLoop = () => {
     } else if (option.kind === 'command_card' && option.commandCardType) {
       state.commandCardInventory[option.commandCardType] =
         (state.commandCardInventory[option.commandCardType] ?? 0) + option.count;
+    } else if (option.kind === 'base_upgrade' && option.baseUpgradeType) {
+      if (!applyBaseUpgradeToCore(state, option.baseUpgradeType)) {
+        showToast(t().baseUpgradeCannotUse);
+        return;
+      }
     }
 
-    const isShopPick = state.pickUiPhase === 'shop_tower' || state.pickUiPhase === 'shop_infra' || state.pickUiPhase === 'shop_command';
+    const isShopPick = state.pickUiPhase === 'shop_tower' || state.pickUiPhase === 'shop_infra' || state.pickUiPhase === 'shop_command' || state.pickUiPhase === 'shop_base_upgrade';
 
     state.pickOptions = [];
     state.status = 'playing';
@@ -289,13 +322,15 @@ export const useGameLoop = () => {
     sync();
   };
 
-  const buyShopPack = (packType: 'tower' | 'infra' | 'advanced' | 'command') => {
+  const buyShopPack = (packType: ShopPackType) => {
     const state = stateRef.current;
     if (state.status !== 'playing') return;
+    if (!state.shopOffers?.includes(packType)) return;
     const price =
       packType === 'tower' ? SHOP_CONFIG.towerPackPrice :
       packType === 'infra' ? SHOP_CONFIG.infraPackPrice :
       packType === 'command' ? SHOP_CONFIG.commandCardPackPrice :
+      packType === 'base_upgrade' ? SHOP_CONFIG.baseUpgradePackPrice :
       SHOP_CONFIG.advancedPackPrice;
     if (state.gold < price) {
       showToast(t().notEnoughGold);
@@ -318,14 +353,30 @@ export const useGameLoop = () => {
     state.pickOptions =
       packType === 'tower' ? generateTowerOnlyPickOptions() :
       packType === 'command' ? generateCommandCardPickOptions() :
+      packType === 'base_upgrade' ? generateBaseUpgradePickOptions() :
       generateInfraOnlyPickOptions();
     state.pickUiPhase =
       packType === 'tower' ? 'shop_tower' :
       packType === 'command' ? 'shop_command' :
+      packType === 'base_upgrade' ? 'shop_base_upgrade' :
       'shop_infra';
     state.pendingBossBonusPick = false;
     state.bossBonusPickQueued = false;
     state.status = 'pick';
+    sync();
+  };
+
+  const refreshShopOffers = () => {
+    const state = stateRef.current;
+    if (state.status !== 'playing') return;
+    const refreshCost = state.shopRefreshCost ?? SHOP_CONFIG.initialRefreshCost;
+    if (state.gold < refreshCost) {
+      showToast(t().notEnoughGold);
+      return;
+    }
+    state.gold -= refreshCost;
+    state.shopRefreshCost = refreshCost + SHOP_CONFIG.refreshCostIncrease;
+    state.shopOffers = generateShopOffers();
     sync();
   };
 
@@ -504,23 +555,46 @@ export const useGameLoop = () => {
 
   const addMachinePort = (state: GameState, tower: GameState['towers'][number], portType: 'input' | 'output') => {
     if (tower.type === 'core') return false;
-    const directions = ['top', 'right', 'bottom', 'left'] as const;
-    const offsets = [1 / 6, 1 / 3, 1 / 2, 2 / 3, 5 / 6];
-    for (const sideOffset of offsets) {
-      for (const direction of directions) {
-        const hasSameSpot = tower.ports.some(port =>
-          port.portType === portType &&
-          port.direction === direction &&
-          Math.abs((port.sideOffset ?? 0.5) - sideOffset) < 0.01,
-        );
-        if (hasSameSpot) continue;
-        const port = { id: genId(), direction, portType, sideOffset };
-        if (!isPortAccessible(state, tower, port)) continue;
-        tower.ports.push(port);
-        if (!syncDirectPortLinks(state, { towerId: tower.id, createSpark: true })) {
-          updatePowerGrid(state);
-        }
+    const getSideLength = (direction: PortDirection) =>
+      direction === 'top' || direction === 'bottom' ? tower.width : tower.height;
+    const getSideCellIndex = (direction: PortDirection, sideOffset = 0.5) =>
+      Math.min(getSideLength(direction) - 1, Math.max(0, Math.floor(getSideLength(direction) * sideOffset)));
+    const getCandidateCellIndexes = (sideLength: number) => {
+      const center = Math.floor(sideLength / 2);
+      const seen = new Set<number>();
+      const ordered = [center, center - 1, center + 1, 0, sideLength - 1];
+      return ordered.filter((index) => {
+        if (index < 0 || index >= sideLength || seen.has(index)) return false;
+        seen.add(index);
         return true;
+      });
+    };
+
+    for (const phaseIndex of [0, 1, 2]) {
+      for (const direction of PORT_DIRECTIONS) {
+        const sideLength = getSideLength(direction);
+        const candidates = getCandidateCellIndexes(sideLength);
+        const phaseCandidates = phaseIndex === 0
+          ? candidates.slice(0, 1)
+          : phaseIndex === 1
+            ? candidates.slice(1, 3)
+            : candidates.slice(3);
+
+        for (const cellIndex of phaseCandidates) {
+          const hasSameSpot = tower.ports.some(port =>
+            port.direction === direction &&
+            getSideCellIndex(direction, port.sideOffset) === cellIndex,
+          );
+          if (hasSameSpot) continue;
+          const sideOffset = (cellIndex + 0.5) / sideLength;
+          const port = { id: genId(), direction, portType, sideOffset };
+          if (!isPortAccessible(state, tower, port)) continue;
+          tower.ports.push(port);
+          if (!syncDirectPortLinks(state, { towerId: tower.id, createSpark: true })) {
+            updatePowerGrid(state);
+          }
+          return true;
+        }
       }
     }
     return false;
@@ -563,7 +637,6 @@ export const useGameLoop = () => {
       used = true;
     } else if (cardType === 'add_input' || cardType === 'add_output') {
       if (!targetTower || targetTower.type === 'core') return false;
-      if ((targetTower.commandUpgradeCount ?? 0) >= MAX_MACHINE_COMMAND_UPGRADES) return false;
       used = addMachinePort(state, targetTower, cardType === 'add_input' ? 'input' : 'output');
     } else if (cardType === 'self_power') {
       if (!targetTower || targetTower.type === 'core') return false;
@@ -577,28 +650,15 @@ export const useGameLoop = () => {
       if ((targetTower.commandUpgradeCount ?? 0) >= MAX_MACHINE_COMMAND_UPGRADES) return false;
       targetTower.rangeMultiplier = (targetTower.rangeMultiplier ?? 1) + (COMMAND_CARD_CONFIG.range_boost.rangeBoostMultiplier ?? 0.2);
       used = true;
-    } else if (cardType === 'core_power_boost') {
-      if (!targetTower || targetTower.type !== 'core') return false;
-      targetTower.corePowerBonus = (targetTower.corePowerBonus ?? 0) + (COMMAND_CARD_CONFIG.core_power_boost.corePowerBonus ?? 1);
-      used = true;
-    } else if (cardType === 'core_turret_unlock') {
-      if (!targetTower || targetTower.type !== 'core' || targetTower.coreTurretUnlocked) return false;
-      targetTower.coreTurretUnlocked = true;
-      targetTower.coreTurretLastShot = 0;
-      used = true;
-    } else if (cardType === 'core_shield_unlock') {
-      if (!targetTower || targetTower.type !== 'core' || targetTower.maxShieldHp > 0) return false;
-      targetTower.maxShieldHp = COMMAND_CARD_CONFIG.core_shield_unlock.coreShieldHp ?? 200;
-      targetTower.shieldHp = targetTower.maxShieldHp;
-      targetTower.shieldRadius = COMMAND_CARD_CONFIG.core_shield_unlock.coreShieldRadius ?? 160;
-      used = true;
     }
 
     if (!used) return false;
-    if (targetTower && targetTower.type !== 'core' && cardType !== 'airstrike') {
+    if (targetTower && targetTower.type !== 'core' && cardType !== 'airstrike' && cardType !== 'add_input' && cardType !== 'add_output') {
       targetTower.commandUpgradeCount = (targetTower.commandUpgradeCount ?? 0) + 1;
     }
-    state.commandCardInventory[cardType] = Math.max(0, (state.commandCardInventory[cardType] ?? 0) - 1);
+    if (state.gameMode !== 'custom') {
+      state.commandCardInventory[cardType] = Math.max(0, (state.commandCardInventory[cardType] ?? 0) - 1);
+    }
     sync();
     return true;
   };
@@ -618,20 +678,6 @@ export const useGameLoop = () => {
   const startCommandCardDrag = (cardType: CommandCardType, sourceClientPos: { x: number; y: number }) => {
     if (stateRef.current.status !== 'playing' || (stateRef.current.commandCardInventory[cardType] ?? 0) <= 0) return;
     setCommandCardDragLine({ cardType, start: sourceClientPos, end: sourceClientPos });
-  };
-
-  const useCommandCardOnCore = (cardType: CommandCardType) => {
-    const state = stateRef.current;
-    const core = state.towers.find(tower => tower.type === 'core');
-    if (!core) {
-      showToast(t().commandCardCannotUse);
-      return;
-    }
-    const wx = (core.x + core.width / 2) * CELL_SIZE;
-    const wy = (core.y + core.height / 2) * CELL_SIZE;
-    if (!applyCommandCardAtWorld(cardType, wx, wy)) {
-      showToast(t().commandCardCannotUse);
-    }
   };
 
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -1344,7 +1390,7 @@ export const useGameLoop = () => {
 
   return {
     canvasRef, cameraRef, gameState, startGame, startCustomGame, togglePause, returnToMenu, handlePick,
-    openCustomPick, buyShopPack, sellTower, rotatingTowerId, startCommandCardDrag, useCommandCardOnCore, commandCardDragLine,
+    openCustomPick, buyShopPack, refreshShopOffers, sellTower, rotatingTowerId, startCommandCardDrag, commandCardDragLine,
     selectedTower, setSelectedTower, placeMonsterMode, setPlaceMonsterMode, skipToNextWave, toastMessage,
     selectedMonsterType, setSelectedMonsterType, staticMonster, setStaticMonster,
     handleCanvasMouseDown, handleCanvasMouseMove, handleCanvasMouseUp, handleCanvasMouseLeave,
