@@ -322,6 +322,16 @@ export const useGameLoop = () => {
     sync();
   };
 
+  const clearPurchasedShopOffer = (state: GameState, shopItemType: ShopItemType) => {
+    const offers = state.shopOffers ?? [];
+    const purchasedIndex = offers.indexOf(shopItemType);
+    if (purchasedIndex < 0) return;
+
+    const nextOffers = [...offers];
+    nextOffers[purchasedIndex] = null;
+    state.shopOffers = nextOffers;
+  };
+
   const buyShopPack = (shopItemType: ShopItemType) => {
     const state = stateRef.current;
     if (state.status !== 'playing') return;
@@ -341,6 +351,7 @@ export const useGameLoop = () => {
         sync();
         return;
       }
+      clearPurchasedShopOffer(state, shopItemType);
       sync();
       return;
     }
@@ -352,6 +363,7 @@ export const useGameLoop = () => {
         return;
       }
       state.commandCardInventory[commandCardType] = (state.commandCardInventory[commandCardType] ?? 0) + 1;
+      clearPurchasedShopOffer(state, shopItemType);
       sync();
       return;
     }
@@ -366,9 +378,11 @@ export const useGameLoop = () => {
           }
         }
       }
+      clearPurchasedShopOffer(state, shopItemType);
       sync();
       return;
     }
+    clearPurchasedShopOffer(state, shopItemType);
     state.pickOptions =
       packType === 'tower' ? generateTowerOnlyPickOptions() :
       packType === 'command' ? generateCommandCardPickOptions() :

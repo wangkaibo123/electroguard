@@ -429,11 +429,20 @@ export default function App() {
           </div>
         </div>
         <div className="flex flex-col gap-2">
-          {offers.map((offer) => {
+          {offers.map((offer, index) => {
+            if (!offer) {
+              return (
+                <div
+                  key={`empty-shop-offer-${index}`}
+                  className="flex h-[70px] items-center justify-center rounded-lg border border-dashed border-gray-800 bg-gray-950/40 text-gray-700"
+                  aria-label="Empty shop slot"
+                />
+              );
+            }
             const item = getShopItemUi(offer);
             return (
               <button
-                key={offer}
+                key={`${offer}-${index}`}
                 type="button"
                 onClick={() => handleBuy(offer)}
                 disabled={!canBuy(item.price)}
