@@ -275,8 +275,7 @@ export const STARTING_INVENTORY = {
 export const SHOP_CONFIG = {
   startingGold: 100,
   goldPerWave: 10,
-  initialRefreshCost: 2,
-  refreshCostIncrease: 2,
+  initialRefreshCost: 5,
   sellPrice: 5,
 } as const;
 
@@ -371,7 +370,7 @@ export const BASE_UPGRADE_CONFIG: Record<BaseUpgradeType, {
 }> = {
   core_power_boost: { color: '#60a5fa', corePowerBonus: 1 },
   core_turret_unlock: { color: '#f87171', coreTurretRange: 220, coreTurretDamage: 30, coreTurretCooldown: 1200 },
-  core_shield_unlock: { color: '#22d3ee', coreShieldHp: 200, coreShieldRadius: 160 },
+  core_shield_unlock: { color: '#22d3ee', coreShieldHp: 200, coreShieldRadius: 200 },
 } as const;
 
 // ── 8. Roguelike 三选一奖励池 ───────────────────────────────────────────────

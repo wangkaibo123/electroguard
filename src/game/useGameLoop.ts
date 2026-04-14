@@ -383,7 +383,7 @@ export const useGameLoop = () => {
       return;
     }
     state.gold -= refreshCost;
-    state.shopRefreshCost = refreshCost + SHOP_CONFIG.refreshCostIncrease;
+    state.shopRefreshCost = SHOP_CONFIG.initialRefreshCost;
     state.shopOffers = generateShopOffers();
     sync();
   };
