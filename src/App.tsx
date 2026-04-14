@@ -395,49 +395,51 @@ export default function App() {
             {i.shop}
           </div>
         </div>
-        {offers.map((offer) => {
-          const pack = shopPackUi[offer];
-          const Icon = pack.Icon;
-          return (
-            <button
-              key={offer}
-              type="button"
-              onClick={() => handleBuy(offer)}
-              disabled={!canBuy(pack.price)}
-              className={`flex items-center gap-2.5 px-3 py-3 rounded-lg border transition-all ${
-                canBuy(pack.price)
-                  ? pack.enabledClass
-                  : 'border-gray-800 bg-gray-900/50 text-gray-500 cursor-not-allowed opacity-40'
-              }`}
-            >
-              <div className={`shrink-0 ${pack.iconClass}`}><Icon size={20} /></div>
-              <div className="flex flex-col items-start min-w-0 flex-1">
-                <span className="text-sm font-bold leading-tight">{pack.label}</span>
-                <span className="text-xs text-gray-400 leading-tight">{pack.description}</span>
-              </div>
-              <div className={`flex items-center gap-1 ${pack.colorClass} text-xs font-bold shrink-0`}>
-                <Coins size={12} />{pack.price}
-              </div>
-            </button>
-          );
-        })}
-        <button
-          type="button"
-          onClick={handleRefresh}
-          disabled={!canRefresh}
-          className={`flex items-center justify-center gap-2.5 px-3 py-2.5 rounded-lg border text-sm font-black transition-all ${
-            canRefresh
-              ? 'border-emerald-700/70 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/15 hover:border-emerald-500/70'
-              : 'border-gray-800 bg-gray-900/50 text-gray-500 cursor-not-allowed opacity-40'
-          }`}
-          title={i.refreshShopDesc(refreshCost)}
-        >
-          <RotateCcw size={16} />
-          <span>{i.refreshShop}</span>
-          <span className="flex items-center gap-1 text-yellow-400">
-            <Coins size={12} />{refreshCost}
-          </span>
-        </button>
+        <div className="flex flex-col gap-2">
+          {offers.map((offer) => {
+            const pack = shopPackUi[offer];
+            const Icon = pack.Icon;
+            return (
+              <button
+                key={offer}
+                type="button"
+                onClick={() => handleBuy(offer)}
+                disabled={!canBuy(pack.price)}
+                className={`flex h-[70px] items-center gap-2.5 px-3 py-3 rounded-lg border text-left transition-all ${
+                  canBuy(pack.price)
+                    ? pack.enabledClass
+                    : 'border-gray-800 bg-gray-900/50 text-gray-500 cursor-not-allowed opacity-40'
+                }`}
+              >
+                <div className={`shrink-0 ${pack.iconClass}`}><Icon size={20} /></div>
+                <div className="flex flex-col items-start min-w-0 flex-1 text-left">
+                  <span className="text-sm font-bold leading-tight">{pack.label}</span>
+                  <span className="text-xs text-gray-400 leading-tight">{pack.description}</span>
+                </div>
+                <div className={`flex items-center gap-1 ${pack.colorClass} text-xs font-bold shrink-0`}>
+                  <Coins size={12} />{pack.price}
+                </div>
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            onClick={handleRefresh}
+            disabled={!canRefresh}
+            className={`flex items-center justify-center gap-2.5 px-3 py-2.5 rounded-lg border text-sm font-black transition-all ${
+              canRefresh
+                ? 'border-emerald-700/70 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/15 hover:border-emerald-500/70'
+                : 'border-gray-800 bg-gray-900/50 text-gray-500 cursor-not-allowed opacity-40'
+            }`}
+            title={i.refreshShopDesc(refreshCost)}
+          >
+            <RotateCcw size={16} />
+            <span>{i.refreshShop}</span>
+            <span className="flex items-center gap-1 text-yellow-400">
+              <Coins size={12} />{refreshCost}
+            </span>
+          </button>
+        </div>
       </>
     );
   };
@@ -464,7 +466,7 @@ export default function App() {
           });
         }}
         disabled={gameState.status !== 'playing'}
-        className={`group relative aspect-[5/3] w-full rounded-lg border p-3 text-left transition-all active:scale-95 ${
+        className={`group relative flex h-[70px] w-full items-center gap-2.5 rounded-lg border px-3 py-3 text-left transition-all active:scale-95 ${
           gameState.status === 'playing'
             ? 'bg-gray-900/90 hover:bg-gray-800/95 cursor-grab active:cursor-grabbing'
             : 'bg-gray-900/40 opacity-60 cursor-not-allowed'
@@ -472,24 +474,22 @@ export default function App() {
         style={{ borderColor: color + '66', boxShadow: `inset 0 0 18px ${color}1f` }}
         title={i.commandCardDesc[type]}
       >
-        <div className="flex h-full flex-col justify-between">
-          <div className="flex items-start justify-between gap-2">
-            <div className="rounded-lg border p-2" style={{ borderColor: color + '55', color, backgroundColor: color + '18' }}>
-              <CommandCardIcon type={type} size={22} />
-            </div>
-            <div className="text-[10px] font-black uppercase tracking-widest" style={{ color }}>{i.commandCard}</div>
-          </div>
-          <div className="min-w-0">
-            <div className="text-sm font-black leading-tight text-white">{i.commandCardName[type]}</div>
-            <div className="mt-1 text-[11px] leading-snug text-gray-400">{i.commandCardDesc[type]}</div>
-          </div>
+        <div className="shrink-0 rounded-lg border p-2" style={{ borderColor: color + '55', color, backgroundColor: color + '18' }}>
+          <CommandCardIcon type={type} size={20} />
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col items-start overflow-hidden text-left">
+          <div className="text-sm font-black leading-tight text-white">{i.commandCardName[type]}</div>
+          <div className="line-clamp-2 mt-1 text-[11px] leading-snug text-gray-400">{i.commandCardDesc[type]}</div>
+        </div>
+        <div className="shrink-0 self-start text-[10px] font-black uppercase tracking-widest" style={{ color }}>
+          {i.commandCard}
         </div>
       </button>
     );
   };
 
   const renderCommandCardPanelContents = () => (
-    <div className="min-w-[235px] flex flex-col gap-2 h-full">
+    <div className="min-w-[236px] flex flex-col gap-2 h-full">
       <div className="text-xs font-bold uppercase tracking-widest text-gray-500 px-1 py-1.5">
         {i.commandCard}
       </div>
@@ -612,7 +612,7 @@ export default function App() {
               {commandSidebarOpen ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
             </button>
             <div
-              className={`bg-gray-900/80 border-r border-gray-800 p-3.5 flex flex-col gap-2.5 overflow-y-auto overflow-x-hidden transition-all duration-300 ease-in-out ${
+              className={`no-scrollbar bg-gray-900/80 border-r border-gray-800 p-3.5 flex flex-col gap-2.5 overflow-y-auto overflow-x-hidden transition-all duration-300 ease-in-out ${
                 commandSidebarOpen ? 'w-[260px] opacity-100' : 'w-0 opacity-0 p-0 border-r-0'
               }`}
             >
@@ -1083,7 +1083,7 @@ export default function App() {
             {commandSidebarOpen && (
               <div className="absolute inset-0 z-40 flex" onClick={() => setCommandSidebarOpen(false)}>
                 <div
-                  className="w-[280px] bg-gray-900/95 backdrop-blur-md border-r border-gray-800 p-3 flex flex-col gap-2 overflow-y-auto animate-[slideInLeft_0.2s_ease-out]"
+                  className="no-scrollbar w-[260px] bg-gray-900/95 backdrop-blur-md border-r border-gray-800 p-3 flex flex-col gap-2 overflow-y-auto animate-[slideInLeft_0.2s_ease-out]"
                   onClick={e => e.stopPropagation()}
                 >
                   <div className="flex items-center justify-between px-1 py-1">
@@ -1118,7 +1118,7 @@ export default function App() {
               <div className="absolute inset-0 z-40 flex" onClick={() => setSidebarOpen(false)}>
                 <div className="flex-1" />
                 <div
-                  className="w-[240px] bg-gray-900/95 backdrop-blur-md border-l border-gray-800 p-3 flex flex-col gap-2 overflow-y-auto animate-[slideInRight_0.2s_ease-out]"
+                  className="no-scrollbar w-[260px] bg-gray-900/95 backdrop-blur-md border-l border-gray-800 p-3 flex flex-col gap-2 overflow-y-auto animate-[slideInRight_0.2s_ease-out]"
                   onClick={e => e.stopPropagation()}
                 >
                   <div className="flex items-center justify-between px-1 py-1">
@@ -1200,7 +1200,7 @@ export default function App() {
 
             {/* Right Build Panel — Inventory based */}
             <div
-              className={`bg-gray-900/80 border-l border-gray-800 p-3.5 flex flex-col gap-2.5 overflow-y-auto overflow-x-hidden transition-all duration-300 ease-in-out ${
+              className={`no-scrollbar bg-gray-900/80 border-l border-gray-800 p-3.5 flex flex-col gap-2.5 overflow-y-auto overflow-x-hidden transition-all duration-300 ease-in-out ${
                 sidebarOpen ? 'w-[260px] opacity-100' : 'w-0 opacity-0 p-0 border-l-0'
               } ${tutorialStep === 3 || tutorialStep === 4 ? 'shadow-[0_0_20px_rgba(6,182,212,0.4),inset_0_0_20px_rgba(6,182,212,0.15)] border-l-cyan-500/50' : ''}`}
             >
