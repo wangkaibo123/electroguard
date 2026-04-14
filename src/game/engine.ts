@@ -4,7 +4,7 @@ import {
   GRID_WIDTH, GRID_HEIGHT, CELL_SIZE, HALF_CELL, TOWER_STATS, CANVAS_WIDTH, CANVAS_HEIGHT, WIRE_MAX_HP,
 } from './types';
 import { t, pickKey } from './i18n';
-import { GLOBAL_CONFIG, ENEMY_CONFIG, STARTING_INVENTORY, PICK_POOL_CONFIG, WEAPON_CONFIG, COMMAND_CARD_CONFIG, BASE_UPGRADE_CONFIG, SHOP_CONFIG, SHOP_ITEM_CONFIG, SHOP_ITEM_TYPES } from './config';
+import { GLOBAL_CONFIG, ENEMY_CONFIG, STARTING_INVENTORY, PICK_POOL_CONFIG, WEAPON_CONFIG, COMMAND_CARD_CONFIG, BASE_UPGRADE_CONFIG, SHOP_CONFIG, SHOP_ITEM_CONFIG, SHOP_OFFER_BUCKETS } from './config';
 import { makeTowerCollider, makeEnemyCollider } from './collider';
 import { getLinearTowerBodyAspectRatio, getLinearTowerBodyRect } from './linearTowerGeometry';
 import { footprintsOverlap, getTowerCells, getTowerFootprintCells } from './footprint';
@@ -554,21 +554,35 @@ export const generateBaseUpgradePickOptions = (): PickOption[] => {
 };
 
 export const generateShopOffers = (count = 3): ShopItemType[] => {
-  const remaining = SHOP_ITEM_TYPES.filter(type => SHOP_ITEM_CONFIG[type].offerWeight > 0);
+  const remaining = SHOP_OFFER_BUCKETS
+    .filter(bucket => bucket.weight > 0 && bucket.items.some(item => item.weight > 0))
+    .map(bucket => ({ weight: bucket.weight, items: [...bucket.items] as { item: ShopItemType; weight: number }[] }));
   const offers: ShopItemType[] = [];
 
   while (offers.length < count && remaining.length > 0) {
-    const totalWeight = remaining.reduce((sum, type) => sum + SHOP_ITEM_CONFIG[type].offerWeight, 0);
+    const totalWeight = remaining.reduce((sum, bucket) => sum + bucket.weight, 0);
     let roll = Math.random() * totalWeight;
     let idx = 0;
     for (let i = 0; i < remaining.length; i++) {
-      roll -= SHOP_ITEM_CONFIG[remaining[i]].offerWeight;
+      roll -= remaining[i].weight;
       if (roll <= 0) {
         idx = i;
         break;
       }
     }
-    offers.push(remaining[idx]);
+    const bucket = remaining[idx];
+    const itemPool = bucket.items.filter(item => item.weight > 0);
+    const totalItemWeight = itemPool.reduce((sum, item) => sum + item.weight, 0);
+    let itemRoll = Math.random() * totalItemWeight;
+    let itemIdx = 0;
+    for (let i = 0; i < itemPool.length; i++) {
+      itemRoll -= itemPool[i].weight;
+      if (itemRoll <= 0) {
+        itemIdx = i;
+        break;
+      }
+    }
+    offers.push(itemPool[itemIdx].item);
     remaining.splice(idx, 1);
   }
 

@@ -285,59 +285,109 @@ export const SHOP_MACHINE_ITEM_TYPES = [
   'bus',
 ] as const satisfies readonly ShopMachineItemType[];
 
+export const SHOP_COMMAND_CARD_ITEM_TYPES = [
+  'airstrike',
+  'add_input',
+  'add_output',
+  'self_power',
+  'range_boost',
+] as const satisfies readonly CommandCardType[];
+
 export const SHOP_ITEM_CONFIG = {
   tower: {
     kind: 'pack',
     name: 'Tower Pack',
     price: 50,
-    offerWeight: 10,
   },
   infra: {
     kind: 'pack',
     name: 'Infrastructure Pack',
     price: 50,
-    offerWeight: 10,
   },
   advanced: {
     kind: 'pack',
     name: 'Advanced Pack',
     price: 100,
-    offerWeight: 5,
   },
   command: {
     kind: 'pack',
     name: 'Command Card Pack',
     price: 50,
-    offerWeight: 8,
   },
   base_upgrade: {
     kind: 'pack',
     name: 'Base Upgrade Pack',
     price: 50,
-    offerWeight: 8,
   },
-  blaster: { kind: 'machine', name: 'Blaster', price: 80, offerWeight: 10, towerType: 'blaster' },
-  gatling: { kind: 'machine', name: 'Gatling', price: 80, offerWeight: 10, towerType: 'gatling' },
-  sniper: { kind: 'machine', name: 'Sniper', price: 80, offerWeight: 10, towerType: 'sniper' },
-  tesla: { kind: 'machine', name: 'Tesla', price: 80, offerWeight: 10, towerType: 'tesla' },
-  generator: { kind: 'machine', name: 'Generator', price: 80, offerWeight: 10, towerType: 'generator' },
-  shield: { kind: 'machine', name: 'Shield', price: 80, offerWeight: 10, towerType: 'shield' },
-  battery: { kind: 'machine', name: 'Battery', price: 80, offerWeight: 10, towerType: 'battery' },
-  bus: { kind: 'machine', name: 'Bus', price: 80, offerWeight: 10, towerType: 'bus' },
+  blaster: { kind: 'machine', name: 'Blaster', price: 80, towerType: 'blaster' },
+  gatling: { kind: 'machine', name: 'Gatling', price: 80, towerType: 'gatling' },
+  sniper: { kind: 'machine', name: 'Sniper', price: 80, towerType: 'sniper' },
+  tesla: { kind: 'machine', name: 'Tesla', price: 80, towerType: 'tesla' },
+  generator: { kind: 'machine', name: 'Generator', price: 80, towerType: 'generator' },
+  shield: { kind: 'machine', name: 'Shield', price: 80, towerType: 'shield' },
+  battery: { kind: 'machine', name: 'Battery', price: 80, towerType: 'battery' },
+  bus: { kind: 'machine', name: 'Bus', price: 80, towerType: 'bus' },
+  airstrike: { kind: 'command_card', name: 'Airstrike', price: 50, commandCardType: 'airstrike' },
+  add_input: { kind: 'command_card', name: 'Add Input', price: 50, commandCardType: 'add_input' },
+  add_output: { kind: 'command_card', name: 'Add Output', price: 50, commandCardType: 'add_output' },
+  self_power: { kind: 'command_card', name: 'Self Power', price: 50, commandCardType: 'self_power' },
+  range_boost: { kind: 'command_card', name: 'Range Boost', price: 50, commandCardType: 'range_boost' },
 } as const satisfies Record<ShopItemType, {
-  kind: 'pack' | 'machine';
+  kind: 'pack' | 'machine' | 'command_card';
   /** Developer-facing item name. Player-facing text still comes from i18n. */
   name: string;
   /** Gold cost to buy this shop item. */
   price: number;
-  /** Relative chance to appear in shop offers. 0 removes it from random offers. */
-  offerWeight: number;
   /** Present for direct machine purchases. Advanced machines stay in the advanced pack. */
   towerType?: ShopMachineItemType;
+  /** Present for direct command-card purchases. */
+  commandCardType?: CommandCardType;
 }>;
 
 export const SHOP_PACK_TYPES = ['tower', 'infra', 'advanced', 'command', 'base_upgrade'] as const satisfies readonly ShopPackType[];
 export const SHOP_ITEM_TYPES = Object.keys(SHOP_ITEM_CONFIG) as ShopItemType[];
+
+export const SHOP_OFFER_BUCKETS = [
+  {
+    name: 'Non-advanced Machines',
+    weight: 10,
+    items: SHOP_MACHINE_ITEM_TYPES.map(item => ({ item, weight: 10 })),
+  },
+  {
+    name: 'Base Upgrade Pack',
+    weight: 5,
+    items: [{ item: 'base_upgrade', weight: 1 }],
+  },
+  {
+    name: 'Infrastructure Pack',
+    weight: 20,
+    items: [{ item: 'infra', weight: 1 }],
+  },
+  {
+    name: 'Tower Pack',
+    weight: 20,
+    items: [{ item: 'tower', weight: 1 }],
+  },
+  {
+    name: 'Command Card Pack',
+    weight: 20,
+    items: [{ item: 'command', weight: 1 }],
+  },
+  {
+    name: 'Command Cards',
+    weight: 20,
+    items: SHOP_COMMAND_CARD_ITEM_TYPES.map(item => ({ item, weight: 10 })),
+  },
+  {
+    name: 'Advanced Machines',
+    weight: 20,
+    items: [{ item: 'advanced', weight: 1 }],
+  },
+] as const satisfies readonly {
+  name: string;
+  weight: number;
+  items: readonly { item: ShopItemType; weight: number }[];
+}[];
 
 export const COMMAND_CARD_CONFIG: Record<CommandCardType, {
   color: string;

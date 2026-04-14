@@ -401,6 +401,18 @@ export default function App() {
           iconClass: 'text-gray-400',
         };
       }
+      if (item.kind === 'command_card') {
+        const commandCardType = item.commandCardType!;
+        return {
+          label: i.commandCardName[commandCardType] ?? item.name,
+          description: i.commandCardDesc[commandCardType] ?? '',
+          price: item.price,
+          icon: <BookOpen size={20} />,
+          colorClass: 'text-cyan-300',
+          enabledClass: 'border-cyan-700/70 bg-cyan-500/10 text-cyan-100 hover:bg-cyan-500/15 hover:border-cyan-500/70',
+          iconClass: 'text-cyan-300',
+        };
+      }
       const pack = shopPackUi[offer as ShopPackType];
       const Icon = pack.Icon;
       return {

@@ -344,6 +344,17 @@ export const useGameLoop = () => {
       sync();
       return;
     }
+    if (shopItem.kind === 'command_card') {
+      const commandCardType = shopItem.commandCardType;
+      if (!commandCardType) {
+        state.gold += price;
+        sync();
+        return;
+      }
+      state.commandCardInventory[commandCardType] = (state.commandCardInventory[commandCardType] ?? 0) + 1;
+      sync();
+      return;
+    }
     const packType = shopItemType as ShopPackType;
     if (packType === 'advanced') {
       const opt = generateAdvancedPickOptions()[0];
