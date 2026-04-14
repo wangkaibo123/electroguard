@@ -130,6 +130,7 @@ const applyDamageToEnemy = (
 
   state.enemies = state.enemies.filter((item) => item.id !== enemy.id);
   state.score += SCORE_CONFIG[enemy.enemyType] ?? SCORE_CONFIG.default;
+  state.gold += enemy.goldReward ?? SHOP_CONFIG.goldPerEnemyKill;
   createExplosion(state, enemy.x, enemy.y, enemy.color, bigExplosion ? 15 : 10);
   return true;
 };
@@ -847,7 +848,7 @@ const updateBossEffects = (state: GameState, now: number) => {
     if (now - enemy.lastSpawnTime >= BOSS_SPAWN_INTERVAL) {
       for (let index = 0; index < BOSS_SPAWN_COUNT; index++) {
         const offset = (Math.random() - 0.5) * enemy.radius * 2;
-        spawnEnemyAt(state, 'scout', state.wave, enemy.x + offset, enemy.y + offset);
+        spawnEnemyAt(state, 'scout', state.wave, enemy.x + offset, enemy.y + offset, { goldReward: 0 });
       }
       enemy.lastSpawnTime = now;
       createExplosion(state, enemy.x, enemy.y, '#ef4444', 8);

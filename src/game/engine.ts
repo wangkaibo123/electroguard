@@ -4,7 +4,7 @@ import {
   GRID_WIDTH, GRID_HEIGHT, CELL_SIZE, HALF_CELL, TOWER_STATS, CANVAS_WIDTH, CANVAS_HEIGHT, WIRE_MAX_HP,
 } from './types';
 import { t, pickKey } from './i18n';
-import { GLOBAL_CONFIG, ENEMY_CONFIG, ENEMY_SCALING, STARTING_INVENTORY, PICK_POOL_CONFIG, WEAPON_CONFIG, COMMAND_CARD_CONFIG, BASE_UPGRADE_CONFIG, SHOP_CONFIG, SHOP_ITEM_CONFIG, SHOP_ITEM_TYPES } from './config';
+import { GLOBAL_CONFIG, ENEMY_CONFIG, STARTING_INVENTORY, PICK_POOL_CONFIG, WEAPON_CONFIG, COMMAND_CARD_CONFIG, BASE_UPGRADE_CONFIG, SHOP_CONFIG, SHOP_ITEM_CONFIG, SHOP_ITEM_TYPES } from './config';
 import { makeTowerCollider, makeEnemyCollider } from './collider';
 import { getLinearTowerBodyAspectRatio, getLinearTowerBodyRect } from './linearTowerGeometry';
 import { footprintsOverlap, getTowerCells, getTowerFootprintCells } from './footprint';
@@ -827,19 +827,17 @@ const spawnPos = (): { x: number; y: number } => {
   return { x, y };
 };
 
-const pushEnemy = (state: GameState, type: EnemyType, wave: number) => {
+const pushEnemy = (state: GameState, type: EnemyType, _wave: number) => {
   const def = ENEMY_CONFIG[type];
-  const sc = ENEMY_SCALING;
-  const hpMul = 1 + wave * sc.hpPerWave;
-  const hp = def.baseHp * hpMul;
+  const hp = def.baseHp;
   const { x, y } = spawnPos();
-  const shieldHp = def.baseShield * hpMul;
-  const speedBonus = 1 + wave * sc.speedPerWave;
+  const shieldHp = def.baseShield;
   state.enemies.push({
     id: genId(), enemyType: type, x, y,
     hp, maxHp: hp,
-    speed: (def.speedMin + Math.random() * (def.speedMax - def.speedMin)) * speedBonus * ENEMY_SPEED_MUL,
-    damage: def.baseDamage + Math.floor(wave * sc.damagePerWave),
+    speed: (def.speedMin + Math.random() * (def.speedMax - def.speedMin)) * ENEMY_SPEED_MUL,
+    damage: def.baseDamage,
+    goldReward: SHOP_CONFIG.goldPerEnemyKill,
     attackCooldown: def.cooldown, lastAttackTime: 0, targetId: null, heading: 0,
     radius: def.radius, color: def.color, wireDamageMul: def.wireDamageMul,
     shieldAbsorb: shieldHp, maxShieldAbsorb: shieldHp,
@@ -859,24 +857,22 @@ export const spawnBoss = (state: GameState, wave: number) => {
 export const spawnEnemyAt = (
   state: GameState,
   type: EnemyType,
-  wave: number,
+  _wave: number,
   x: number,
   y: number,
-  options?: { isStatic?: boolean },
+  options?: { isStatic?: boolean; goldReward?: number },
 ) => {
   const def = ENEMY_CONFIG[type];
-  const sc = ENEMY_SCALING;
-  const hpMul = 1 + wave * sc.hpPerWave;
-  const hp = def.baseHp * hpMul;
-  const shieldHp = def.baseShield * hpMul;
-  const speedBonus = 1 + wave * sc.speedPerWave;
+  const hp = def.baseHp;
+  const shieldHp = def.baseShield;
   state.enemies.push({
     id: genId(), enemyType: type, isStatic: options?.isStatic, x, y,
     hp, maxHp: hp,
     speed: options?.isStatic
       ? 0
-      : (def.speedMin + Math.random() * (def.speedMax - def.speedMin)) * speedBonus * ENEMY_SPEED_MUL,
-    damage: def.baseDamage + Math.floor(wave * sc.damagePerWave),
+      : (def.speedMin + Math.random() * (def.speedMax - def.speedMin)) * ENEMY_SPEED_MUL,
+    damage: def.baseDamage,
+    goldReward: options?.goldReward ?? SHOP_CONFIG.goldPerEnemyKill,
     attackCooldown: def.cooldown, lastAttackTime: 0, targetId: null, heading: 0,
     radius: def.radius, color: def.color, wireDamageMul: def.wireDamageMul,
     shieldAbsorb: shieldHp, maxShieldAbsorb: shieldHp,

@@ -619,6 +619,7 @@ export const useGameLoop = () => {
     createExplosion(state, enemy.x, enemy.y, enemy.color, enemy.hp <= 0 ? 12 : 5);
     if (enemy.hp > 0) return;
     state.score += SCORE_CONFIG[enemy.enemyType] ?? SCORE_CONFIG.default;
+    state.gold += enemy.goldReward ?? SHOP_CONFIG.goldPerEnemyKill;
   };
 
   const applyCommandCardAtWorld = (cardType: CommandCardType, wx: number, wy: number) => {

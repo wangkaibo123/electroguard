@@ -181,13 +181,13 @@ export const WEAPON_CONFIG = {
 //  unlockWave: 该敌人从第几波开始出现在随机池中，-1 表示仅作为 Boss 刷出
 
 export const ENEMY_CONFIG: Record<EnemyType, {
-  /** 基础血量（会随波次缩放） */
+  /** 基础血量 */
   baseHp: number;
   /** 最低移动速度（px/s） */
   speedMin: number;
   /** 最高移动速度（px/s），实际速度在 min~max 间随机 */
   speedMax: number;
-  /** 基础攻击伤害（会随波次增长） */
+  /** 基础攻击伤害 */
   baseDamage: number;
   /** 攻击间隔（ms） */
   cooldown: number;
@@ -214,14 +214,8 @@ export const ENEMY_CONFIG: Record<EnemyType, {
   overlord: { baseHp: 200, speedMin: 14, speedMax: 18, baseDamage: 20, cooldown: 1500, radius: 52, color: '#ef4444', wireDamageMul: 1, baseShield: 50, unlockWave: -1 },
 };
 
-/** 敌人属性随波次的缩放系数 */
+/** 敌人刷怪数随波次的缩放系数 */
 export const ENEMY_SCALING = {
-  /** 每波血量乘数增量：实际血量 = baseHp × (1 + wave × hpPerWave) */
-  hpPerWave: 0.15,
-  /** 每波速度乘数增量：实际速度 × (1 + wave × speedPerWave) */
-  speedPerWave: 0.02,
-  /** 每波伤害线性增量：实际伤害 = baseDamage + floor(wave × damagePerWave) */
-  damagePerWave: 0.8,
   /** 每波刷怪数公式的常数项：floor(spawnBase + wave×spawnLinear + sqrt(wave)×spawnSqrt) */
   spawnBase: 2,
   /** 每波刷怪数公式的线性系数 */
@@ -275,6 +269,7 @@ export const STARTING_INVENTORY = {
 export const SHOP_CONFIG = {
   startingGold: 100,
   goldPerWave: 10,
+  goldPerEnemyKill: 1,
   initialRefreshCost: 5,
   sellPrice: 5,
 } as const;

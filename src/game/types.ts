@@ -102,6 +102,7 @@ export interface Enemy {
   maxHp: number;
   speed: number;
   damage: number;
+  goldReward: number;
   attackCooldown: number;
   lastAttackTime: number;
   targetId: string | null;
