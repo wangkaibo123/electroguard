@@ -1,4 +1,4 @@
-import type { TowerType, EnemyType, CommandCardType, BaseUpgradeType } from './types';
+import type { TowerType, EnemyType, CommandCardType, BaseUpgradeType, ShopPackType } from './types';
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  游戏配置表  —  所有影响游戏平衡的数值集中在此文件
@@ -275,15 +275,47 @@ export const STARTING_INVENTORY = {
 export const SHOP_CONFIG = {
   startingGold: 100,
   goldPerWave: 10,
-  towerPackPrice: 50,
-  infraPackPrice: 50,
-  advancedPackPrice: 100,
-  commandCardPackPrice: 50,
-  baseUpgradePackPrice: 50,
   initialRefreshCost: 2,
   refreshCostIncrease: 2,
   sellPrice: 5,
 } as const;
+
+export const SHOP_ITEM_CONFIG = {
+  tower: {
+    name: 'Tower Pack',
+    price: 50,
+    offerWeight: 10,
+  },
+  infra: {
+    name: 'Infrastructure Pack',
+    price: 50,
+    offerWeight: 10,
+  },
+  advanced: {
+    name: 'Advanced Pack',
+    price: 100,
+    offerWeight: 5,
+  },
+  command: {
+    name: 'Command Card Pack',
+    price: 50,
+    offerWeight: 8,
+  },
+  base_upgrade: {
+    name: 'Base Upgrade Pack',
+    price: 50,
+    offerWeight: 8,
+  },
+} as const satisfies Record<ShopPackType, {
+  /** Developer-facing item name. Player-facing text still comes from i18n. */
+  name: string;
+  /** Gold cost to buy this shop item. */
+  price: number;
+  /** Relative chance to appear in shop offers. 0 removes it from random offers. */
+  offerWeight: number;
+}>;
+
+export const SHOP_PACK_TYPES = Object.keys(SHOP_ITEM_CONFIG) as ShopPackType[];
 
 export const COMMAND_CARD_CONFIG: Record<CommandCardType, {
   color: string;

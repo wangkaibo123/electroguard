@@ -3,7 +3,7 @@ import { Battery, Zap, Crosshair, Activity, Play, RotateCcw, Pause, Hexagon, Cab
 import { useGameLoop } from './game/useGameLoop';
 import { TOWER_STATS, TowerType, PickOption, EnemyType, CommandCardType, BaseUpgradeType, ShopPackType } from './game/types';
 import { t, getLocale, setLocale, Locale } from './game/i18n';
-import { BASE_UPGRADE_CONFIG, COMMAND_CARD_CONFIG, GLOBAL_CONFIG, TIPS_CONFIG, TOWER_CONFIG, WEAPON_CONFIG, SHOP_CONFIG } from './game/config';
+import { BASE_UPGRADE_CONFIG, COMMAND_CARD_CONFIG, GLOBAL_CONFIG, TIPS_CONFIG, TOWER_CONFIG, WEAPON_CONFIG, SHOP_CONFIG, SHOP_ITEM_CONFIG } from './game/config';
 
 const TowerIcon = ({ type, size = 22 }: { type: string; size?: number }) => {
   const icons: Record<string, React.ComponentType<{ size: number }>> = {
@@ -330,7 +330,7 @@ export default function App() {
     tower: {
       label: i.towerPack,
       description: i.towerPackDesc,
-      price: SHOP_CONFIG.towerPackPrice,
+      price: SHOP_ITEM_CONFIG.tower.price,
       Icon: Crosshair,
       colorClass: 'text-yellow-400',
       enabledClass: 'border-yellow-700/70 bg-yellow-500/10 text-yellow-200 hover:bg-yellow-500/15 hover:border-yellow-500/70',
@@ -339,7 +339,7 @@ export default function App() {
     infra: {
       label: i.infraPack,
       description: i.infraPackDesc,
-      price: SHOP_CONFIG.infraPackPrice,
+      price: SHOP_ITEM_CONFIG.infra.price,
       Icon: Zap,
       colorClass: 'text-yellow-400',
       enabledClass: 'border-yellow-700/70 bg-yellow-500/10 text-yellow-200 hover:bg-yellow-500/15 hover:border-yellow-500/70',
@@ -348,7 +348,7 @@ export default function App() {
     advanced: {
       label: i.advancedPack,
       description: i.advancedPackDesc,
-      price: SHOP_CONFIG.advancedPackPrice,
+      price: SHOP_ITEM_CONFIG.advanced.price,
       Icon: Rocket,
       colorClass: 'text-yellow-400',
       enabledClass: 'border-rose-700/70 bg-rose-500/10 text-rose-200 hover:bg-rose-500/15 hover:border-rose-500/70',
@@ -357,7 +357,7 @@ export default function App() {
     command: {
       label: i.commandCardPack,
       description: i.commandCardPackDesc,
-      price: SHOP_CONFIG.commandCardPackPrice,
+      price: SHOP_ITEM_CONFIG.command.price,
       Icon: BookOpen,
       colorClass: 'text-yellow-400',
       enabledClass: 'border-cyan-700/70 bg-cyan-500/10 text-cyan-100 hover:bg-cyan-500/15 hover:border-cyan-500/70',
@@ -366,7 +366,7 @@ export default function App() {
     base_upgrade: {
       label: i.baseUpgradePack,
       description: i.baseUpgradePackDesc,
-      price: SHOP_CONFIG.baseUpgradePackPrice,
+      price: SHOP_ITEM_CONFIG.base_upgrade.price,
       Icon: Globe,
       colorClass: 'text-yellow-400',
       enabledClass: 'border-sky-700/70 bg-sky-500/10 text-sky-100 hover:bg-sky-500/15 hover:border-sky-500/70',

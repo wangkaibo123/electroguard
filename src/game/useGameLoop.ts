@@ -14,7 +14,7 @@ import {
   createExplosion,
 } from './engine';
 import { renderGame } from './renderer';
-import { BASE_UPGRADE_CONFIG, COMMAND_CARD_CONFIG, GLOBAL_CONFIG, SCORE_CONFIG, SHOP_CONFIG } from './config';
+import { BASE_UPGRADE_CONFIG, COMMAND_CARD_CONFIG, GLOBAL_CONFIG, SCORE_CONFIG, SHOP_CONFIG, SHOP_ITEM_CONFIG } from './config';
 import { t } from './i18n';
 import { addTowerToState, createTowerAt } from './towerFactory';
 import { findAutoPlacementNearCore } from './placement';
@@ -326,12 +326,7 @@ export const useGameLoop = () => {
     const state = stateRef.current;
     if (state.status !== 'playing') return;
     if (!state.shopOffers?.includes(packType)) return;
-    const price =
-      packType === 'tower' ? SHOP_CONFIG.towerPackPrice :
-      packType === 'infra' ? SHOP_CONFIG.infraPackPrice :
-      packType === 'command' ? SHOP_CONFIG.commandCardPackPrice :
-      packType === 'base_upgrade' ? SHOP_CONFIG.baseUpgradePackPrice :
-      SHOP_CONFIG.advancedPackPrice;
+    const price = SHOP_ITEM_CONFIG[packType].price;
     if (state.gold < price) {
       showToast(t().notEnoughGold);
       return;
