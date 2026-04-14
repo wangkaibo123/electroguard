@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Battery, Zap, Crosshair, Activity, Play, RotateCcw, Pause, Hexagon, Cable, Wrench, ChevronRight, ChevronLeft, Flame, Focus, Radio, GitMerge, Globe, LogOut, BookOpen, X, Keyboard, Menu, Eye, EyeOff, ShoppingBag, Coins, Rocket, Bot, Bomb, Plus, Power, Shield } from 'lucide-react';
 import { useGameLoop } from './game/useGameLoop';
-import { TOWER_STATS, TowerType, PickOption, EnemyType, CommandCardType, BaseUpgradeType, ShopPackType } from './game/types';
+import { TOWER_STATS, TowerType, PickOption, EnemyType, CommandCardType, BaseUpgradeType, ShopItemType, ShopPackType } from './game/types';
 import { t, getLocale, setLocale, Locale } from './game/i18n';
 import { BASE_UPGRADE_CONFIG, COMMAND_CARD_CONFIG, GLOBAL_CONFIG, TIPS_CONFIG, TOWER_CONFIG, WEAPON_CONFIG, SHOP_CONFIG, SHOP_ITEM_CONFIG } from './game/config';
 
@@ -375,7 +375,7 @@ export default function App() {
   };
 
   const renderShopButtons = (closeSidebar = false, topMargin = true) => {
-    const handleBuy = (type: ShopPackType) => {
+    const handleBuy = (type: ShopItemType) => {
       buyShopPack(type);
       if (closeSidebar) setSidebarOpen(false);
     };
@@ -384,9 +384,30 @@ export default function App() {
     };
     const isCustom = gameState.gameMode === 'custom';
     const canBuy = (price: number) => gameState.status === 'playing' && (isCustom || gameState.gold >= price);
-    const offers = gameState.shopOffers.length > 0 ? gameState.shopOffers : (['tower', 'infra', 'command'] as ShopPackType[]);
+    const offers = gameState.shopOffers.length > 0 ? gameState.shopOffers : (['tower', 'infra', 'command'] as ShopItemType[]);
     const refreshCost = gameState.shopRefreshCost ?? SHOP_CONFIG.initialRefreshCost;
     const canRefresh = gameState.status === 'playing' && (isCustom || gameState.gold >= refreshCost);
+    const getShopItemUi = (offer: ShopItemType) => {
+      const item = SHOP_ITEM_CONFIG[offer];
+      if (item.kind === 'machine') {
+        const towerType = item.towerType!;
+        return {
+          label: i.towerName[towerType] ?? item.name,
+          description: i.towerDesc[towerType] ?? TOWER_STATS[towerType].description,
+          price: item.price,
+          icon: <TowerIcon type={towerType} size={20} />,
+          colorClass: 'text-yellow-400',
+          enabledClass: 'border-gray-700 bg-gray-800/80 text-gray-200 hover:bg-gray-700 hover:border-gray-500',
+          iconClass: 'text-gray-400',
+        };
+      }
+      const pack = shopPackUi[offer as ShopPackType];
+      const Icon = pack.Icon;
+      return {
+        ...pack,
+        icon: <Icon size={20} />,
+      };
+    };
     return (
       <>
         <div className={`text-xs font-bold uppercase tracking-widest text-gray-500 px-1 py-1.5 ${topMargin ? 'mt-2' : ''}`}>
@@ -397,27 +418,26 @@ export default function App() {
         </div>
         <div className="flex flex-col gap-2">
           {offers.map((offer) => {
-            const pack = shopPackUi[offer];
-            const Icon = pack.Icon;
+            const item = getShopItemUi(offer);
             return (
               <button
                 key={offer}
                 type="button"
                 onClick={() => handleBuy(offer)}
-                disabled={!canBuy(pack.price)}
+                disabled={!canBuy(item.price)}
                 className={`flex h-[70px] items-center gap-2.5 px-3 py-3 rounded-lg border text-left transition-all ${
-                  canBuy(pack.price)
-                    ? pack.enabledClass
+                  canBuy(item.price)
+                    ? item.enabledClass
                     : 'border-gray-800 bg-gray-900/50 text-gray-500 cursor-not-allowed opacity-40'
                 }`}
               >
-                <div className={`shrink-0 ${pack.iconClass}`}><Icon size={20} /></div>
+                <div className={`shrink-0 ${item.iconClass}`}>{item.icon}</div>
                 <div className="flex flex-col items-start min-w-0 flex-1 text-left">
-                  <span className="text-sm font-bold leading-tight">{pack.label}</span>
-                  <span className="text-xs text-gray-400 leading-tight">{pack.description}</span>
+                  <span className="text-sm font-bold leading-tight">{item.label}</span>
+                  <span className="text-xs text-gray-400 leading-tight line-clamp-2">{item.description}</span>
                 </div>
-                <div className={`flex items-center gap-1 ${pack.colorClass} text-xs font-bold shrink-0`}>
-                  <Coins size={12} />{pack.price}
+                <div className={`flex items-center gap-1 ${item.colorClass} text-xs font-bold shrink-0`}>
+                  <Coins size={12} />{item.price}
                 </div>
               </button>
             );

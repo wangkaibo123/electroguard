@@ -1,4 +1,4 @@
-import type { TowerType, EnemyType, CommandCardType, BaseUpgradeType, ShopPackType } from './types';
+import type { TowerType, EnemyType, CommandCardType, BaseUpgradeType, ShopItemType, ShopMachineItemType, ShopPackType } from './types';
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  游戏配置表  —  所有影响游戏平衡的数值集中在此文件
@@ -280,42 +280,70 @@ export const SHOP_CONFIG = {
   sellPrice: 5,
 } as const;
 
+export const SHOP_MACHINE_ITEM_TYPES = [
+  'blaster',
+  'gatling',
+  'sniper',
+  'tesla',
+  'generator',
+  'shield',
+  'battery',
+  'bus',
+] as const satisfies readonly ShopMachineItemType[];
+
 export const SHOP_ITEM_CONFIG = {
   tower: {
+    kind: 'pack',
     name: 'Tower Pack',
     price: 50,
     offerWeight: 10,
   },
   infra: {
+    kind: 'pack',
     name: 'Infrastructure Pack',
     price: 50,
     offerWeight: 10,
   },
   advanced: {
+    kind: 'pack',
     name: 'Advanced Pack',
     price: 100,
     offerWeight: 5,
   },
   command: {
+    kind: 'pack',
     name: 'Command Card Pack',
     price: 50,
     offerWeight: 8,
   },
   base_upgrade: {
+    kind: 'pack',
     name: 'Base Upgrade Pack',
     price: 50,
     offerWeight: 8,
   },
-} as const satisfies Record<ShopPackType, {
+  blaster: { kind: 'machine', name: 'Blaster', price: 80, offerWeight: 10, towerType: 'blaster' },
+  gatling: { kind: 'machine', name: 'Gatling', price: 80, offerWeight: 10, towerType: 'gatling' },
+  sniper: { kind: 'machine', name: 'Sniper', price: 80, offerWeight: 10, towerType: 'sniper' },
+  tesla: { kind: 'machine', name: 'Tesla', price: 80, offerWeight: 10, towerType: 'tesla' },
+  generator: { kind: 'machine', name: 'Generator', price: 80, offerWeight: 10, towerType: 'generator' },
+  shield: { kind: 'machine', name: 'Shield', price: 80, offerWeight: 10, towerType: 'shield' },
+  battery: { kind: 'machine', name: 'Battery', price: 80, offerWeight: 10, towerType: 'battery' },
+  bus: { kind: 'machine', name: 'Bus', price: 80, offerWeight: 10, towerType: 'bus' },
+} as const satisfies Record<ShopItemType, {
+  kind: 'pack' | 'machine';
   /** Developer-facing item name. Player-facing text still comes from i18n. */
   name: string;
   /** Gold cost to buy this shop item. */
   price: number;
   /** Relative chance to appear in shop offers. 0 removes it from random offers. */
   offerWeight: number;
+  /** Present for direct machine purchases. Advanced machines stay in the advanced pack. */
+  towerType?: ShopMachineItemType;
 }>;
 
-export const SHOP_PACK_TYPES = Object.keys(SHOP_ITEM_CONFIG) as ShopPackType[];
+export const SHOP_PACK_TYPES = ['tower', 'infra', 'advanced', 'command', 'base_upgrade'] as const satisfies readonly ShopPackType[];
+export const SHOP_ITEM_TYPES = Object.keys(SHOP_ITEM_CONFIG) as ShopItemType[];
 
 export const COMMAND_CARD_CONFIG: Record<CommandCardType, {
   color: string;

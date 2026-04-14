@@ -9,6 +9,8 @@ export type PortDirection = 'top' | 'right' | 'bottom' | 'left';
 export type PortType = 'input' | 'output';
 export type GameStatus = 'menu' | 'playing' | 'paused' | 'pick' | 'gameover';
 export type ShopPackType = 'tower' | 'infra' | 'advanced' | 'command' | 'base_upgrade';
+export type ShopMachineItemType = Exclude<TowerType, 'core' | 'missile' | 'big_generator' | 'repair_drone'>;
+export type ShopItemType = ShopPackType | ShopMachineItemType;
 
 /** Pick overlay: normal random pool vs. fixed boss-wave bonus vs. shop purchases */
 export type PickUiPhase = 'standard' | 'boss_bonus' | 'shop_tower' | 'shop_infra' | 'shop_command' | 'shop_base_upgrade';
@@ -198,7 +200,7 @@ export interface GameState {
   powerTimer: number;
   wireInventory: number;
   gold: number;
-  shopOffers: ShopPackType[];
+  shopOffers: ShopItemType[];
   shopRefreshCost: number;
   towerInventory: Record<string, number>;
   commandCardInventory: Record<string, number>;

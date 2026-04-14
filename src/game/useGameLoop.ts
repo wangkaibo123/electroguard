@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  GameState, TowerType, CommandCardType, BaseUpgradeType, ShopPackType, Port, Wire, CELL_SIZE, GRID_WIDTH, GRID_HEIGHT, EnemyType, PortDirection,
+  GameState, TowerType, CommandCardType, BaseUpgradeType, ShopItemType, ShopPackType, Port, Wire, CELL_SIZE, GRID_WIDTH, GRID_HEIGHT, EnemyType, PortDirection,
   TOWER_STATS, CANVAS_WIDTH, CANVAS_HEIGHT, WIRE_MAX_HP,
   Camera, VIEWPORT_WIDTH, VIEWPORT_HEIGHT, getTowerRange,
 } from './types';
@@ -322,16 +322,29 @@ export const useGameLoop = () => {
     sync();
   };
 
-  const buyShopPack = (packType: ShopPackType) => {
+  const buyShopPack = (shopItemType: ShopItemType) => {
     const state = stateRef.current;
     if (state.status !== 'playing') return;
-    if (!state.shopOffers?.includes(packType)) return;
-    const price = SHOP_ITEM_CONFIG[packType].price;
+    if (!state.shopOffers?.includes(shopItemType)) return;
+    const shopItem = SHOP_ITEM_CONFIG[shopItemType];
+    const price = shopItem.price;
     if (state.gold < price) {
       showToast(t().notEnoughGold);
       return;
     }
     state.gold -= price;
+    if (shopItem.kind === 'machine') {
+      const towerType = shopItem.towerType;
+      if (!towerType || !queueTowerDropNearCore(state, towerType)) {
+        state.gold += price;
+        showToast(t().autoDeployFailed);
+        sync();
+        return;
+      }
+      sync();
+      return;
+    }
+    const packType = shopItemType as ShopPackType;
     if (packType === 'advanced') {
       const opt = generateAdvancedPickOptions()[0];
       if (opt.towerType) {
