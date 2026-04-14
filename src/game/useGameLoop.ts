@@ -18,14 +18,15 @@ import { BASE_UPGRADE_CONFIG, COMMAND_CARD_CONFIG, GLOBAL_CONFIG, SCORE_CONFIG, 
 import { t } from './i18n';
 import { addTowerToState, createTowerAt } from './towerFactory';
 import { findAutoPlacementNearCore } from './placement';
-import { updateGameState } from './updateGameState';
+import { startNextWave, updateGameState } from './updateGameState';
 import { getDeleteButtonLayout, getRotationKnobLayout } from './render/towers';
 import { isWorldPointInTowerFootprint } from './footprint';
 
-const { maxZoom: MAX_ZOOM, waveDelay: WAVE_DELAY } = GLOBAL_CONFIG;
+const { maxZoom: MAX_ZOOM } = GLOBAL_CONFIG;
 const MAX_MACHINE_COMMAND_UPGRADES = 3;
 const PORT_DIRECTIONS: PortDirection[] = ['top', 'right', 'bottom', 'left'];
 const COMMAND_CARD_TYPES = Object.keys(COMMAND_CARD_CONFIG) as CommandCardType[];
+const isMachineCommandCard = (cardType: CommandCardType) => cardType !== 'airstrike';
 
 export const useGameLoop = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -87,6 +88,7 @@ export const useGameLoop = () => {
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const commandCardFailureHandledRef = useRef(false);
   const showToast = (msg: string, durationMs = 2000) => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToastMessage(msg);
@@ -430,11 +432,7 @@ export const useGameLoop = () => {
 
   const skipToNextWave = () => {
     const state = stateRef.current;
-    if (state.status !== 'playing' || state.gameMode === 'custom') return;
-    if (state.enemies.length > 0 || state.enemiesToSpawn > 0) return;
-    if (state.needsPick) return;
-    state.waveTimer = WAVE_DELAY + 1;
-    sync();
+    if (startNextWave(state)) sync();
   };
 
   const placeTowerFromSelection = (state: GameState, towerType: TowerType, x: number, y: number) => {
@@ -656,6 +654,17 @@ export const useGameLoop = () => {
     const targetTower = findTowerAtWorldPoint(state, wx, wy);
     let used = false;
 
+    if (
+      isMachineCommandCard(cardType) &&
+      targetTower &&
+      targetTower.type !== 'core' &&
+      (targetTower.commandUpgradeCount ?? 0) >= MAX_MACHINE_COMMAND_UPGRADES
+    ) {
+      commandCardFailureHandledRef.current = true;
+      showToast(t().commandCardMachineMaxed);
+      return false;
+    }
+
     if (cardType === 'airstrike') {
       const cfg = COMMAND_CARD_CONFIG.airstrike;
       const radius = cfg.airstrikeRadius ?? 90;
@@ -674,20 +683,18 @@ export const useGameLoop = () => {
       used = addMachinePort(state, targetTower, cardType === 'add_input' ? 'input' : 'output');
     } else if (cardType === 'self_power') {
       if (!targetTower || targetTower.type === 'core') return false;
-      if ((targetTower.commandUpgradeCount ?? 0) >= MAX_MACHINE_COMMAND_UPGRADES) return false;
       targetTower.selfPowerLevel = (targetTower.selfPowerLevel ?? 0) + 1;
       targetTower.selfPowerTimer = 0;
       updatePowerGrid(state);
       used = true;
     } else if (cardType === 'range_boost') {
       if (!targetTower || targetTower.type === 'core' || getTowerRange(targetTower) == null) return false;
-      if ((targetTower.commandUpgradeCount ?? 0) >= MAX_MACHINE_COMMAND_UPGRADES) return false;
       targetTower.rangeMultiplier = (targetTower.rangeMultiplier ?? 1) + (COMMAND_CARD_CONFIG.range_boost.rangeBoostMultiplier ?? 0.2);
       used = true;
     }
 
     if (!used) return false;
-    if (targetTower && targetTower.type !== 'core' && cardType !== 'airstrike' && cardType !== 'add_input' && cardType !== 'add_output') {
+    if (targetTower && targetTower.type !== 'core' && isMachineCommandCard(cardType)) {
       targetTower.commandUpgradeCount = (targetTower.commandUpgradeCount ?? 0) + 1;
     }
     if (state.gameMode !== 'custom') {
@@ -704,7 +711,8 @@ export const useGameLoop = () => {
       return;
     }
     const { wx, wy } = toWorld(point.sx, point.sy);
-    if (!applyCommandCardAtWorld(cardType, wx, wy)) {
+    commandCardFailureHandledRef.current = false;
+    if (!applyCommandCardAtWorld(cardType, wx, wy) && !commandCardFailureHandledRef.current) {
       showToast(t().commandCardCannotUse);
     }
   };

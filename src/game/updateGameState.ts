@@ -44,7 +44,6 @@ const {
   powerInterval: POWER_INTERVAL,
   spawnInterval: SPAWN_INTERVAL,
   waveClearScoreMul: WAVE_CLEAR_SCORE_MUL,
-  waveDelay: WAVE_DELAY,
 } = GLOBAL_CONFIG;
 const {
   batteryInterval: BATTERY_INTERVAL,
@@ -642,6 +641,25 @@ const updateCombatTowers = (state: GameState, dt: number, now: number) => {
   return changed;
 };
 
+export const startNextWave = (state: GameState) => {
+  if (state.gameMode === 'custom') return false;
+  if (state.status !== 'playing') return false;
+  if (state.enemies.length > 0 || state.enemiesToSpawn > 0) return false;
+  if (state.needsPick || state.pendingBossBonusPick) return false;
+
+  state.wave++;
+  state.enemiesToSpawn = Math.floor(
+    ENEMY_SCALING.spawnBase +
+      state.wave * ENEMY_SCALING.spawnLinear +
+      Math.sqrt(state.wave) * ENEMY_SCALING.spawnSqrt,
+  );
+  state.waveTimer = 0;
+  state.spawnTimer = 0;
+  state.needsPick = true;
+  if (state.wave % BOSS_WAVE_INTERVAL === 0) spawnBoss(state, state.wave);
+  return true;
+};
+
 const updateWaveState = (state: GameState, dt: number) => {
   let changed = false;
 
@@ -659,20 +677,6 @@ const updateWaveState = (state: GameState, dt: number) => {
       state.pickOptions = generatePickOptions();
       state.status = 'pick';
       changed = true;
-    } else {
-      state.waveTimer += dt;
-      if (state.waveTimer > WAVE_DELAY) {
-        state.wave++;
-        state.enemiesToSpawn = Math.floor(
-          ENEMY_SCALING.spawnBase +
-            state.wave * ENEMY_SCALING.spawnLinear +
-            Math.sqrt(state.wave) * ENEMY_SCALING.spawnSqrt,
-        );
-        state.waveTimer = 0;
-        state.needsPick = true;
-        if (state.wave % BOSS_WAVE_INTERVAL === 0) spawnBoss(state, state.wave);
-        changed = true;
-      }
     }
   }
 

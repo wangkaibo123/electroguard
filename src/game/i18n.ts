@@ -82,6 +82,7 @@ export interface I18nStrings {
   autoDeployFailed: string;
   coreCannotMove: string;
   commandCardCannotUse: string;
+  commandCardMachineMaxed: string;
   baseUpgradeCannotUse: string;
 
   // Pick stats bar
@@ -198,6 +199,7 @@ const en: I18nStrings = {
   autoDeployFailed: 'No open space near the Core for this tower.',
   coreCannotMove: 'Core cannot be moved or rotated!',
   commandCardCannotUse: 'Cannot use command card',
+  commandCardMachineMaxed: 'This machine is already fully upgraded',
   baseUpgradeCannotUse: 'Cannot apply base upgrade',
   statHp: 'HP',
   statRange: 'Range',
@@ -441,11 +443,12 @@ const zh: I18nStrings = {
   baseUpgradePickTitle: '基地升级包',
   baseUpgradePickDescription: '选择一项基地升级',
 
-  startNextWave: '提前开始下一波',
+  startNextWave: '开启下一波',
   noWires: '没有可用的线缆！',
   autoDeployFailed: '主基地附近没有可部署这座防御塔的空地。',
   coreCannotMove: '主基地无法拖动和旋转！',
   commandCardCannotUse: '无法使用指令卡',
+  commandCardMachineMaxed: '这台机器已经满级',
   baseUpgradeCannotUse: '无法应用基地升级',
   statHp: '血量',
   statRange: '射程',

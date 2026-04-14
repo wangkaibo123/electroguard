@@ -585,16 +585,13 @@ export default function App() {
           <span className="text-base sm:text-lg font-mono font-bold ml-0.5 sm:ml-1">{gameState.gameMode === 'custom' ? '\u221E' : gameState.gold}</span>
         </div>
 
-        {gameState.gameMode !== 'custom' && gameState.status === 'playing' && gameState.enemiesToSpawn === 0 && gameState.enemies.length === 0 && (
+        {gameState.gameMode !== 'custom' && gameState.status === 'playing' && gameState.enemiesToSpawn === 0 && gameState.enemies.length === 0 && !gameState.pendingBossBonusPick && (
           <div className="flex items-center gap-1 sm:gap-3 ml-1 sm:ml-2">
-            <div className="text-blue-300 text-[10px] sm:text-xs font-medium animate-pulse hidden sm:block">
-              {i.nextWaveIn(Math.ceil(GLOBAL_CONFIG.waveDelay - gameState.waveTimer))}
-            </div>
             <button
               onClick={skipToNextWave}
               className="px-2 sm:px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white text-[10px] sm:text-xs font-bold rounded-lg transition-colors flex items-center gap-1"
             >
-              <Play size={10} /> <span className="hidden sm:inline">{i.startNextWave}</span><span className="sm:hidden">GO</span>
+              <Play size={10} /> <span>{i.startNextWave}</span>
             </button>
           </div>
         )}
