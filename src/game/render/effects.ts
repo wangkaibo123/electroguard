@@ -245,26 +245,22 @@ export const drawProjectiles = (ctx: CanvasRenderingContext2D, state: GameState)
       const headX = p.x;
       const headY = p.y;
 
-      ctx.shadowColor = color;
-      ctx.shadowBlur = 10;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
 
-      for (let pass = 0; pass < 2; pass++) {
-        ctx.beginPath();
-        for (let i = 0; i < points.length; i++) {
-          const point = points[i];
-          if (i === 0) {
-            ctx.moveTo(point.x, point.y);
-          } else {
-            const prev = points[i - 1];
-            ctx.quadraticCurveTo(prev.x, prev.y, (prev.x + point.x) / 2, (prev.y + point.y) / 2);
-          }
+      ctx.beginPath();
+      for (let i = 0; i < points.length; i++) {
+        const point = points[i];
+        if (i === 0) {
+          ctx.moveTo(point.x, point.y);
+        } else {
+          const prev = points[i - 1];
+          ctx.quadraticCurveTo(prev.x, prev.y, (prev.x + point.x) / 2, (prev.y + point.y) / 2);
         }
-        ctx.lineWidth = pass === 0 ? sz * 2.6 : sz * 0.9;
-        ctx.strokeStyle = pass === 0 ? 'rgba(251,113,133,0.18)' : 'rgba(254,205,211,0.82)';
-        ctx.stroke();
       }
+      ctx.lineWidth = sz * 0.9;
+      ctx.strokeStyle = 'rgba(254,205,211,0.82)';
+      ctx.stroke();
 
       const flareX = headX - Math.cos(angle) * sz * 3.2;
       const flareY = headY - Math.sin(angle) * sz * 3.2;
@@ -304,7 +300,6 @@ export const drawProjectiles = (ctx: CanvasRenderingContext2D, state: GameState)
       ctx.lineTo(sz * 0.45, sz * 0.76);
       ctx.stroke();
       ctx.restore();
-      ctx.shadowBlur = 0;
       continue;
     }
 

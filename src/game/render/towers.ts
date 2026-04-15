@@ -586,7 +586,7 @@ export const drawTowers = (ctx: CanvasRenderingContext2D, state: GameState, now:
         ctx.restore();
       }
     }
-    if (!tower.isRuined && tower.maxPower > 0 && tower.type !== 'core' && tower.type !== 'battery' && tower.type !== 'blaster' && tower.type !== 'gatling' && tower.type !== 'sniper' && tower.type !== 'tesla') {
+    if (!tower.isRuined && tower.maxPower > 0 && tower.type !== 'core' && tower.type !== 'battery' && tower.type !== 'blaster' && tower.type !== 'gatling' && tower.type !== 'sniper' && tower.type !== 'tesla' && tower.type !== 'missile') {
       const pr = Math.min(tw, th) / 3;
       const pcx = px + tw / 2, pcy = py + th / 2;
       if (tower.storedPower > 0) {
@@ -1351,8 +1351,9 @@ function drawTowerDetails(
     const span = Math.min(tw, th);
     const siloSize = span * 0.25;
     const siloGap = span * 0.12;
-    const loadedCount = Math.floor(t.storedPower / 2);
-    const partialLoad = (t.storedPower % 2) / 2;
+    const missilePowerCost = 4;
+    const loadedCount = Math.floor(t.storedPower / missilePowerCost);
+    const partialLoad = (t.storedPower % missilePowerCost) / missilePowerCost;
     const cursor = t.missileSiloCursor ?? 0;
     const flashAge = now - t.lastActionTime;
 
@@ -1412,18 +1413,6 @@ function drawTowerDetails(
       }
     }
 
-    const localAngle = t.barrelAngle - t.rotation;
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate(localAngle);
-    ctx.strokeStyle = `rgba(254,205,211,${t.powered ? 0.72 : 0.28})`;
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    ctx.moveTo(span * 0.08, 0);
-    ctx.lineTo(span * 0.31, 0);
-    ctx.stroke();
-    ctx.restore();
-    drawPowerArc(ctx, cx, cy, Math.min(tw, th) / 2 - inset - 2, t.maxPower, t.storedPower, tColor);
   } else if (t.type === 'generator' || t.type === 'big_generator') {
     drawEnergyEffect(ctx, cx, cy, now, t.powered, tColor);
     if (t.type === 'big_generator') {
