@@ -80,9 +80,14 @@ export const useGameLoop = () => {
   const dragOrigWiresRef = useRef<Wire[] | null>(null);
   const dragOrigInventoryRef = useRef<number>(0);
   const activeCommandCardRef = useRef<CommandCardType | null>(null);
+  const activeShopCommandPurchaseRef = useRef<{
+    shopItemType: ShopItemType;
+    price: number;
+  } | null>(null);
   const [activeCommandCard, setActiveCommandCardState] = useState<CommandCardType | null>(null);
   const setActiveCommandCard = (cardType: CommandCardType | null) => {
     activeCommandCardRef.current = cardType;
+    if (!cardType) activeShopCommandPurchaseRef.current = null;
     setActiveCommandCardState(cardType);
   };
 
@@ -344,6 +349,21 @@ export const useGameLoop = () => {
       showToast(t().notEnoughGold);
       return;
     }
+
+    if (shopItem.kind === 'command_card') {
+      const commandCardType = shopItem.commandCardType;
+      if (!commandCardType) return;
+      setSelectedTower(null);
+      updateRotating(null);
+      cancelTowerDrag();
+      clearWireDragState();
+      activeShopCommandPurchaseRef.current = { shopItemType, price };
+      activeCommandCardRef.current = commandCardType;
+      setActiveCommandCardState(commandCardType);
+      sync();
+      return;
+    }
+
     state.gold -= price;
     if (shopItem.kind === 'machine') {
       const towerType = shopItem.towerType;
@@ -353,18 +373,6 @@ export const useGameLoop = () => {
         sync();
         return;
       }
-      clearPurchasedShopOffer(state, shopItemType);
-      sync();
-      return;
-    }
-    if (shopItem.kind === 'command_card') {
-      const commandCardType = shopItem.commandCardType;
-      if (!commandCardType) {
-        state.gold += price;
-        sync();
-        return;
-      }
-      state.commandCardInventory[commandCardType] = (state.commandCardInventory[commandCardType] ?? 0) + 1;
       clearPurchasedShopOffer(state, shopItemType);
       sync();
       return;
@@ -638,10 +646,17 @@ export const useGameLoop = () => {
     state.gold += enemy.goldReward ?? SHOP_CONFIG.goldPerEnemyKill;
   };
 
-  const applyCommandCardAtWorld = (cardType: CommandCardType, wx: number, wy: number) => {
+  const applyCommandCardAtWorld = (
+    cardType: CommandCardType,
+    wx: number,
+    wy: number,
+    options: { requireInventory?: boolean; consumeInventory?: boolean } = {},
+  ) => {
+    const requireInventory = options.requireInventory ?? true;
+    const consumeInventory = options.consumeInventory ?? true;
     const state = stateRef.current;
     if (state.status !== 'playing') return false;
-    if ((state.commandCardInventory[cardType] ?? 0) <= 0) return false;
+    if (requireInventory && (state.commandCardInventory[cardType] ?? 0) <= 0) return false;
     if (wx < 0 || wy < 0 || wx > CANVAS_WIDTH || wy > CANVAS_HEIGHT) return false;
 
     const targetTower = findTowerAtWorldPoint(state, wx, wy);
@@ -690,7 +705,7 @@ export const useGameLoop = () => {
     if (targetTower && targetTower.type !== 'core' && isMachineCommandCard(cardType)) {
       targetTower.commandUpgradeCount = (targetTower.commandUpgradeCount ?? 0) + 1;
     }
-    if (state.gameMode !== 'custom') {
+    if (consumeInventory && state.gameMode !== 'custom') {
       state.commandCardInventory[cardType] = Math.max(0, (state.commandCardInventory[cardType] ?? 0) - 1);
     }
     sync();
@@ -709,10 +724,27 @@ export const useGameLoop = () => {
   const commitActiveCommandCardAtWorld = (wx: number, wy: number) => {
     const cardType = activeCommandCardRef.current;
     if (!cardType) return false;
+    const pendingShopPurchase = activeShopCommandPurchaseRef.current;
+    const state = stateRef.current;
+
+    if (pendingShopPurchase && state.gold < pendingShopPurchase.price) {
+      showToast(t().notEnoughGold);
+      setActiveCommandCard(null);
+      sync();
+      return true;
+    }
 
     commandCardFailureHandledRef.current = false;
-    if (applyCommandCardAtWorld(cardType, wx, wy)) {
+    if (applyCommandCardAtWorld(cardType, wx, wy, {
+      requireInventory: !pendingShopPurchase,
+      consumeInventory: !pendingShopPurchase,
+    })) {
+      if (pendingShopPurchase) {
+        state.gold -= pendingShopPurchase.price;
+        clearPurchasedShopOffer(state, pendingShopPurchase.shopItemType);
+      }
       setActiveCommandCard(null);
+      sync();
       return true;
     }
 

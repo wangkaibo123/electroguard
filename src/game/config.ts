@@ -369,11 +369,6 @@ export const SHOP_OFFER_BUCKETS = [
     items: [{ item: 'tower', weight: 1 }],
   },
   {
-    name: 'Command Card Pack',
-    weight: 20,
-    items: [{ item: 'command', weight: 1 }],
-  },
-  {
     name: 'Command Cards',
     weight: 20,
     items: SHOP_COMMAND_CARD_ITEM_TYPES.map(item => ({ item, weight: 10 })),
