@@ -397,17 +397,26 @@ export const useGameLoop = () => {
   const repairTowerAtWorld = (wx: number, wy: number) => {
     const state = stateRef.current;
     if (state.status !== 'playing') return false;
-    if (wx < 0 || wy < 0 || wx > CANVAS_WIDTH || wy > CANVAS_HEIGHT) return false;
+    if (wx < 0 || wy < 0 || wx > CANVAS_WIDTH || wy > CANVAS_HEIGHT) {
+      showToast(t().repairCannotUse);
+      setActiveRepair(false);
+      sync();
+      return false;
+    }
 
     const tower = findTowerAtWorldPoint(state, wx, wy);
     if (!canRepairTower(tower)) {
       showToast(t().repairCannotUse);
+      setActiveRepair(false);
+      sync();
       return false;
     }
 
     const cost = SHOP_CONFIG.repairCost;
     if (state.gameMode !== 'custom' && state.gold < cost) {
       showToast(t().notEnoughGold);
+      setActiveRepair(false);
+      sync();
       return false;
     }
 
@@ -637,6 +646,8 @@ export const useGameLoop = () => {
     }
 
     if (!commandCardFailureHandledRef.current) showToast(t().commandCardCannotUse);
+    setActiveCommandCard(null);
+    sync();
     return true;
   };
 

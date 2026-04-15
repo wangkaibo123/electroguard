@@ -1,4 +1,4 @@
-import type { ComponentType, Dispatch, SetStateAction } from 'react';
+import { useState, type ComponentType, type Dispatch, type SetStateAction } from 'react';
 import { Activity, BookOpen, Cable, ChevronLeft, ChevronRight, Coins, Menu, Play, RotateCcw, ShoppingBag, Wrench, X, Crosshair, Zap, Rocket } from 'lucide-react';
 import { SHOP_CONFIG, SHOP_ITEM_CONFIG } from '../config';
 import type { I18nStrings } from '../i18n';
@@ -76,6 +76,7 @@ export const ShopPanel = (props: ShopPanelProps) => {
     startRepair,
     tutorialStep,
   } = props;
+  const [refreshAnimationId, setRefreshAnimationId] = useState(0);
 
   const renderTowerButton = (type: TowerType) => {
     const isCustom = gameState.gameMode === 'custom';
@@ -282,6 +283,10 @@ export const ShopPanel = (props: ShopPanelProps) => {
       buyShopPack(type);
       if (closeSidebar) setSidebarOpen(false);
     };
+    const handleRefresh = () => {
+      setRefreshAnimationId(id => id + 1);
+      refreshShopOffers();
+    };
     const isCustom = gameState.gameMode === 'custom';
     const canBuy = (price: number) => gameState.status === 'playing' && (isCustom || gameState.gold >= price);
     const offers = gameState.shopOffers.length > 0 ? gameState.shopOffers : (['tower', 'infra', 'command'] as ShopItemType[]);
@@ -339,8 +344,11 @@ export const ShopPanel = (props: ShopPanelProps) => {
             if (!offer) {
               return (
                 <div
-                  key={`empty-shop-offer-${index}`}
-                  className="flex h-[70px] items-center justify-center rounded-lg border border-dashed border-gray-800 bg-gray-950/40 text-gray-700"
+                  key={`empty-shop-offer-${refreshAnimationId}-${index}`}
+                  className={`flex h-[70px] items-center justify-center rounded-lg border border-dashed border-gray-800 bg-gray-950/40 text-gray-700 ${
+                    refreshAnimationId > 0 ? 'shop-card-refresh-in' : ''
+                  }`}
+                  style={refreshAnimationId > 0 ? { animationDelay: `${index * 55}ms` } : undefined}
                   aria-label="Empty shop slot"
                 />
               );
@@ -349,7 +357,7 @@ export const ShopPanel = (props: ShopPanelProps) => {
             const activeShopCommand = item.commandCardType && activeCommandCard === item.commandCardType;
             return (
               <button
-                key={`${offer}-${index}`}
+                key={`${refreshAnimationId}-${offer}-${index}`}
                 type="button"
                 onClick={() => handleBuy(offer)}
                 disabled={!canBuy(item.price)}
@@ -359,7 +367,8 @@ export const ShopPanel = (props: ShopPanelProps) => {
                       ? 'border-cyan-300 bg-cyan-400/20 text-cyan-50 ring-2 ring-cyan-300/70 ring-offset-2 ring-offset-gray-950'
                       : item.enabledClass
                     : 'border-gray-800 bg-gray-900/50 text-gray-500 cursor-not-allowed opacity-40'
-                }`}
+                } ${refreshAnimationId > 0 ? 'shop-card-refresh-in' : ''}`}
+                style={refreshAnimationId > 0 ? { animationDelay: `${index * 55}ms` } : undefined}
               >
                 <div className={`shrink-0 ${item.iconClass}`}>{item.icon}</div>
                 <div className="flex flex-col items-start min-w-0 flex-1 text-left">
@@ -374,7 +383,7 @@ export const ShopPanel = (props: ShopPanelProps) => {
           })}
           <button
             type="button"
-            onClick={refreshShopOffers}
+            onClick={handleRefresh}
             disabled={!canRefresh}
             className={`flex items-center justify-center gap-2.5 px-3 py-2.5 rounded-lg border text-sm font-black transition-all ${
               canRefresh
