@@ -1,30 +1,37 @@
 ﻿import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  GameState, TowerType, CommandCardType, BaseUpgradeType, ShopItemType, ShopPackType, Port, Wire, CELL_SIZE, GRID_WIDTH, GRID_HEIGHT, EnemyType, PortDirection,
+  GameState, TowerType, CommandCardType, ShopItemType, ShopPackType, Port, Wire, CELL_SIZE, EnemyType,
   TOWER_STATS, CANVAS_WIDTH, CANVAS_HEIGHT, WIRE_MAX_HP,
-  Camera, VIEWPORT_WIDTH, VIEWPORT_HEIGHT, getTowerRange,
+  VIEWPORT_WIDTH, VIEWPORT_HEIGHT,
 } from './types';
 import {
   createInitialState, updatePowerGrid, getPortPos, getPortCell, findWirePath,
-  snapRotation, applyTowerRotation, canPlace, collidesWithTowers,
-  collidesWithWires, repathConnectedWires, genId, generatePickOptions, spawnEnemyAt,
+  snapRotation, applyTowerRotation, canPlace, genId, generatePickOptions, spawnEnemyAt,
   canDirectLinkPorts, isPortAccessible,
   generateTowerOnlyPickOptions, generateInfraOnlyPickOptions, rebuildTowerMap,
-  generateAdvancedPickOptions, generateCommandCardPickOptions, generateBaseUpgradePickOptions, generateShopOffers, syncDirectPortLinks,
-  createExplosion,
+  generateAdvancedPickOptions, generateCommandCardPickOptions, generateBaseUpgradePickOptions, generateShopOffers,
 } from './engine';
 import { renderGame } from './renderer';
-import { BASE_UPGRADE_CONFIG, COMMAND_CARD_CONFIG, GLOBAL_CONFIG, SCORE_CONFIG, SHOP_CONFIG, SHOP_ITEM_CONFIG } from './config';
+import { COMMAND_CARD_CONFIG, GLOBAL_CONFIG, SHOP_CONFIG, SHOP_ITEM_CONFIG } from './config';
 import { t } from './i18n';
 import { addTowerToState, createTowerAt } from './towerFactory';
 import { findAutoPlacementNearCore } from './placement';
 import { startNextWave, updateGameState } from './updateGameState';
 import { getDeleteButtonLayout, getRotationKnobLayout } from './render/towers';
 import { isWorldPointInTowerFootprint } from './footprint';
-import { MAX_MACHINE_COMMAND_UPGRADES, isMachineCommandCard } from './commandCards';
+import { isMachineCommandCard } from './commandCards';
+import { centerCameraOnCore, clampCamera, createInitialCamera, getMinZoom, screenToWorld } from './camera';
+import {
+  applyBaseUpgradeToCore,
+  applyMachineCommandCard,
+  canApplyMachineCommandCard,
+  clearPurchasedShopOffer,
+  deployStartingLoadout,
+  findTowerAtWorldPoint,
+} from './gameActions';
+import { getGridCell, getHoverCell, moveDraggedTower, previewWirePath } from './pointerActions';
 
 const { maxZoom: MAX_ZOOM } = GLOBAL_CONFIG;
-const PORT_DIRECTIONS: PortDirection[] = ['top', 'right', 'bottom', 'left'];
 const COMMAND_CARD_TYPES = Object.keys(COMMAND_CARD_CONFIG) as CommandCardType[];
 
 export const useGameLoop = () => {
@@ -61,15 +68,7 @@ export const useGameLoop = () => {
   const rotStartAngleRef = useRef(0);
   const lastTimeRef = useRef(0);
 
-  // Camera
-  const INITIAL_MIN_ZOOM = Math.max(VIEWPORT_WIDTH / CANVAS_WIDTH, VIEWPORT_HEIGHT / CANVAS_HEIGHT);
-  const initialViewW = VIEWPORT_WIDTH / INITIAL_MIN_ZOOM;
-  const initialViewH = VIEWPORT_HEIGHT / INITIAL_MIN_ZOOM;
-  const cameraRef = useRef<Camera>({
-    x: Math.max(0, (CANVAS_WIDTH - initialViewW) / 2),
-    y: Math.max(0, (CANVAS_HEIGHT - initialViewH) / 2),
-    zoom: INITIAL_MIN_ZOOM,
-  });
+  const cameraRef = useRef(createInitialCamera());
 
   // Pan state
   const isPanningRef = useRef(false);
@@ -102,12 +101,6 @@ export const useGameLoop = () => {
 
   const sync = () => setGameState({ ...stateRef.current });
 
-  const getMinZoom = () => {
-    const vp = viewportRef.current;
-    // Keep viewport fully inside world bounds on both axes.
-    return Math.max(vp.width / CANVAS_WIDTH, vp.height / CANVAS_HEIGHT);
-  };
-
   const cancelTowerDrag = () => {
     if (dragTowerRef.current && dragOrigPosRef.current) {
       const state = stateRef.current;
@@ -134,24 +127,6 @@ export const useGameLoop = () => {
 
   // 鈹€鈹€ Actions 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
-  /** Center camera on the core tower using the actual viewport size */
-  const centerOnCore = (state: GameState) => {
-    const core = state.towers.find(tw => tw.type === 'core');
-    if (!core) return;
-    const vp = viewportRef.current;
-    const cam = cameraRef.current;
-    // Core center in world pixels
-    const cx = (core.x + core.width / 2) * CELL_SIZE;
-    const cy = (core.y + core.height / 2) * CELL_SIZE;
-    // Recalculate zoom from actual viewport
-    const minZoom = getMinZoom();
-    cam.zoom = Math.max(minZoom, Math.min(MAX_ZOOM, 1.0));
-    // Position camera so core is centered
-    cam.x = cx - (vp.width / cam.zoom) / 2;
-    cam.y = cy - (vp.height / cam.zoom) / 2;
-    clampCamera(cam);
-  };
-
   const queueTowerDropNearCore = (
     state: GameState,
     type: TowerType,
@@ -177,16 +152,6 @@ export const useGameLoop = () => {
     return true;
   };
 
-  const deployStartingLoadout = (state: GameState) => {
-    const starterTowers: TowerType[] = ['generator', 'blaster'];
-
-    for (const type of starterTowers) {
-      const placement = findAutoPlacementNearCore(state, type, 2, 1);
-      if (!placement) continue;
-      addTowerToState(state, createTowerAt(type, placement.x, placement.y));
-    }
-  };
-
   const startGame = () => {
     const s = createInitialState();
     deployStartingLoadout(s);
@@ -197,7 +162,7 @@ export const useGameLoop = () => {
     setPlaceMonsterMode(false);
     setSelectedMonsterType('grunt');
     setStaticMonster(true);
-    centerOnCore(s);
+    centerCameraOnCore(s, cameraRef.current, viewportRef.current);
     sync();
   };
 
@@ -214,7 +179,7 @@ export const useGameLoop = () => {
     setPlaceMonsterMode(false);
     setSelectedMonsterType('grunt');
     setStaticMonster(true);
-    centerOnCore(s);
+    centerCameraOnCore(s, cameraRef.current, viewportRef.current);
     sync();
   };
 
@@ -233,7 +198,7 @@ export const useGameLoop = () => {
     setPlaceMonsterMode(false);
     setSelectedMonsterType('grunt');
     setStaticMonster(true);
-    centerOnCore(s);
+    centerCameraOnCore(s, cameraRef.current, viewportRef.current);
     sync();
   };
 
@@ -244,31 +209,6 @@ export const useGameLoop = () => {
     });
     sync();
     return true;
-  };
-
-  const applyBaseUpgradeToCore = (state: GameState, upgradeType: BaseUpgradeType) => {
-    const core = state.towers.find(tower => tower.type === 'core');
-    if (!core) return false;
-
-    if (upgradeType === 'core_power_boost') {
-      core.corePowerBonus = (core.corePowerBonus ?? 0) + (BASE_UPGRADE_CONFIG.core_power_boost.corePowerBonus ?? 1);
-      return true;
-    }
-    if (upgradeType === 'core_turret_unlock') {
-      if (core.coreTurretUnlocked) return false;
-      core.coreTurretUnlocked = true;
-      core.coreTurretLastShot = 0;
-      return true;
-    }
-    if (upgradeType === 'core_shield_unlock') {
-      if (core.maxShieldHp > 0) return false;
-      core.maxShieldHp = BASE_UPGRADE_CONFIG.core_shield_unlock.coreShieldHp ?? 200;
-      core.shieldHp = core.maxShieldHp;
-      core.shieldRadius = BASE_UPGRADE_CONFIG.core_shield_unlock.coreShieldRadius ?? 160;
-      return true;
-    }
-
-    return false;
   };
 
   const handlePick = (optionId: string, sourceClientPos?: { x: number; y: number }) => {
@@ -328,16 +268,6 @@ export const useGameLoop = () => {
     state.bossBonusPickQueued = false;
     state.status = 'pick';
     sync();
-  };
-
-  const clearPurchasedShopOffer = (state: GameState, shopItemType: ShopItemType) => {
-    const offers = state.shopOffers ?? [];
-    const purchasedIndex = offers.indexOf(shopItemType);
-    if (purchasedIndex < 0) return;
-
-    const nextOffers = [...offers];
-    nextOffers[purchasedIndex] = null;
-    state.shopOffers = nextOffers;
   };
 
   const buyShopPack = (shopItemType: ShopItemType) => {
@@ -559,78 +489,13 @@ export const useGameLoop = () => {
   };
 
   const toWorld = (sx: number, sy: number) => {
-    const cam = cameraRef.current;
-    return { wx: sx / cam.zoom + cam.x, wy: sy / cam.zoom + cam.y };
+    return screenToWorld(cameraRef.current, sx, sy);
   };
 
   const clientToWorld = (clientX: number, clientY: number) => {
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return null;
     return toWorld(clientX - rect.left, clientY - rect.top);
-  };
-
-  const clampCamera = (cam: Camera) => {
-    const vp = viewportRef.current;
-    const viewW = vp.width / cam.zoom;
-    const viewH = vp.height / cam.zoom;
-    const maxX = Math.max(0, CANVAS_WIDTH - viewW);
-    const maxY = Math.max(0, CANVAS_HEIGHT - viewH);
-    cam.x = Math.max(0, Math.min(cam.x, maxX));
-    cam.y = Math.max(0, Math.min(cam.y, maxY));
-  };
-
-  const findTowerAtWorldPoint = (state: GameState, wx: number, wy: number) => {
-    for (const tower of state.towers) {
-      if (isWorldPointInTowerFootprint(tower, wx, wy)) return tower;
-    }
-    return null;
-  };
-
-  const addMachinePort = (state: GameState, tower: GameState['towers'][number], portType: 'input' | 'output') => {
-    if (tower.type === 'core') return false;
-    const getSideLength = (direction: PortDirection) =>
-      direction === 'top' || direction === 'bottom' ? tower.width : tower.height;
-    const getSideCellIndex = (direction: PortDirection, sideOffset = 0.5) =>
-      Math.min(getSideLength(direction) - 1, Math.max(0, Math.floor(getSideLength(direction) * sideOffset)));
-    const getCandidateCellIndexes = (sideLength: number) => {
-      const center = Math.floor(sideLength / 2);
-      const seen = new Set<number>();
-      const ordered = [center, center - 1, center + 1, 0, sideLength - 1];
-      return ordered.filter((index) => {
-        if (index < 0 || index >= sideLength || seen.has(index)) return false;
-        seen.add(index);
-        return true;
-      });
-    };
-
-    for (const phaseIndex of [0, 1, 2]) {
-      for (const direction of PORT_DIRECTIONS) {
-        const sideLength = getSideLength(direction);
-        const candidates = getCandidateCellIndexes(sideLength);
-        const phaseCandidates = phaseIndex === 0
-          ? candidates.slice(0, 1)
-          : phaseIndex === 1
-            ? candidates.slice(1, 3)
-            : candidates.slice(3);
-
-        for (const cellIndex of phaseCandidates) {
-          const hasSameSpot = tower.ports.some(port =>
-            port.direction === direction &&
-            getSideCellIndex(direction, port.sideOffset) === cellIndex,
-          );
-          if (hasSameSpot) continue;
-          const sideOffset = (cellIndex + 0.5) / sideLength;
-          const port = { id: genId(), direction, portType, sideOffset };
-          if (!isPortAccessible(state, tower, port)) continue;
-          tower.ports.push(port);
-          if (!syncDirectPortLinks(state, { towerId: tower.id, createSpark: true })) {
-            updatePowerGrid(state);
-          }
-          return true;
-        }
-      }
-    }
-    return false;
   };
 
   const applyCommandCardAtWorld = (
@@ -647,34 +512,13 @@ export const useGameLoop = () => {
     if (wx < 0 || wy < 0 || wx > CANVAS_WIDTH || wy > CANVAS_HEIGHT) return false;
 
     const targetTower = findTowerAtWorldPoint(state, wx, wy);
-    let used = false;
-
-    if (
-      isMachineCommandCard(cardType) &&
-      targetTower &&
-      targetTower.type !== 'core' &&
-      (targetTower.commandUpgradeCount ?? 0) >= MAX_MACHINE_COMMAND_UPGRADES
-    ) {
+    if (!canApplyMachineCommandCard(state, cardType, targetTower)) {
       commandCardFailureHandledRef.current = true;
       showToast(t().commandCardMachineMaxed);
       return false;
     }
 
-    if (cardType === 'add_input' || cardType === 'add_output') {
-      if (!targetTower || targetTower.type === 'core') return false;
-      used = addMachinePort(state, targetTower, cardType === 'add_input' ? 'input' : 'output');
-    } else if (cardType === 'self_power') {
-      if (!targetTower || targetTower.type === 'core') return false;
-      targetTower.selfPowerLevel = (targetTower.selfPowerLevel ?? 0) + 1;
-      targetTower.selfPowerTimer = 0;
-      updatePowerGrid(state);
-      used = true;
-    } else if (cardType === 'range_boost') {
-      if (!targetTower || targetTower.type === 'core' || getTowerRange(targetTower) == null) return false;
-      targetTower.rangeMultiplier = (targetTower.rangeMultiplier ?? 1) + (COMMAND_CARD_CONFIG.range_boost.rangeBoostMultiplier ?? 0.2);
-      used = true;
-    }
-
+    const used = applyMachineCommandCard(state, cardType, targetTower);
     if (!used) return false;
     if (targetTower && targetTower.type !== 'core' && isMachineCommandCard(cardType)) {
       targetTower.commandUpgradeCount = (targetTower.commandUpgradeCount ?? 0) + 1;
@@ -830,7 +674,7 @@ export const useGameLoop = () => {
     }
 
     // Place tower from inventory
-    const gx = (wx / CELL_SIZE) | 0, gy = (wy / CELL_SIZE) | 0;
+    const { x: gx, y: gy } = getGridCell(wx, wy);
     const sel = selectedTowerRef.current;
     if (sel && placeTowerFromSelection(state, sel, gx, gy)) {
       return;
@@ -853,7 +697,7 @@ export const useGameLoop = () => {
       const cam = cameraRef.current;
       cam.x -= (sx - panLastRef.current.x) / cam.zoom;
       cam.y -= (sy - panLastRef.current.y) / cam.zoom;
-      clampCamera(cam);
+      clampCamera(cam, viewportRef.current);
       panLastRef.current = { x: sx, y: sy };
       return;
     }
@@ -863,50 +707,13 @@ export const useGameLoop = () => {
     const { wx, wy } = toWorld(sx, sy);
     mousePxRef.current = { x: wx, y: wy };
 
-    const gx = (wx / CELL_SIZE) | 0, gy = (wy / CELL_SIZE) | 0;
-    hoverRef.current = (gx >= 0 && gx < GRID_WIDTH && gy >= 0 && gy < GRID_HEIGHT)
-      ? { x: gx, y: gy } : null;
+    hoverRef.current = getHoverCell(wx, wy);
 
     if (dragWireStartRef.current) {
-      const dw = dragWireStartRef.current;
-      const st = state.towerMap.get(dw.towerId);
-      const sp = st?.ports.find(p => p.id === dw.portId);
-      if (st && sp) {
-        const sc = getPortCell(st, sp);
-        let endCell = { x: gx, y: gy };
-        let directPath = false;
-        for (const tower of state.towers) {
-          for (const port of tower.ports) {
-            const pp = getPortPos(tower, port);
-            if (Math.hypot(pp.x - wx, pp.y - wy) < 15 && tower.id !== st.id) {
-              if (canDirectLinkPorts(state, st, sp, tower, port)) {
-                directPath = true;
-                break;
-              } else if (isPortAccessible(state, tower, port)) {
-                endCell = getPortCell(tower, port);
-                break;
-              }
-            }
-          }
-          if (directPath) break;
-        }
-        dragWirePathRef.current = directPath ? [] : findWirePath(sc, endCell, state);
-      }
+      dragWirePathRef.current = previewWirePath(state, dragWireStartRef.current, wx, wy, 15);
     }
 
-    if (dragTowerRef.current) {
-      const tower = state.towerMap.get(dragTowerRef.current);
-      if (!tower) return;
-      const nx = (wx / CELL_SIZE | 0) - (tower.width >> 1);
-      const ny = (wy / CELL_SIZE | 0) - (tower.height >> 1);
-      if (nx < 0 || ny < 0 || nx + tower.width > GRID_WIDTH || ny + tower.height > GRID_HEIGHT) return;
-      if (collidesWithTowers(nx, ny, tower.width, tower.height, state.towers, tower.id, 0, tower.type)) return;
-      if (collidesWithWires(nx, ny, tower.width, tower.height, state.wires, tower.id, 0, tower.type)) return;
-      if (tower.x === nx && tower.y === ny) return;
-
-      tower.x = nx;
-      tower.y = ny;
-      repathConnectedWires(state, tower.id);
+    if (dragTowerRef.current && moveDraggedTower(state, dragTowerRef.current, wx, wy)) {
       sync();
     }
   };
@@ -974,13 +781,13 @@ export const useGameLoop = () => {
 
     // Adjust zoom
     const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
-    const minZoom = getMinZoom();
+    const minZoom = getMinZoom(viewportRef.current);
     cam.zoom = Math.max(minZoom, Math.min(MAX_ZOOM, cam.zoom * factor));
 
     // Keep world point under cursor after zoom
     cam.x = wx - sx / cam.zoom;
     cam.y = wy - sy / cam.zoom;
-    clampCamera(cam);
+    clampCamera(cam, viewportRef.current);
   };
 
   const handleCanvasContextMenu = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -1113,7 +920,7 @@ export const useGameLoop = () => {
     }
 
     // Place tower from inventory
-    const gx = (wx / CELL_SIZE) | 0, gy = (wy / CELL_SIZE) | 0;
+    const { x: gx, y: gy } = getGridCell(wx, wy);
     const sel = selectedTowerRef.current;
     if (sel && placeTowerFromSelection(state, sel, gx, gy)) {
       return;
@@ -1142,11 +949,11 @@ export const useGameLoop = () => {
         const wx = mx / cam.zoom + cam.x;
         const wy = my / cam.zoom + cam.y;
         const factor = dist / lastPinchDistRef.current;
-        const minZoom = getMinZoom();
+        const minZoom = getMinZoom(viewportRef.current);
         cam.zoom = Math.max(minZoom, Math.min(MAX_ZOOM, cam.zoom * factor));
         cam.x = wx - mx / cam.zoom;
         cam.y = wy - my / cam.zoom;
-        clampCamera(cam);
+        clampCamera(cam, viewportRef.current);
       }
       lastPinchDistRef.current = dist;
       return;
@@ -1162,7 +969,7 @@ export const useGameLoop = () => {
       const cam = cameraRef.current;
       cam.x -= (sx - panLastRef.current.x) / cam.zoom;
       cam.y -= (sy - panLastRef.current.y) / cam.zoom;
-      clampCamera(cam);
+      clampCamera(cam, viewportRef.current);
       panLastRef.current = { x: sx, y: sy };
       return;
     }
@@ -1172,49 +979,13 @@ export const useGameLoop = () => {
     const { wx, wy } = toWorld(sx, sy);
     mousePxRef.current = { x: wx, y: wy };
 
-    const gx = (wx / CELL_SIZE) | 0, gy = (wy / CELL_SIZE) | 0;
-    hoverRef.current = (gx >= 0 && gx < GRID_WIDTH && gy >= 0 && gy < GRID_HEIGHT)
-      ? { x: gx, y: gy } : null;
+    hoverRef.current = getHoverCell(wx, wy);
 
     if (dragWireStartRef.current) {
-      const dw = dragWireStartRef.current;
-      const st = state.towerMap.get(dw.towerId);
-      const sp = st?.ports.find(p => p.id === dw.portId);
-      if (st && sp) {
-        const sc = getPortCell(st, sp);
-        let endCell = { x: gx, y: gy };
-        let directPath = false;
-        for (const tower of state.towers) {
-          for (const port of tower.ports) {
-            const pp = getPortPos(tower, port);
-            if (Math.hypot(pp.x - wx, pp.y - wy) < 20 && tower.id !== st.id) {
-              if (canDirectLinkPorts(state, st, sp, tower, port)) {
-                directPath = true;
-                break;
-              } else if (isPortAccessible(state, tower, port)) {
-                endCell = getPortCell(tower, port);
-                break;
-              }
-            }
-          }
-          if (directPath) break;
-        }
-        dragWirePathRef.current = directPath ? [] : findWirePath(sc, endCell, state);
-      }
+      dragWirePathRef.current = previewWirePath(state, dragWireStartRef.current, wx, wy, 20);
     }
 
-    if (dragTowerRef.current) {
-      const tower = state.towerMap.get(dragTowerRef.current);
-      if (!tower) return;
-      const nx = (wx / CELL_SIZE | 0) - (tower.width >> 1);
-      const ny = (wy / CELL_SIZE | 0) - (tower.height >> 1);
-      if (nx < 0 || ny < 0 || nx + tower.width > GRID_WIDTH || ny + tower.height > GRID_HEIGHT) return;
-      if (collidesWithTowers(nx, ny, tower.width, tower.height, state.towers, tower.id, 0, tower.type)) return;
-      if (collidesWithWires(nx, ny, tower.width, tower.height, state.wires, tower.id, 0, tower.type)) return;
-      if (tower.x === nx && tower.y === ny) return;
-      tower.x = nx;
-      tower.y = ny;
-      repathConnectedWires(state, tower.id);
+    if (dragTowerRef.current && moveDraggedTower(state, dragTowerRef.current, wx, wy)) {
       sync();
     }
   };
@@ -1275,9 +1046,9 @@ export const useGameLoop = () => {
       if (c.height !== pending.ph) c.height = pending.ph;
       viewportRef.current = { width: pending.w, height: pending.h };
       const cam = cameraRef.current;
-      const minZoom = getMinZoom();
+      const minZoom = getMinZoom(viewportRef.current);
       if (cam.zoom < minZoom) cam.zoom = minZoom;
-      clampCamera(cam);
+      clampCamera(cam, viewportRef.current);
       pendingCanvasSizeRef.current = null;
     }
     const ctx = canvasRef.current?.getContext('2d');
@@ -1326,9 +1097,9 @@ export const useGameLoop = () => {
       if (canvas.height !== pixelH) canvas.height = pixelH;
       viewportRef.current = { width, height };
       const cam = cameraRef.current;
-      const minZoom = getMinZoom();
+      const minZoom = getMinZoom(viewportRef.current);
       if (cam.zoom < minZoom) cam.zoom = minZoom;
-      clampCamera(cam);
+      clampCamera(cam, viewportRef.current);
     };
 
     const updateCanvasSize = (immediate?: boolean) => {
@@ -1348,7 +1119,7 @@ export const useGameLoop = () => {
 
     updateCanvasSize(true);
     // Center on core after first measurement so all devices start with the same view
-    centerOnCore(stateRef.current);
+    centerCameraOnCore(stateRef.current, cameraRef.current, viewportRef.current);
     const deferredResize = () => updateCanvasSize();
     const ro = new ResizeObserver(deferredResize);
     ro.observe(canvas);
