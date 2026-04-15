@@ -1,9 +1,9 @@
-import { GameState, TowerType, CELL_SIZE, CANVAS_WIDTH, CANVAS_HEIGHT, Camera } from './types';
+import { GameState, TowerType, CommandCardType, CELL_SIZE, CANVAS_WIDTH, CANVAS_HEIGHT, Camera } from './types';
 import { BG_DARK, BG_MID, BG_GRID, MAP_BORDER } from './render/constants';
 import { updateAndDrawDecorations } from './render/decorations';
 import {
   drawOccupiedGround, drawPorts, drawTowers, drawPlacementPreview, drawRangePreview,
-  drawRotationKnob, drawDeleteButton, drawDraggedTowerFootprint,
+  drawRotationKnob, drawDeleteButton, drawDraggedTowerFootprint, drawCommandCardTargeting,
 } from './render/towers';
 import { drawEnemies, drawEnemyPreview } from './render/enemies';
 import {
@@ -27,6 +27,7 @@ export const renderGame = (
   draggedTowerId: string | null = null,
   rotatingTowerId: string | null = null,
   enemyPreview: { x: number; y: number; enemyType: import('./types').EnemyType; isStatic: boolean } | null = null,
+  activeCommandCard: CommandCardType | null = null,
 ) => {
   const now = performance.now();
 
@@ -80,6 +81,7 @@ export const renderGame = (
 
   drawPorts(ctx, state);
   drawTowers(ctx, state, now);
+  drawCommandCardTargeting(ctx, state, now, activeCommandCard);
 
   drawPlacementPreview(ctx, state, hoverPos, selectedTower, canPlaceFlag);
   drawDraggedTowerFootprint(ctx, state, draggedTowerId);

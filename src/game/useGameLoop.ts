@@ -21,12 +21,11 @@ import { findAutoPlacementNearCore } from './placement';
 import { startNextWave, updateGameState } from './updateGameState';
 import { getDeleteButtonLayout, getRotationKnobLayout } from './render/towers';
 import { isWorldPointInTowerFootprint } from './footprint';
+import { MAX_MACHINE_COMMAND_UPGRADES, isMachineCommandCard } from './commandCards';
 
 const { maxZoom: MAX_ZOOM } = GLOBAL_CONFIG;
-const MAX_MACHINE_COMMAND_UPGRADES = 3;
 const PORT_DIRECTIONS: PortDirection[] = ['top', 'right', 'bottom', 'left'];
 const COMMAND_CARD_TYPES = Object.keys(COMMAND_CARD_CONFIG) as CommandCardType[];
-const isMachineCommandCard = (cardType: CommandCardType) => cardType !== 'airstrike';
 
 export const useGameLoop = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -80,11 +79,12 @@ export const useGameLoop = () => {
   const dragOrigPosRef = useRef<{ x: number; y: number } | null>(null);
   const dragOrigWiresRef = useRef<Wire[] | null>(null);
   const dragOrigInventoryRef = useRef<number>(0);
-  const [commandCardDragLine, setCommandCardDragLine] = useState<{
-    cardType: CommandCardType;
-    start: { x: number; y: number };
-    end: { x: number; y: number };
-  } | null>(null);
+  const activeCommandCardRef = useRef<CommandCardType | null>(null);
+  const [activeCommandCard, setActiveCommandCardState] = useState<CommandCardType | null>(null);
+  const setActiveCommandCard = (cardType: CommandCardType | null) => {
+    activeCommandCardRef.current = cardType;
+    setActiveCommandCardState(cardType);
+  };
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -560,13 +560,6 @@ export const useGameLoop = () => {
     return toWorld(clientX - rect.left, clientY - rect.top);
   };
 
-  const getCanvasClientPoint = (clientX: number, clientY: number) => {
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return null;
-    if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) return null;
-    return { sx: clientX - rect.left, sy: clientY - rect.top };
-  };
-
   const clampCamera = (cam: Camera) => {
     const vp = viewportRef.current;
     const viewW = vp.width / cam.zoom;
@@ -704,22 +697,27 @@ export const useGameLoop = () => {
     return true;
   };
 
-  const commitCommandCardDrag = (cardType: CommandCardType, clientX: number, clientY: number) => {
-    const point = getCanvasClientPoint(clientX, clientY);
-    if (!point) {
-      showToast(t().commandCardCannotUse);
-      return;
-    }
-    const { wx, wy } = toWorld(point.sx, point.sy);
-    commandCardFailureHandledRef.current = false;
-    if (!applyCommandCardAtWorld(cardType, wx, wy) && !commandCardFailureHandledRef.current) {
-      showToast(t().commandCardCannotUse);
-    }
+  const startCommandCardUse = (cardType: CommandCardType) => {
+    if (stateRef.current.status !== 'playing' || (stateRef.current.commandCardInventory[cardType] ?? 0) <= 0) return;
+    setSelectedTower(null);
+    updateRotating(null);
+    cancelTowerDrag();
+    clearWireDragState();
+    setActiveCommandCard(activeCommandCardRef.current === cardType ? null : cardType);
   };
 
-  const startCommandCardDrag = (cardType: CommandCardType, sourceClientPos: { x: number; y: number }) => {
-    if (stateRef.current.status !== 'playing' || (stateRef.current.commandCardInventory[cardType] ?? 0) <= 0) return;
-    setCommandCardDragLine({ cardType, start: sourceClientPos, end: sourceClientPos });
+  const commitActiveCommandCardAtWorld = (wx: number, wy: number) => {
+    const cardType = activeCommandCardRef.current;
+    if (!cardType) return false;
+
+    commandCardFailureHandledRef.current = false;
+    if (applyCommandCardAtWorld(cardType, wx, wy)) {
+      setActiveCommandCard(null);
+      return true;
+    }
+
+    if (!commandCardFailureHandledRef.current) showToast(t().commandCardCannotUse);
+    return true;
   };
 
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -744,6 +742,11 @@ export const useGameLoop = () => {
     }
     const { wx, wy } = toWorld(sx, sy);
     mouseDownPosRef.current = { x: wx, y: wy };
+
+    if (activeCommandCardRef.current) {
+      commitActiveCommandCardAtWorld(wx, wy);
+      return;
+    }
 
     if (placeMonsterModeRef.current) {
       if (spawnStaticMonsterAt(state, wx, wy)) {
@@ -1011,6 +1014,11 @@ export const useGameLoop = () => {
     }
     const { wx, wy } = toWorld(sx, sy);
     mouseDownPosRef.current = { x: wx, y: wy };
+
+    if (activeCommandCardRef.current) {
+      commitActiveCommandCardAtWorld(wx, wy);
+      return;
+    }
 
     if (placeMonsterModeRef.current) {
       if (spawnStaticMonsterAt(state, wx, wy)) {
@@ -1290,6 +1298,7 @@ export const useGameLoop = () => {
               isStatic: staticMonsterRef.current,
             }
           : null,
+        activeCommandCardRef.current,
       );
     }
 
@@ -1403,36 +1412,17 @@ export const useGameLoop = () => {
   }, []);
 
   useEffect(() => {
-    if (!commandCardDragLine) return;
-
-    const onPointerMove = (event: PointerEvent) => {
-      setCommandCardDragLine(current => current
-        ? { ...current, end: { x: event.clientX, y: event.clientY } }
-        : current,
-      );
-    };
-    const onPointerUp = (event: PointerEvent) => {
-      const cardType = commandCardDragLine.cardType;
-      setCommandCardDragLine(null);
-      commitCommandCardDrag(cardType, event.clientX, event.clientY);
-    };
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setCommandCardDragLine(null);
+      if (event.key === 'Escape') setActiveCommandCard(null);
     };
-
-    window.addEventListener('pointermove', onPointerMove);
-    window.addEventListener('pointerup', onPointerUp, { once: true });
     window.addEventListener('keydown', onKeyDown);
-    return () => {
-      window.removeEventListener('pointermove', onPointerMove);
-      window.removeEventListener('pointerup', onPointerUp);
-      window.removeEventListener('keydown', onKeyDown);
-    };
-  }, [commandCardDragLine]);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   return {
     canvasRef, cameraRef, gameState, startGame, startCustomGame, togglePause, returnToMenu, handlePick,
-    openCustomPick, buyShopPack, refreshShopOffers, sellTower, rotatingTowerId, startCommandCardDrag, commandCardDragLine,
+    openCustomPick, buyShopPack, refreshShopOffers, sellTower, rotatingTowerId,
+    startCommandCardUse, activeCommandCard,
     selectedTower, setSelectedTower, placeMonsterMode, setPlaceMonsterMode, skipToNextWave, toastMessage,
     selectedMonsterType, setSelectedMonsterType, staticMonster, setStaticMonster,
     handleCanvasMouseDown, handleCanvasMouseMove, handleCanvasMouseUp, handleCanvasMouseLeave,

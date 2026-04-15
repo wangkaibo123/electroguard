@@ -106,9 +106,9 @@ export default function App() {
     handleCanvasTouchStart,
     handleCanvasTouchMove,
     handleCanvasTouchEnd,
-    startCommandCardDrag,
+    startCommandCardUse,
     refreshShopOffers,
-    commandCardDragLine,
+    activeCommandCard,
   } = useGameLoop();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -496,23 +496,26 @@ export default function App() {
       <button
         key={key}
         type="button"
-        onPointerDown={(event) => {
+        onClick={(event) => {
           if (gameState.status !== 'playing') return;
           event.preventDefault();
-          event.currentTarget.setPointerCapture?.(event.pointerId);
-          const rect = event.currentTarget.getBoundingClientRect();
-          startCommandCardDrag(type, {
-            x: rect.left + rect.width / 2,
-            y: rect.top + rect.height / 2,
-          });
+          startCommandCardUse(type);
         }}
         disabled={gameState.status !== 'playing'}
         className={`group relative flex h-[70px] w-full items-center gap-2.5 rounded-lg border px-3 py-3 text-left transition-all active:scale-95 ${
           gameState.status === 'playing'
-            ? 'bg-gray-900/90 hover:bg-gray-800/95 cursor-grab active:cursor-grabbing'
+            ? activeCommandCard === type
+              ? 'bg-gray-800/95 cursor-crosshair ring-2 ring-offset-2 ring-offset-gray-950'
+              : 'bg-gray-900/90 hover:bg-gray-800/95 cursor-pointer'
             : 'bg-gray-900/40 opacity-60 cursor-not-allowed'
         }`}
-        style={{ borderColor: color + '66', boxShadow: `inset 0 0 18px ${color}1f` }}
+        style={{
+          borderColor: color + (activeCommandCard === type ? 'cc' : '66'),
+          boxShadow: activeCommandCard === type
+            ? `inset 0 0 22px ${color}33, 0 0 18px ${color}55`
+            : `inset 0 0 18px ${color}1f`,
+          ['--tw-ring-color' as string]: color + 'aa',
+        }}
         title={i.commandCardDesc[type]}
       >
         <div className="shrink-0 rounded-lg border p-2" style={{ borderColor: color + '55', color, backgroundColor: color + '18' }}>
@@ -1305,21 +1308,6 @@ export default function App() {
           </div>
         ))}
       </div>
-
-      {commandCardDragLine && (
-        <svg className="fixed inset-0 z-[90] pointer-events-none" width="100%" height="100%">
-          <line
-            x1={commandCardDragLine.start.x}
-            y1={commandCardDragLine.start.y}
-            x2={commandCardDragLine.end.x}
-            y2={commandCardDragLine.end.y}
-            stroke={COMMAND_CARD_CONFIG[commandCardDragLine.cardType].color}
-            strokeWidth="3"
-            strokeDasharray="8 8"
-            strokeLinecap="round"
-          />
-        </svg>
-      )}
 
       {/* Machine codex modal */}
       {codexTower && (

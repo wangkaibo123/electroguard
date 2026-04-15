@@ -1,7 +1,7 @@
-import { GameState, Tower, TowerType, CELL_SIZE, HALF_CELL, TOWER_STATS, getTowerRange } from '../types';
+import { GameState, Tower, TowerType, CommandCardType, CELL_SIZE, HALF_CELL, TOWER_STATS, CANVAS_WIDTH, CANVAS_HEIGHT, getTowerRange } from '../types';
 import { getPortPos, isPortAccessible } from '../engine';
 import { getLinearTowerBodyAspectRatio, getLinearTowerBodyRect } from '../linearTowerGeometry';
-import { SHOP_CONFIG } from '../config';
+import { COMMAND_CARD_CONFIG, SHOP_CONFIG } from '../config';
 import { __iconNode as coinsIconNode } from 'lucide-react/dist/esm/icons/coins.js';
 import { __iconNode as trash2IconNode } from 'lucide-react/dist/esm/icons/trash-2.js';
 import {
@@ -15,6 +15,7 @@ import {
   SNIPER_COOLDOWN_MS,
 } from './helpers';
 import { getTowerCells, getTowerFootprintCells } from '../footprint';
+import { canUseCommandCardOnTower } from '../commandCards';
 
 const ROTATION_KNOB_BASE_OFFSET = 20;
 export const ROTATION_BUTTON_WIDTH = 58;
@@ -542,6 +543,89 @@ export const drawTowers = (ctx: CanvasRenderingContext2D, state: GameState, now:
         ctx.globalAlpha = 1;
       }
     }
+  }
+};
+
+export const drawCommandCardTargeting = (
+  ctx: CanvasRenderingContext2D,
+  state: GameState,
+  now: number,
+  activeCommandCard: CommandCardType | null,
+) => {
+  if (!activeCommandCard || activeCommandCard === 'airstrike' || state.status !== 'playing') return;
+
+  const targets = state.towers.filter(tower => canUseCommandCardOnTower(state, activeCommandCard, tower));
+  if (!targets.length) return;
+
+  const color = COMMAND_CARD_CONFIG[activeCommandCard].color;
+  const pulse = 0.5 + 0.5 * Math.sin(now / 210);
+  const bounce = Math.sin(now / 260) * 5;
+
+  ctx.save();
+  const mask = new Path2D();
+  mask.rect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+  for (const tower of targets) {
+    const px = tower.x * CELL_SIZE;
+    const py = tower.y * CELL_SIZE;
+    const tw = tower.width * CELL_SIZE;
+    const th = tower.height * CELL_SIZE;
+    const pad = 10 + pulse * 3;
+    mask.roundRect(px - pad, py - pad, tw + pad * 2, th + pad * 2, 8);
+  }
+  ctx.fillStyle = 'rgba(2, 6, 23, 0.58)';
+  ctx.fill(mask, 'evenodd');
+  ctx.restore();
+
+  for (const tower of targets) {
+    const px = tower.x * CELL_SIZE;
+    const py = tower.y * CELL_SIZE;
+    const tw = tower.width * CELL_SIZE;
+    const th = tower.height * CELL_SIZE;
+    const cx = px + tw / 2;
+    const bottomY = py + th;
+    const pad = 8;
+    const haloAlpha = 0.18 + pulse * 0.16;
+
+    ctx.save();
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 16 + pulse * 12;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2.2 + pulse * 0.8;
+    ctx.setLineDash([9, 6]);
+    ctx.lineDashOffset = -now / 55;
+    ctx.strokeRect(px - pad, py - pad, tw + pad * 2, th + pad * 2);
+    ctx.setLineDash([]);
+
+    const halo = ctx.createRadialGradient(cx, py + th / 2, 0, cx, py + th / 2, Math.max(tw, th) * 0.9);
+    halo.addColorStop(0, `${color}${Math.round(haloAlpha * 255).toString(16).padStart(2, '0')}`);
+    halo.addColorStop(1, `${color}00`);
+    ctx.fillStyle = halo;
+    ctx.beginPath();
+    ctx.arc(cx, py + th / 2, Math.max(tw, th) * 0.9, 0, TWO_PI);
+    ctx.fill();
+
+    const arrowY = Math.min(CANVAS_HEIGHT - 12, bottomY + 18 + bounce);
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(2,6,23,0.95)';
+    ctx.beginPath();
+    ctx.moveTo(cx, arrowY - 16);
+    ctx.lineTo(cx, arrowY);
+    ctx.moveTo(cx - 10, arrowY - 8);
+    ctx.lineTo(cx, arrowY);
+    ctx.lineTo(cx + 10, arrowY - 8);
+    ctx.stroke();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    ctx.moveTo(cx, arrowY - 16);
+    ctx.lineTo(cx, arrowY);
+    ctx.moveTo(cx - 10, arrowY - 8);
+    ctx.lineTo(cx, arrowY);
+    ctx.lineTo(cx + 10, arrowY - 8);
+    ctx.stroke();
+    ctx.restore();
   }
 };
 
