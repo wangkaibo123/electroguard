@@ -44,6 +44,8 @@ type ShopPanelProps = {
   buyShopPack: (type: ShopItemType) => void;
   refreshShopOffers: () => void;
   activeCommandCard: CommandCardType | null;
+  activeRepair: boolean;
+  startRepair: () => void;
   tutorialStep: number | null;
 };
 
@@ -70,6 +72,8 @@ export const ShopPanel = (props: ShopPanelProps) => {
     buyShopPack,
     refreshShopOffers,
     activeCommandCard,
+    activeRepair,
+    startRepair,
     tutorialStep,
   } = props;
 
@@ -283,6 +287,11 @@ export const ShopPanel = (props: ShopPanelProps) => {
     const offers = gameState.shopOffers.length > 0 ? gameState.shopOffers : (['tower', 'infra', 'command'] as ShopItemType[]);
     const refreshCost = gameState.shopRefreshCost ?? SHOP_CONFIG.initialRefreshCost;
     const canRefresh = gameState.status === 'playing' && (isCustom || gameState.gold >= refreshCost);
+    const repairCost = SHOP_CONFIG.repairCost;
+    const hasRepairTarget = gameState.towers.some(tower =>
+      tower.type !== 'core' && (tower.isRuined || tower.hp < tower.maxHp),
+    );
+    const canRepair = gameState.status === 'playing' && hasRepairTarget && (isCustom || gameState.gold >= repairCost);
     const getShopItemUi = (offer: ShopItemType) => {
       const item = SHOP_ITEM_CONFIG[offer];
       if (item.kind === 'machine') {
@@ -378,6 +387,25 @@ export const ShopPanel = (props: ShopPanelProps) => {
             <span>{i.refreshShop}</span>
             <span className="flex items-center gap-1 text-yellow-400">
               <Coins size={12} />{refreshCost}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={startRepair}
+            disabled={!canRepair}
+            className={`flex items-center justify-center gap-2.5 px-3 py-2.5 rounded-lg border text-sm font-black transition-all ${
+              canRepair
+                ? activeRepair
+                  ? 'border-cyan-300 bg-cyan-400/20 text-cyan-50 ring-2 ring-cyan-300/70 ring-offset-2 ring-offset-gray-950'
+                  : 'border-cyan-700/70 bg-cyan-500/10 text-cyan-100 hover:bg-cyan-500/15 hover:border-cyan-500/70'
+                : 'border-gray-800 bg-gray-900/50 text-gray-500 cursor-not-allowed opacity-40'
+            }`}
+            title={i.repairDesc(repairCost)}
+          >
+            <Wrench size={16} />
+            <span>{i.repair}</span>
+            <span className="flex items-center gap-1 text-yellow-400">
+              <Coins size={12} />{repairCost}
             </span>
           </button>
         </div>

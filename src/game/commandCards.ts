@@ -14,7 +14,7 @@ export const canAddMachinePort = (
   tower: Tower,
   portType: 'input' | 'output',
 ) => {
-  if (tower.type === 'core') return false;
+  if (tower.type === 'core' || tower.isRuined) return false;
 
   const getSideLength = (direction: PortDirection) =>
     direction === 'top' || direction === 'bottom' ? tower.width : tower.height;
@@ -69,7 +69,7 @@ export const canUseCommandCardOnTower = (
   cardType: CommandCardType,
   tower: Tower,
 ) => {
-  if (tower.type === 'core') return false;
+  if (tower.type === 'core' || tower.isRuined) return false;
   if ((tower.commandUpgradeCount ?? 0) >= MAX_MACHINE_COMMAND_UPGRADES) return false;
 
   if (cardType === 'add_input' || cardType === 'add_output') {

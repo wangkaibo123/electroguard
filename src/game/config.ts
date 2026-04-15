@@ -1,4 +1,4 @@
-import type { TowerType, EnemyType, CommandCardType, BaseUpgradeType, ShopItemType, ShopMachineItemType, ShopPackType } from './types';
+import type { Tower, TowerType, EnemyType, CommandCardType, BaseUpgradeType, ShopItemType, ShopMachineItemType, ShopPackType } from './types';
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  游戏配置表  —  所有影响游戏平衡的数值集中在此文件
@@ -272,8 +272,18 @@ export const SHOP_CONFIG = {
   goldPerEnemyKill: 1,
   initialRefreshCost: 0,
   refreshCost: 5,
+  repairCost: 2,
   sellPrice: 5,
+  advancedRuinSellPrice: 20,
 } as const;
+
+export const ADVANCED_TOWER_TYPES = ['missile', 'big_generator', 'repair_drone'] as const satisfies readonly TowerType[];
+
+export const isAdvancedTowerType = (towerType: TowerType) =>
+  (ADVANCED_TOWER_TYPES as readonly TowerType[]).includes(towerType);
+
+export const getTowerSellPrice = (tower: Pick<Tower, 'type' | 'isRuined'>) =>
+  tower.isRuined && isAdvancedTowerType(tower.type) ? SHOP_CONFIG.advancedRuinSellPrice : SHOP_CONFIG.sellPrice;
 
 export const SHOP_MACHINE_ITEM_TYPES = [
   'blaster',

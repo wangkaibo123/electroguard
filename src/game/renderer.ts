@@ -3,7 +3,7 @@ import { BG_DARK, BG_MID, BG_GRID, MAP_BORDER } from './render/constants';
 import { updateAndDrawDecorations } from './render/decorations';
 import {
   drawOccupiedGround, drawPorts, drawTowers, drawPlacementPreview, drawRangePreview,
-  drawRotationKnob, drawDeleteButton, drawDraggedTowerFootprint, drawCommandCardTargeting,
+  drawRotationKnob, drawDeleteButton, drawDraggedTowerFootprint, drawCommandCardTargeting, drawRepairTargeting,
 } from './render/towers';
 import { drawEnemies, drawEnemyPreview } from './render/enemies';
 import {
@@ -28,6 +28,7 @@ export const renderGame = (
   rotatingTowerId: string | null = null,
   enemyPreview: { x: number; y: number; enemyType: import('./types').EnemyType; isStatic: boolean } | null = null,
   activeCommandCard: CommandCardType | null = null,
+  activeRepair = false,
 ) => {
   const now = performance.now();
 
@@ -80,8 +81,9 @@ export const renderGame = (
   drawRangePreview(ctx, state, hoverPos, selectedTower, rotatingTowerId);
 
   drawPorts(ctx, state);
-  drawTowers(ctx, state, now);
+  drawTowers(ctx, state, now, activeRepair);
   drawCommandCardTargeting(ctx, state, now, activeCommandCard);
+  drawRepairTargeting(ctx, state, now, activeRepair);
 
   drawPlacementPreview(ctx, state, hoverPos, selectedTower, canPlaceFlag);
   drawDraggedTowerFootprint(ctx, state, draggedTowerId);

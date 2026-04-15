@@ -193,6 +193,23 @@ const destroyTower = (state: GameState, towerId: string) => {
   updatePowerGrid(state);
 };
 
+const ruinTower = (state: GameState, tower: Tower) => {
+  tower.isRuined = true;
+  tower.hp = 0;
+  tower.powered = false;
+  tower.storedPower = 0;
+  tower.incomingPower = 0;
+  tower.shieldHp = 0;
+  tower.lastActionTime = 0;
+  tower.heat = 0;
+  tower.overloaded = false;
+  tower.gatlingAmmo = 0;
+  tower.sniperAimSince = undefined;
+  state.wires = state.wires.filter((wire) => wire.startTowerId !== tower.id && wire.endTowerId !== tower.id);
+  state.pulses = state.pulses.filter((pulse) => pulse.sourceTowerId !== tower.id && pulse.targetTowerId !== tower.id);
+  updatePowerGrid(state);
+};
+
 const updateIncomingDrops = (state: GameState, dt: number) => {
   let changed = false;
 
@@ -246,6 +263,8 @@ const updatePowerSystems = (state: GameState, dt: number, now: number) => {
   if (state.powerTimer >= POWER_INTERVAL) {
     state.powerTimer -= POWER_INTERVAL;
     for (const tower of state.towers) {
+      if (tower.isRuined) continue;
+
       if (tower.type === 'core') {
         const pulseCount = 1 + (tower.corePowerBonus ?? 0);
         for (let pulse = 0; pulse < pulseCount; pulse++) dispatchPulse(state, tower);
@@ -261,6 +280,8 @@ const updatePowerSystems = (state: GameState, dt: number, now: number) => {
   }
 
   for (const tower of state.towers) {
+    if (tower.isRuined) continue;
+
     const selfPowerLevel = tower.selfPowerLevel ?? 0;
     if (selfPowerLevel <= 0) continue;
 
@@ -284,6 +305,8 @@ const updatePowerSystems = (state: GameState, dt: number, now: number) => {
   }
 
   for (const tower of state.towers) {
+    if (tower.isRuined) continue;
+
     if (tower.maxShieldHp <= 0 || tower.shieldHp >= tower.maxShieldHp) continue;
     if ((tower.type !== 'core' && tower.type !== 'shield') || !tower.powered) continue;
 
@@ -315,6 +338,8 @@ const updatePowerSystems = (state: GameState, dt: number, now: number) => {
   }
 
   for (const tower of state.towers) {
+    if (tower.isRuined) continue;
+
     if (tower.type !== 'battery' || !tower.powered || tower.storedPower <= 0) continue;
     if (now - tower.lastActionTime <= BATTERY_INTERVAL) continue;
 
@@ -354,7 +379,7 @@ const updatePulses = (state: GameState, dt: number, now: number) => {
 
     if (reached) {
       const target = state.towerMap.get(pulse.targetTowerId);
-      if (target) {
+      if (target && !target.isRuined) {
         target.incomingPower = Math.max(0, target.incomingPower - 1);
         if (target.type === 'gatling') {
           if (target.powered && !target.overloaded) {
@@ -379,6 +404,8 @@ const updateCombatTowers = (state: GameState, dt: number, now: number) => {
   let changed = false;
 
   for (const tower of state.towers) {
+    if (tower.isRuined) continue;
+
     if (tower.type === 'gatling' && tower.heat > 0) {
       tower.heat = Math.max(0, tower.heat * Math.pow(1 - GATLING_HEAT_DECAY_PCT, dt));
       if (tower.overloaded && tower.heat <= 0.001) {
@@ -392,6 +419,8 @@ const updateCombatTowers = (state: GameState, dt: number, now: number) => {
   const turretTypes = new Set<Tower['type']>(['blaster', 'gatling', 'sniper', 'missile', 'repair_drone']);
 
   for (const tower of state.towers) {
+    if (tower.isRuined) continue;
+
     if (!turretTypes.has(tower.type)) continue;
     if (!tower.powered) {
       if (tower.type === 'sniper') tower.sniperAimSince = undefined;
@@ -403,7 +432,7 @@ const updateCombatTowers = (state: GameState, dt: number, now: number) => {
 
     if (tower.type === 'repair_drone') {
       const repairTarget = state.towers
-        .filter((other) => other.id !== tower.id && other.hp < other.maxHp)
+        .filter((other) => !other.isRuined && other.id !== tower.id && other.hp < other.maxHp)
         .map((other) => ({ tower: other, distance: Math.hypot((other.x + other.width / 2) * GLOBAL_CONFIG.cellSize - baseX, (other.y + other.height / 2) * GLOBAL_CONFIG.cellSize - baseY) }))
         .filter((item) => item.distance <= REPAIR_DRONE_REPAIR_RANGE)
         .sort((a, b) => (a.tower.hp / a.tower.maxHp) - (b.tower.hp / b.tower.maxHp))[0]?.tower;
@@ -580,6 +609,8 @@ const updateCombatTowers = (state: GameState, dt: number, now: number) => {
   }
 
   for (const tower of state.towers) {
+    if (tower.isRuined) continue;
+
     if (tower.type !== 'tesla' || !tower.powered || tower.storedPower <= 0) continue;
     if (now - tower.lastActionTime <= TESLA_COOLDOWN) continue;
 
@@ -720,6 +751,8 @@ const updateEnemyState = (state: GameState, dt: number, now: number) => {
     const isSaboteur = enemy.enemyType === 'saboteur';
 
     for (const tower of state.towers) {
+      if (tower.isRuined) continue;
+
       // Query the tower's collider component so enemies must visually touch the body
       const closest = closestPointOnTower(tower, enemy.x, enemy.y);
       const tx = closest.x;
@@ -827,7 +860,11 @@ const updateEnemyState = (state: GameState, dt: number, now: number) => {
 
       if (targetTower.hp <= 0) {
         if (targetTower.type === 'core') state.status = 'gameover';
-        destroyTower(state, targetTower.id);
+        if (targetTower.type === 'core') {
+          destroyTower(state, targetTower.id);
+        } else {
+          ruinTower(state, targetTower);
+        }
       }
     }
 

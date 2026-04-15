@@ -1,7 +1,7 @@
 import { GameState, Tower, TowerType, CommandCardType, CELL_SIZE, HALF_CELL, TOWER_STATS, CANVAS_WIDTH, CANVAS_HEIGHT, getTowerRange } from '../types';
 import { getPortPos, isPortAccessible } from '../engine';
 import { getLinearTowerBodyAspectRatio, getLinearTowerBodyRect } from '../linearTowerGeometry';
-import { COMMAND_CARD_CONFIG, SHOP_CONFIG } from '../config';
+import { COMMAND_CARD_CONFIG, getTowerSellPrice } from '../config';
 import { __iconNode as coinsIconNode } from 'lucide-react/dist/esm/icons/coins.js';
 import { __iconNode as trash2IconNode } from 'lucide-react/dist/esm/icons/trash-2.js';
 import {
@@ -281,6 +281,60 @@ const drawCommandUpgradeMarks = (
   ctx.restore();
 };
 
+const drawRuinOverlay = (
+  ctx: CanvasRenderingContext2D,
+  px: number,
+  py: number,
+  tw: number,
+  th: number,
+  inset: number,
+) => {
+  const left = px + inset;
+  const top = py + inset;
+  const right = px + tw - inset;
+  const bottom = py + th - inset;
+  const cx = px + tw / 2;
+  const cy = py + th / 2;
+
+  ctx.save();
+  ctx.strokeStyle = 'rgba(203,213,225,0.55)';
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(left + tw * 0.18, top + th * 0.18);
+  ctx.lineTo(cx - tw * 0.08, cy - th * 0.05);
+  ctx.lineTo(left + tw * 0.33, bottom - th * 0.14);
+  ctx.moveTo(right - tw * 0.16, top + th * 0.2);
+  ctx.lineTo(cx + tw * 0.08, cy + th * 0.02);
+  ctx.lineTo(right - tw * 0.28, bottom - th * 0.18);
+  ctx.moveTo(cx - tw * 0.2, top + th * 0.62);
+  ctx.lineTo(cx + tw * 0.02, cy + th * 0.12);
+  ctx.lineTo(cx + tw * 0.24, top + th * 0.56);
+  ctx.stroke();
+
+  ctx.strokeStyle = 'rgba(15,23,42,0.85)';
+  ctx.lineWidth = 4;
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.beginPath();
+  ctx.moveTo(left + tw * 0.2, top + th * 0.2);
+  ctx.lineTo(cx - tw * 0.08, cy - th * 0.05);
+  ctx.moveTo(right - tw * 0.18, top + th * 0.22);
+  ctx.lineTo(cx + tw * 0.08, cy + th * 0.02);
+  ctx.stroke();
+
+  const fontSize = Math.max(12, Math.min(18, Math.floor(Math.min(tw, th) * 0.2)));
+  ctx.font = `bold ${fontSize}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = 'rgba(2,6,23,0.92)';
+  ctx.fillStyle = 'rgba(226,232,240,0.92)';
+  ctx.strokeText('废墟', cx, cy);
+  ctx.fillText('废墟', cx, cy);
+  ctx.restore();
+};
+
 // ── Ports (drawn under tower bodies) ─────────────────────────────────────
 export const drawPorts = (ctx: CanvasRenderingContext2D, state: GameState) => {
   const PORT_SCALE = 4 / 3;
@@ -309,6 +363,7 @@ export const drawPorts = (ctx: CanvasRenderingContext2D, state: GameState) => {
   };
 
   for (const tower of state.towers) {
+    if (tower.isRuined) continue;
     for (const port of tower.ports) {
       const pos = getPortPos(tower, port);
       const off = portOutward(port.direction);
@@ -414,7 +469,7 @@ export const drawPorts = (ctx: CanvasRenderingContext2D, state: GameState) => {
 };
 
 // ── Tower bodies ────────────────────────────────────────────────────────────
-export const drawTowers = (ctx: CanvasRenderingContext2D, state: GameState, now: number) => {
+export const drawTowers = (ctx: CanvasRenderingContext2D, state: GameState, now: number, activeRepair = false) => {
   for (const tower of state.towers) {
     const px = tower.x * CELL_SIZE, py = tower.y * CELL_SIZE;
     const tw = tower.width * CELL_SIZE, th = tower.height * CELL_SIZE;
@@ -427,10 +482,12 @@ export const drawTowers = (ctx: CanvasRenderingContext2D, state: GameState, now:
     ctx.rotate(tower.rotation);
     ctx.translate(-cx, -cy);
 
-    const tColor = (!tower.powered && tower.type !== 'core') ? UNPOWERED : TOWER_STATS[tower.type].color;
+    const tColor = tower.isRuined
+      ? 'rgba(148,163,184,0.72)'
+      : (!tower.powered && tower.type !== 'core') ? UNPOWERED : TOWER_STATS[tower.type].color;
 
     // Outlined style: dark fill + colored border (shape varies by turret type)
-    ctx.fillStyle = 'rgba(10,14,26,0.85)';
+    ctx.fillStyle = tower.isRuined ? 'rgba(24,24,27,0.92)' : 'rgba(10,14,26,0.85)';
     ctx.strokeStyle = tColor;
     ctx.lineWidth = 1.75;
 
@@ -502,21 +559,23 @@ export const drawTowers = (ctx: CanvasRenderingContext2D, state: GameState, now:
         getLinearTowerVisualLandscape(tower),
         getLinearTowerBodyAspectRatio(tower.type),
       );
-      drawTowerDetails(
-        ctx, tower, body.x, body.y, body.width, body.height, cx, cy, tColor, inset, now,
-      );
+      drawTowerDetails(ctx, tower, body.x, body.y, body.width, body.height, cx, cy, tColor, inset, now);
+      if (tower.isRuined) drawRuinOverlay(ctx, body.x, body.y, body.width, body.height, inset);
     } else {
       drawTowerDetails(ctx, tower, visual.px, visual.py, visual.tw, visual.th, cx, cy, tColor, inset, now);
+      if (tower.isRuined) drawRuinOverlay(ctx, visual.px, visual.py, visual.tw, visual.th, inset);
     }
 
     ctx.restore();
 
-    drawCommandUpgradeMarks(ctx, tower, px, py, tw);
+    if (!tower.isRuined) drawCommandUpgradeMarks(ctx, tower, px, py, tw);
 
     // Bars (not rotated) — shield bar removed, shield uses fade visualization
-    if (tower.hp < tower.maxHp) {
+    if (tower.type !== 'core' && (tower.isRuined || tower.hp < tower.maxHp)) {
       const elapsed = now - tower.lastDamagedAt;
-      const fadeRatio = elapsed <= TOWER_BAR_SHOW_MS
+      const fadeRatio = activeRepair
+        ? 1
+        : elapsed <= TOWER_BAR_SHOW_MS
         ? 1
         : Math.max(0, 1 - (elapsed - TOWER_BAR_SHOW_MS) / TOWER_BAR_FADE_MS);
       if (fadeRatio > 0) {
@@ -527,7 +586,7 @@ export const drawTowers = (ctx: CanvasRenderingContext2D, state: GameState, now:
         ctx.restore();
       }
     }
-    if (tower.maxPower > 0 && tower.type !== 'core' && tower.type !== 'battery' && tower.type !== 'blaster' && tower.type !== 'gatling' && tower.type !== 'sniper' && tower.type !== 'tesla') {
+    if (!tower.isRuined && tower.maxPower > 0 && tower.type !== 'core' && tower.type !== 'battery' && tower.type !== 'blaster' && tower.type !== 'gatling' && tower.type !== 'sniper' && tower.type !== 'tesla') {
       const pr = Math.min(tw, th) / 3;
       const pcx = px + tw / 2, pcy = py + th / 2;
       if (tower.storedPower > 0) {
@@ -546,18 +605,14 @@ export const drawTowers = (ctx: CanvasRenderingContext2D, state: GameState, now:
   }
 };
 
-export const drawCommandCardTargeting = (
+const drawTowerTargeting = (
   ctx: CanvasRenderingContext2D,
-  state: GameState,
   now: number,
-  activeCommandCard: CommandCardType | null,
+  targets: Tower[],
+  color: string,
 ) => {
-  if (!activeCommandCard || state.status !== 'playing') return;
-
-  const targets = state.towers.filter(tower => canUseCommandCardOnTower(state, activeCommandCard, tower));
   if (!targets.length) return;
 
-  const color = COMMAND_CARD_CONFIG[activeCommandCard].color;
   const pulse = 0.5 + 0.5 * Math.sin(now / 210);
   const bounce = Math.sin(now / 260) * 5;
 
@@ -629,6 +684,38 @@ export const drawCommandCardTargeting = (
     ctx.stroke();
     ctx.restore();
   }
+};
+
+export const drawCommandCardTargeting = (
+  ctx: CanvasRenderingContext2D,
+  state: GameState,
+  now: number,
+  activeCommandCard: CommandCardType | null,
+) => {
+  if (!activeCommandCard || state.status !== 'playing') return;
+
+  drawTowerTargeting(
+    ctx,
+    now,
+    state.towers.filter(tower => canUseCommandCardOnTower(state, activeCommandCard, tower)),
+    COMMAND_CARD_CONFIG[activeCommandCard].color,
+  );
+};
+
+export const drawRepairTargeting = (
+  ctx: CanvasRenderingContext2D,
+  state: GameState,
+  now: number,
+  activeRepair: boolean,
+) => {
+  if (!activeRepair || state.status !== 'playing') return;
+
+  drawTowerTargeting(
+    ctx,
+    now,
+    state.towers.filter(tower => tower.type !== 'core' && (tower.isRuined || tower.hp < tower.maxHp)),
+    '#22d3ee',
+  );
 };
 
 // ── Placement preview ─────────────────────────────────────────────────────
@@ -734,7 +821,7 @@ export const drawRangePreview = (
 export const drawRotationKnob = (ctx: CanvasRenderingContext2D, state: GameState, rotatingTowerId: string | null) => {
   if (!rotatingTowerId) return;
   const tower = state.towerMap.get(rotatingTowerId);
-  if (!tower) return;
+  if (!tower || tower.isRuined) return;
 
   const { tpx, tpy, ttw, tth, tcx, tcy, buttonX, buttonY, buttonWidth, buttonHeight } = getRotationKnobLayout(tower);
 
@@ -834,7 +921,7 @@ export const drawDeleteButton = (ctx: CanvasRenderingContext2D, state: GameState
 
   drawLucideIconNode(ctx, trash2IconNode as LucideIconNode, trashX, centerY, 13, '#ffffff');
 
-  ctx.fillText(String(SHOP_CONFIG.sellPrice), contentCx, centerY + 0.5);
+  ctx.fillText(String(getTowerSellPrice(tower)), contentCx, centerY + 0.5);
 
   drawLucideIconNode(ctx, coinsIconNode as LucideIconNode, coinX, centerY, 13, 'rgba(250,204,21,0.96)');
 };

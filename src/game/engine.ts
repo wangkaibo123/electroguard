@@ -4,7 +4,7 @@ import {
   GRID_WIDTH, GRID_HEIGHT, CELL_SIZE, HALF_CELL, TOWER_STATS, CANVAS_WIDTH, CANVAS_HEIGHT, WIRE_MAX_HP,
 } from './types';
 import { t, pickKey } from './i18n';
-import { GLOBAL_CONFIG, ENEMY_CONFIG, STARTING_INVENTORY, PICK_POOL_CONFIG, WEAPON_CONFIG, COMMAND_CARD_CONFIG, BASE_UPGRADE_CONFIG, SHOP_CONFIG, SHOP_ITEM_CONFIG, SHOP_OFFER_BUCKETS } from './config';
+import { GLOBAL_CONFIG, ENEMY_CONFIG, STARTING_INVENTORY, PICK_POOL_CONFIG, WEAPON_CONFIG, COMMAND_CARD_CONFIG, BASE_UPGRADE_CONFIG, SHOP_CONFIG, SHOP_ITEM_CONFIG, SHOP_OFFER_BUCKETS, ADVANCED_TOWER_TYPES } from './config';
 import { makeTowerCollider, makeEnemyCollider } from './collider';
 import { getLinearTowerBodyAspectRatio, getLinearTowerBodyRect } from './linearTowerGeometry';
 import { footprintsOverlap, getTowerCells, getTowerFootprintCells } from './footprint';
@@ -130,7 +130,7 @@ const hasDirectLinkCandidate = (
   if (isPortLinked(state, port.id, ignoreWireId)) return false;
 
   for (const otherTower of state.towers) {
-    if (otherTower.id === tower.id) continue;
+    if (otherTower.id === tower.id || otherTower.isRuined) continue;
     for (const otherPort of otherTower.ports) {
       if (canDirectLinkPorts(state, tower, port, otherTower, otherPort, ignoreWireId)) {
         return true;
@@ -229,8 +229,10 @@ export const syncDirectPortLinks = (
 
   for (let i = 0; i < state.towers.length; i++) {
     const towerA = state.towers[i];
+    if (towerA.isRuined) continue;
     for (let j = i + 1; j < state.towers.length; j++) {
       const towerB = state.towers[j];
+      if (towerB.isRuined) continue;
       if (options.towerId && towerA.id !== options.towerId && towerB.id !== options.towerId) continue;
 
       for (const portA of towerA.ports) {
@@ -436,7 +438,7 @@ export const generatePickOptions = (): PickOption[] => {
 };
 
 const TURRET_TYPES = new Set<string>(['blaster', 'gatling', 'sniper', 'tesla']);
-const ADVANCED_TYPES: TowerType[] = ['missile', 'big_generator', 'repair_drone'];
+const ADVANCED_TYPES: TowerType[] = [...ADVANCED_TOWER_TYPES];
 
 export const generateTowerOnlyPickOptions = (): PickOption[] => {
   const loc = t();
@@ -663,6 +665,7 @@ export const updatePowerGrid = (state: GameState) => {
 
   const queue: string[] = [];
   for (const t of state.towers) {
+    if (t.isRuined) continue;
     if (t.type === 'core' || t.type === 'generator' || t.type === 'big_generator') {
       t.powered = true;
       queue.push(t.id);
@@ -676,21 +679,24 @@ export const updatePowerGrid = (state: GameState) => {
       const nextId = w.startTowerId === cid ? w.endTowerId
                    : w.endTowerId === cid ? w.startTowerId : null;
       if (!nextId || visited.has(nextId)) continue;
+      const t = state.towerMap.get(nextId);
+      if (!t || t.isRuined) continue;
       visited.add(nextId);
       queue.push(nextId);
-      const t = state.towerMap.get(nextId);
-      if (t) t.powered = true;
+      t.powered = true;
     }
   }
 
   for (const t of state.towers) {
-    if ((t.selfPowerLevel ?? 0) > 0) t.powered = true;
+    if (!t.isRuined && (t.selfPowerLevel ?? 0) > 0) t.powered = true;
   }
 };
 
 // ── Pulse dispatch ───────────────────────────────────────────────────────────
 
 export const dispatchPulse = (state: GameState, src: Tower, isBattery = false): boolean => {
+  if (src.isRuined) return false;
+
   const queue = [{ tower: src, path: [] as Wire[] }];
   const visited = new Set([src.id]);
   const launchDuration = src.type === 'generator' || src.type === 'big_generator' ? 0.28 : 0;
@@ -698,7 +704,7 @@ export const dispatchPulse = (state: GameState, src: Tower, isBattery = false): 
   while (queue.length > 0) {
     const { tower, path } = queue.shift()!;
 
-    const canReceivePulse = tower.id !== src.id && (
+    const canReceivePulse = !tower.isRuined && tower.id !== src.id && (
       tower.type === 'gatling'
         ? gatlingNeedsPower(state, tower)
         : (tower.storedPower + tower.incomingPower) < tower.maxPower
@@ -747,6 +753,7 @@ export const dispatchPulse = (state: GameState, src: Tower, isBattery = false): 
       if (!nextId || visited.has(nextId)) continue;
       visited.add(nextId);
       const next = state.towerMap.get(nextId);
+      if (next?.isRuined) continue;
       if (next) queue.push({ tower: next, path: [...path, w] });
     }
   }

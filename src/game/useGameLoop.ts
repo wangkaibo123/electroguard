@@ -10,9 +10,10 @@ import {
   canDirectLinkPorts, isPortAccessible,
   generateTowerOnlyPickOptions, generateInfraOnlyPickOptions, rebuildTowerMap,
   generateAdvancedPickOptions, generateCommandCardPickOptions, generateBaseUpgradePickOptions, generateShopOffers,
+  syncDirectPortLinks,
 } from './engine';
 import { renderGame } from './renderer';
-import { COMMAND_CARD_CONFIG, GLOBAL_CONFIG, SHOP_CONFIG, SHOP_ITEM_CONFIG } from './config';
+import { COMMAND_CARD_CONFIG, GLOBAL_CONFIG, SHOP_CONFIG, SHOP_ITEM_CONFIG, getTowerSellPrice } from './config';
 import { t } from './i18n';
 import { addTowerToState, createTowerAt } from './towerFactory';
 import { startNextWave, updateGameState } from './updateGameState';
@@ -50,13 +51,37 @@ export const useGameLoop = () => {
     height: VIEWPORT_HEIGHT,
   });
   const pendingCanvasSizeRef = useRef<{ w: number; h: number; pw: number; ph: number } | null>(null);
+  const markRepairTargetBarsForFade = () => {
+    const now = performance.now();
+    for (const tower of stateRef.current.towers) {
+      if (tower.type !== 'core' && (tower.isRuined || tower.hp < tower.maxHp)) {
+        tower.lastDamagedAt = now;
+      }
+    }
+  };
 
   const selectedTowerRef = useRef<TowerType | null>(null);
   const [selectedTower, _setSelectedTower] = useState<TowerType | null>(null);
-  const setSelectedTower = (v: TowerType | null) => { selectedTowerRef.current = v; _setSelectedTower(v); };
+  const setSelectedTower = (v: TowerType | null) => {
+    if (v) {
+      if (activeRepairRef.current) markRepairTargetBarsForFade();
+      activeRepairRef.current = false;
+      setActiveRepairState(false);
+    }
+    selectedTowerRef.current = v;
+    _setSelectedTower(v);
+  };
   const placeMonsterModeRef = useRef(false);
   const [placeMonsterMode, _setPlaceMonsterMode] = useState(false);
-  const setPlaceMonsterMode = (v: boolean) => { placeMonsterModeRef.current = v; _setPlaceMonsterMode(v); };
+  const setPlaceMonsterMode = (v: boolean) => {
+    if (v) {
+      if (activeRepairRef.current) markRepairTargetBarsForFade();
+      activeRepairRef.current = false;
+      setActiveRepairState(false);
+    }
+    placeMonsterModeRef.current = v;
+    _setPlaceMonsterMode(v);
+  };
   const selectedMonsterTypeRef = useRef<EnemyType>('grunt');
   const [selectedMonsterType, _setSelectedMonsterType] = useState<EnemyType>('grunt');
   const setSelectedMonsterType = (v: EnemyType) => { selectedMonsterTypeRef.current = v; _setSelectedMonsterType(v); };
@@ -86,15 +111,28 @@ export const useGameLoop = () => {
   const dragOrigWiresRef = useRef<Wire[] | null>(null);
   const dragOrigInventoryRef = useRef<number>(0);
   const activeCommandCardRef = useRef<CommandCardType | null>(null);
+  const activeRepairRef = useRef(false);
   const activeShopCommandPurchaseRef = useRef<{
     shopItemType: ShopItemType;
     price: number;
   } | null>(null);
   const [activeCommandCard, setActiveCommandCardState] = useState<CommandCardType | null>(null);
+  const [activeRepair, setActiveRepairState] = useState(false);
   const setActiveCommandCard = (cardType: CommandCardType | null) => {
     activeCommandCardRef.current = cardType;
     if (!cardType) activeShopCommandPurchaseRef.current = null;
+    if (cardType) {
+      if (activeRepairRef.current) markRepairTargetBarsForFade();
+      activeRepairRef.current = false;
+      setActiveRepairState(false);
+    }
     setActiveCommandCardState(cardType);
+  };
+  const setActiveRepair = (active: boolean) => {
+    if (activeRepairRef.current && !active) markRepairTargetBarsForFade();
+    activeRepairRef.current = active;
+    if (active) setActiveCommandCard(null);
+    setActiveRepairState(active);
   };
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -271,6 +309,7 @@ export const useGameLoop = () => {
       updateRotating(null);
       cancelTowerDrag();
       clearWireDragState();
+      setActiveRepair(false);
       activeShopCommandPurchaseRef.current = { shopItemType, price };
       activeCommandCardRef.current = commandCardType;
       setActiveCommandCardState(commandCardType);
@@ -347,9 +386,43 @@ export const useGameLoop = () => {
     state.towerMap.delete(towerId);
     rebuildTowerMap(state);
     updatePowerGrid(state);
-    state.gold += SHOP_CONFIG.sellPrice;
+    state.gold += getTowerSellPrice(tower);
     updateRotating(null);
     sync();
+  };
+
+  const canRepairTower = (tower: GameState['towers'][number] | null) =>
+    Boolean(tower && tower.type !== 'core' && (tower.isRuined || tower.hp < tower.maxHp));
+
+  const repairTowerAtWorld = (wx: number, wy: number) => {
+    const state = stateRef.current;
+    if (state.status !== 'playing') return false;
+    if (wx < 0 || wy < 0 || wx > CANVAS_WIDTH || wy > CANVAS_HEIGHT) return false;
+
+    const tower = findTowerAtWorldPoint(state, wx, wy);
+    if (!canRepairTower(tower)) {
+      showToast(t().repairCannotUse);
+      return false;
+    }
+
+    const cost = SHOP_CONFIG.repairCost;
+    if (state.gameMode !== 'custom' && state.gold < cost) {
+      showToast(t().notEnoughGold);
+      return false;
+    }
+
+    if (state.gameMode !== 'custom') state.gold -= cost;
+    tower!.isRuined = false;
+    tower!.hp = tower!.maxHp;
+    tower!.shieldHp = tower!.maxShieldHp;
+    tower!.lastDamagedAt = performance.now();
+    if (!syncDirectPortLinks(state, { towerId: tower!.id, createSpark: true })) {
+      updatePowerGrid(state);
+    }
+    updateRotating(null);
+    setActiveRepair(false);
+    sync();
+    return true;
   };
 
   const skipToNextWave = () => {
@@ -522,6 +595,20 @@ export const useGameLoop = () => {
     setActiveCommandCard(activeCommandCardRef.current === cardType ? null : cardType);
   };
 
+  const startRepair = () => {
+    const state = stateRef.current;
+    if (state.status !== 'playing') return;
+    if (state.gameMode !== 'custom' && state.gold < SHOP_CONFIG.repairCost) {
+      showToast(t().notEnoughGold);
+      return;
+    }
+    setSelectedTower(null);
+    updateRotating(null);
+    cancelTowerDrag();
+    clearWireDragState();
+    setActiveRepair(!activeRepairRef.current);
+  };
+
   const commitActiveCommandCardAtWorld = (wx: number, wy: number) => {
     const cardType = activeCommandCardRef.current;
     if (!cardType) return false;
@@ -575,6 +662,11 @@ export const useGameLoop = () => {
 
     if (activeCommandCardRef.current) {
       commitActiveCommandCardAtWorld(wx, wy);
+      return;
+    }
+
+    if (activeRepairRef.current) {
+      repairTowerAtWorld(wx, wy);
       return;
     }
 
@@ -899,6 +991,7 @@ export const useGameLoop = () => {
             }
           : null,
         activeCommandCardRef.current,
+        activeRepairRef.current,
       );
     }
 
@@ -997,7 +1090,7 @@ export const useGameLoop = () => {
         // Quick rotate the currently selected (rotating) tower 90掳 right
         if (rotatingRef.current) {
           const tower = state.towerMap.get(rotatingRef.current);
-          if (tower) {
+          if (tower && !tower.isRuined) {
             const newAngle = snapRotation(tower.rotation) + Math.PI / 2;
             if (!applyTowerRotation(tower, snapRotation(newAngle), snapRotation(tower.rotation), state)) {
               // Rotation failed (collision), do nothing
@@ -1013,7 +1106,10 @@ export const useGameLoop = () => {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setActiveCommandCard(null);
+      if (event.key === 'Escape') {
+        setActiveCommandCard(null);
+        setActiveRepair(false);
+      }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
@@ -1022,7 +1118,7 @@ export const useGameLoop = () => {
   return {
     canvasRef, cameraRef, gameState, startGame, startCustomGame, togglePause, returnToMenu, handlePick,
     openCustomPick, buyShopPack, refreshShopOffers, sellTower, rotatingTowerId,
-    startCommandCardUse, activeCommandCard,
+    startCommandCardUse, activeCommandCard, startRepair, activeRepair,
     selectedTower, setSelectedTower, placeMonsterMode, setPlaceMonsterMode, skipToNextWave, toastMessage,
     selectedMonsterType, setSelectedMonsterType, staticMonster, setStaticMonster,
     handleCanvasMouseDown, handleCanvasMouseMove, handleCanvasMouseUp, handleCanvasMouseLeave,

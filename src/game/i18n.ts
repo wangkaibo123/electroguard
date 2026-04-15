@@ -55,6 +55,8 @@ export interface I18nStrings {
   shop: string;
   refreshShop: string;
   refreshShopDesc: (cost: number) => string;
+  repair: string;
+  repairDesc: (cost: number) => string;
   towerPack: string;
   towerPackDesc: string;
   infraPack: string;
@@ -83,6 +85,7 @@ export interface I18nStrings {
   coreCannotMove: string;
   commandCardCannotUse: string;
   commandCardMachineMaxed: string;
+  repairCannotUse: string;
   baseUpgradeCannotUse: string;
 
   // Pick stats bar
@@ -122,7 +125,7 @@ export interface I18nStrings {
   towerCodex: Record<string, string>;
 
   // Controls guide (top-left overlay)
-  controlsGuide: string[];
+  controlsGuide: Array<{ keys: string[]; action: string }>;
 
   // Pick labels (may differ from tower names, e.g. "Blaster x2")
   pickLabel: Record<string, string>;
@@ -175,6 +178,8 @@ const en: I18nStrings = {
   shop: 'Shop',
   refreshShop: 'Refresh',
   refreshShopDesc: (cost: number) => `Refresh shop offers for ${cost} gold`,
+  repair: 'Repair',
+  repairDesc: (cost: number) => `Repair a damaged machine or ruin for ${cost} gold`,
   towerPack: 'Turret Pack',
   towerPackDesc: 'Pick 1 of 3 random turrets',
   infraPack: 'Infra Pack',
@@ -200,6 +205,7 @@ const en: I18nStrings = {
   coreCannotMove: 'Core cannot be moved or rotated!',
   commandCardCannotUse: 'Cannot use command card',
   commandCardMachineMaxed: 'This machine is already fully upgraded',
+  repairCannotUse: 'Choose a damaged machine or ruin',
   baseUpgradeCannotUse: 'Cannot apply base upgrade',
   statHp: 'HP',
   statRange: 'Range',
@@ -316,14 +322,14 @@ const en: I18nStrings = {
   },
 
   controlsGuide: [
-    'ESC — Cancel current action',
-    'Left Click — Select / Place tower',
-    'Left Drag — Pan the map',
-    'Left Click Tower — Rotate tower',
-    'Q — Quick rotate selected tower',
-    'Right Click — Delete wire / tower',
-    'Scroll — Zoom in / out',
-    'Drag Port → Port — Connect wire',
+    { keys: ['esc'], action: 'Cancel current action' },
+    { keys: ['leftClick'], action: 'Select / Place tower' },
+    { keys: ['leftDrag'], action: 'Pan the map' },
+    { keys: ['towerClick'], action: 'Rotate tower' },
+    { keys: ['q'], action: 'Quick rotate selected tower' },
+    { keys: ['rightClick'], action: 'Delete wire / tower' },
+    { keys: ['wheel'], action: 'Zoom in / out' },
+    { keys: ['portDrag'], action: 'Connect wire' },
   ],
 
   pickLabel: {
@@ -420,6 +426,8 @@ const zh: I18nStrings = {
   shop: '商店',
   refreshShop: '刷新',
   refreshShopDesc: (cost: number) => `花费 ${cost} 金币刷新商店商品`,
+  repair: '维修',
+  repairDesc: (cost: number) => `花费 ${cost} 金币维修受损机器或废墟`,
   towerPack: '炮塔卡包',
   towerPackDesc: '获得一次只含炮塔的三选一',
   infraPack: '基建卡包',
@@ -445,6 +453,7 @@ const zh: I18nStrings = {
   coreCannotMove: '主基地无法拖动和旋转！',
   commandCardCannotUse: '无法使用指令卡',
   commandCardMachineMaxed: '这台机器已经满级',
+  repairCannotUse: '请选择受损机器或废墟',
   baseUpgradeCannotUse: '无法应用基地升级',
   statHp: '血量',
   statRange: '射程',
@@ -561,14 +570,14 @@ const zh: I18nStrings = {
   },
 
   controlsGuide: [
-    'ESC — 取消当前操作',
-    '左键点击 — 选中 / 放置设备',
-    '左键拖拽 — 平移地图',
-    '左键点击已放置设备 — 旋转设备',
-    'Q — 快速旋转选中设备',
-    '右键 — 删除线缆 / 设备',
-    '滚轮 — 缩放地图',
-    '拖拽端口→端口 — 连接线缆',
+    { keys: ['esc'], action: '取消当前操作' },
+    { keys: ['leftClick'], action: '选中 / 放置设备' },
+    { keys: ['leftDrag'], action: '平移地图' },
+    { keys: ['towerClick'], action: '旋转设备' },
+    { keys: ['q'], action: '快速旋转选中设备' },
+    { keys: ['rightClick'], action: '删除线缆 / 设备' },
+    { keys: ['wheel'], action: '缩放地图' },
+    { keys: ['portDrag'], action: '连接线缆' },
   ],
 
   pickLabel: {

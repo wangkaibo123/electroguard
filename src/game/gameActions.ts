@@ -91,7 +91,7 @@ export const findTowerAtWorldPoint = (state: GameState, wx: number, wy: number) 
 };
 
 export const addMachinePort = (state: GameState, tower: GameState['towers'][number], portType: 'input' | 'output') => {
-  if (tower.type === 'core') return false;
+  if (tower.type === 'core' || tower.isRuined) return false;
   const getSideLength = (direction: PortDirection) =>
     direction === 'top' || direction === 'bottom' ? tower.width : tower.height;
   const getSideCellIndex = (direction: PortDirection, sideOffset = 0.5) =>
@@ -146,6 +146,7 @@ export const canApplyMachineCommandCard = (
     isMachineCommandCard(cardType) &&
     targetTower &&
     targetTower.type !== 'core' &&
+    !targetTower.isRuined &&
     (targetTower.commandUpgradeCount ?? 0) >= MAX_MACHINE_COMMAND_UPGRADES
   );
 
@@ -155,18 +156,18 @@ export const applyMachineCommandCard = (
   targetTower: GameState['towers'][number] | null,
 ) => {
   if (cardType === 'add_input' || cardType === 'add_output') {
-    if (!targetTower || targetTower.type === 'core') return false;
+    if (!targetTower || targetTower.type === 'core' || targetTower.isRuined) return false;
     return addMachinePort(state, targetTower, cardType === 'add_input' ? 'input' : 'output');
   }
   if (cardType === 'self_power') {
-    if (!targetTower || targetTower.type === 'core') return false;
+    if (!targetTower || targetTower.type === 'core' || targetTower.isRuined) return false;
     targetTower.selfPowerLevel = (targetTower.selfPowerLevel ?? 0) + 1;
     targetTower.selfPowerTimer = 0;
     updatePowerGrid(state);
     return true;
   }
   if (cardType === 'range_boost') {
-    if (!targetTower || targetTower.type === 'core' || getTowerRange(targetTower) == null) return false;
+    if (!targetTower || targetTower.type === 'core' || targetTower.isRuined || getTowerRange(targetTower) == null) return false;
     targetTower.rangeMultiplier = (targetTower.rangeMultiplier ?? 1) + (COMMAND_CARD_CONFIG.range_boost.rangeBoostMultiplier ?? 0.2);
     return true;
   }

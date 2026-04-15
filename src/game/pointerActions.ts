@@ -34,13 +34,14 @@ export const previewWirePath = (
 ) => {
   const startTower = state.towerMap.get(dragStart.towerId);
   const startPort = startTower?.ports.find(port => port.id === dragStart.portId);
-  if (!startTower || !startPort) return null;
+  if (!startTower || startTower.isRuined || !startPort) return null;
 
   const startCell = getPortCell(startTower, startPort);
   let endCell = getGridCell(wx, wy);
   let directPath = false;
 
   for (const tower of state.towers) {
+    if (tower.isRuined) continue;
     for (const port of tower.ports) {
       const portPos = getPortPos(tower, port);
       if (Math.hypot(portPos.x - wx, portPos.y - wy) >= hitRadius || tower.id === startTower.id) continue;
@@ -104,14 +105,16 @@ export const hitRotatingControl = (
     }
   }
 
-  const { buttonX, buttonY, buttonWidth, buttonHeight } = getRotationKnobLayout(tower);
-  if (
-    wx >= buttonX - touchPadding &&
-    wx <= buttonX + buttonWidth + touchPadding &&
-    wy >= buttonY - touchPadding &&
-    wy <= buttonY + buttonHeight + touchPadding
-  ) {
-    return 'rotate';
+  if (!tower.isRuined) {
+    const { buttonX, buttonY, buttonWidth, buttonHeight } = getRotationKnobLayout(tower);
+    if (
+      wx >= buttonX - touchPadding &&
+      wx <= buttonX + buttonWidth + touchPadding &&
+      wy >= buttonY - touchPadding &&
+      wy <= buttonY + buttonHeight + touchPadding
+    ) {
+      return 'rotate';
+    }
   }
 
   return null;
@@ -119,7 +122,7 @@ export const hitRotatingControl = (
 
 export const rotateTowerQuarterTurn = (state: GameState, towerId: string) => {
   const tower = state.towerMap.get(towerId);
-  if (!tower) return false;
+  if (!tower || tower.isRuined) return false;
   const oldAngle = snapRotation(tower.rotation);
   const newAngle = snapRotation(oldAngle + Math.PI / 2);
   return applyTowerRotation(tower, newAngle, oldAngle, state);
@@ -139,6 +142,7 @@ export const startWireDragAt = (
   hitRadius: number,
 ): WireDragStartResult => {
   for (const tower of state.towers) {
+    if (tower.isRuined) continue;
     for (const port of tower.ports) {
       const portPos = getPortPos(tower, port);
       if (Math.hypot(portPos.x - wx, portPos.y - wy) >= hitRadius) continue;

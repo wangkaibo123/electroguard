@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { Activity, BookOpen, Cable, Coins, Globe, Keyboard, LogOut, Pause, Play, RotateCcw, Wrench, X } from 'lucide-react';
 import { useGameLoop } from './game/useGameLoop';
 import { TowerType } from './game/types';
@@ -7,6 +7,56 @@ import { GLOBAL_CONFIG, TIPS_CONFIG } from './game/config';
 import { PickOverlay } from './game/ui/PickOverlay';
 import { ShopPanel } from './game/ui/ShopPanel';
 import { TowerCodexModal } from './game/ui/TowerCodexModal';
+
+const KeyCap = ({ children, className = '' }: { children: ReactNode; className?: string }) => (
+  <span className={`inline-flex h-6 min-w-8 items-center justify-center rounded-md border border-gray-600/70 bg-gray-900/90 px-2 text-[10px] font-black uppercase text-gray-200 shadow-[inset_0_-2px_0_rgba(255,255,255,0.06)] ${className}`}>
+    {children}
+  </span>
+);
+
+const MouseButtonIcon = ({ button, accent = false }: { button: 'left' | 'right' | 'wheel'; accent?: boolean }) => (
+  <span className="relative inline-flex h-6 w-7 overflow-hidden rounded-md border border-gray-600/70 bg-gray-900/90 shadow-[inset_0_-2px_0_rgba(255,255,255,0.06)]">
+    <span className={`absolute left-0 top-0 h-2.5 w-1/2 border-b border-r border-gray-600/70 ${button === 'left' || accent ? 'bg-cyan-400/80' : 'bg-gray-800'}`} />
+    <span className={`absolute right-0 top-0 h-2.5 w-1/2 border-b border-gray-600/70 ${button === 'right' ? 'bg-cyan-400/80' : 'bg-gray-800'}`} />
+    <span className={`absolute left-1/2 top-1 h-2 w-1 -translate-x-1/2 rounded-full ${button === 'wheel' ? 'bg-cyan-300' : 'bg-gray-600'}`} />
+    <span className="absolute bottom-1 left-1/2 h-2.5 w-3.5 -translate-x-1/2 rounded-b-full border border-gray-700/80 border-t-0" />
+  </span>
+);
+
+const ControlKeyIcon = ({ code }: { code: string }) => {
+  if (code === 'esc') return <KeyCap>Esc</KeyCap>;
+  if (code === 'q') return <KeyCap>Q</KeyCap>;
+  if (code === 'leftClick') return <MouseButtonIcon button="left" />;
+  if (code === 'rightClick') return <MouseButtonIcon button="right" />;
+  if (code === 'wheel') return <MouseButtonIcon button="wheel" />;
+  if (code === 'leftDrag') {
+    return (
+      <span className="inline-flex items-center gap-1">
+        <MouseButtonIcon button="left" accent />
+        <span className="text-[10px] font-black text-cyan-300">+</span>
+        <KeyCap className="min-w-6 px-1">↔</KeyCap>
+      </span>
+    );
+  }
+  if (code === 'towerClick') {
+    return (
+      <span className="inline-flex items-center gap-1">
+        <MouseButtonIcon button="left" />
+        <span className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-cyan-500/50 bg-cyan-500/15 text-[11px] font-black text-cyan-200">⟳</span>
+      </span>
+    );
+  }
+  if (code === 'portDrag') {
+    return (
+      <span className="inline-flex h-6 items-center justify-center gap-1 rounded-md border border-gray-600/70 bg-gray-900/90 px-2">
+        <span className="h-2 w-2 rounded-full bg-cyan-300" />
+        <span className="h-px w-5 bg-cyan-300/80" />
+        <span className="h-2 w-2 rounded-full bg-cyan-300" />
+      </span>
+    );
+  }
+  return <KeyCap>{code}</KeyCap>;
+};
 
 export default function App() {
   const {
@@ -41,6 +91,8 @@ export default function App() {
     handleCanvasTouchEnd,
     refreshShopOffers,
     activeCommandCard,
+    activeRepair,
+    startRepair,
   } = useGameLoop();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -110,8 +162,9 @@ export default function App() {
 
   const [tipIndex, setTipIndex] = useState(0);
   const [tipHidden, setTipHidden] = useState(false);
-  const [controlsHidden, setControlsHidden] = useState(() => window.innerWidth < 768);
+  const [controlsHidden, setControlsHidden] = useState(false);
   const [pickOverlayHidden, setPickOverlayHidden] = useState(false);
+  const showControlsGuide = !isMobile && (gameState.status === 'playing' || gameState.status === 'paused');
   useEffect(() => {
     const id = setInterval(() => {
       setTipIndex(prev => (prev + 1) % TIPS_CONFIG.tips.length);
@@ -254,11 +307,11 @@ export default function App() {
               onTouchMove={handleCanvasTouchMove}
               onTouchEnd={handleCanvasTouchEnd}
               onTouchCancel={handleCanvasTouchEnd}
-              className={`block w-full h-full touch-none ${gameState.status === 'playing' ? (selectedTower || placeMonsterMode || activeCommandCard ? 'cursor-crosshair' : 'cursor-grab active:cursor-grabbing') : ''}`}
+              className={`block w-full h-full touch-none ${gameState.status === 'playing' ? (selectedTower || placeMonsterMode || activeCommandCard || activeRepair ? 'cursor-crosshair' : 'cursor-grab active:cursor-grabbing') : ''}`}
             />
 
             {/* Controls Guide — top-left (desktop only) */}
-            {!isMobile && (gameState.status === 'playing' || gameState.status === 'paused') && (
+            {showControlsGuide && (
               controlsHidden ? (
                 <button
                   onClick={() => setControlsHidden(false)}
@@ -269,8 +322,8 @@ export default function App() {
                 </button>
               ) : (
                 <div className="absolute top-2 left-2 select-none">
-                  <div className="bg-gray-950/60 backdrop-blur-sm rounded-lg px-3 py-2 border border-gray-700/40">
-                    <div className="flex items-center justify-between mb-1">
+                  <div className="w-[260px] bg-gray-950/70 backdrop-blur-sm rounded-lg px-3 py-2.5 border border-gray-700/40 shadow-lg">
+                    <div className="flex items-center justify-between mb-2">
                       <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider">{locale === 'zh' ? '操作指南' : 'Controls'}</span>
                       <button
                         onClick={() => setControlsHidden(true)}
@@ -280,9 +333,16 @@ export default function App() {
                         <X size={12} />
                       </button>
                     </div>
-                    <ul className="space-y-0.5 pointer-events-none">
-                      {i.controlsGuide.map((line, idx) => (
-                        <li key={idx} className="text-[11px] text-gray-400 leading-snug font-mono whitespace-nowrap">{line}</li>
+                    <ul className="space-y-1.5 pointer-events-none">
+                      {i.controlsGuide.map((item, idx) => (
+                        <li key={idx} className="grid grid-cols-[78px_1fr] items-center gap-3">
+                          <span className="flex justify-end">
+                            {item.keys.map((key) => (
+                              <ControlKeyIcon key={key} code={key} />
+                            ))}
+                          </span>
+                          <span className="text-[12px] leading-snug text-gray-300">{item.action}</span>
+                        </li>
                       ))}
                     </ul>
                   </div>
@@ -607,6 +667,8 @@ export default function App() {
             buyShopPack={buyShopPack}
             refreshShopOffers={refreshShopOffers}
             activeCommandCard={activeCommandCard}
+            activeRepair={activeRepair}
+            startRepair={startRepair}
             tutorialStep={tutorialStep}
           />
         )}

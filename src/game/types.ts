@@ -68,6 +68,7 @@ export interface Tower {
   height: number;
   hp: number;
   maxHp: number;
+  isRuined?: boolean;
   powered: boolean;
   storedPower: number;
   maxPower: number;
