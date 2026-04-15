@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Battery, Zap, Crosshair, Activity, Play, RotateCcw, Pause, Hexagon, Cable, Wrench, ChevronRight, ChevronLeft, Flame, Focus, Radio, GitMerge, Globe, LogOut, BookOpen, X, Keyboard, Menu, Eye, EyeOff, ShoppingBag, Coins, Rocket, Bot, Bomb, Plus, Power, Shield } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Battery, Zap, Crosshair, Activity, Play, RotateCcw, Pause, Hexagon, Cable, Wrench, ChevronRight, ChevronLeft, Flame, Focus, Radio, GitMerge, Globe, LogOut, BookOpen, X, Keyboard, Menu, Eye, EyeOff, ShoppingBag, Coins, Rocket, Bot, Plus, Power, Shield } from 'lucide-react';
 import { useGameLoop } from './game/useGameLoop';
 import { TOWER_STATS, TowerType, PickOption, EnemyType, CommandCardType, BaseUpgradeType, ShopItemType, ShopPackType } from './game/types';
 import { t, getLocale, setLocale, Locale } from './game/i18n';
@@ -17,7 +17,6 @@ const TowerIcon = ({ type, size = 22 }: { type: string; size?: number }) => {
 
 const CommandCardIcon = ({ type, size = 22 }: { type: CommandCardType; size?: number }) => {
   const icons: Record<CommandCardType, React.ComponentType<{ size: number }>> = {
-    airstrike: Bomb,
     add_input: Plus,
     add_output: Plus,
     self_power: Power,
@@ -114,6 +113,15 @@ export default function App() {
   const [codexTower, setCodexTower] = useState<TowerType | null>(null);
   const [locale, _setLocale] = useState<Locale>(getLocale());
   const [monsterSubTab, setMonsterSubTab] = useState<'type' | 'static'>('type');
+  const previousPickStateRef = useRef({
+    status: gameState.status,
+    pickUiPhase: gameState.pickUiPhase,
+  });
+  const shopPanelHiddenForWave =
+    gameState.gameMode !== 'custom' &&
+    gameState.status === 'playing' &&
+    (gameState.needsPick || gameState.enemiesToSpawn > 0 || gameState.enemies.length > 0);
+  const shopPanelVisible = sidebarOpen && !shopPanelHiddenForWave;
 
   // Mobile detection
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
@@ -127,6 +135,37 @@ export default function App() {
   useEffect(() => {
     if (isMobile && gameState.gameMode === 'custom') setSidebarOpen(false);
   }, [isMobile, gameState.gameMode]);
+
+  useEffect(() => {
+    const previous = previousPickStateRef.current;
+    const previousWasWavePick =
+      previous.status === 'pick' &&
+      previous.pickUiPhase !== 'shop_tower' &&
+      previous.pickUiPhase !== 'shop_infra' &&
+      previous.pickUiPhase !== 'shop_command' &&
+      previous.pickUiPhase !== 'shop_base_upgrade';
+
+    if (
+      gameState.gameMode !== 'custom' &&
+      previousWasWavePick &&
+      gameState.status === 'playing' &&
+      !gameState.pendingBossBonusPick &&
+      !gameState.needsPick
+    ) {
+      setSidebarOpen(true);
+    }
+
+    previousPickStateRef.current = {
+      status: gameState.status,
+      pickUiPhase: gameState.pickUiPhase,
+    };
+  }, [
+    gameState.status,
+    gameState.pickUiPhase,
+    gameState.gameMode,
+    gameState.pendingBossBonusPick,
+    gameState.needsPick,
+  ]);
 
   const toggleLocale = () => {
     const next: Locale = locale === 'en' ? 'zh' : 'en';
@@ -381,7 +420,7 @@ export default function App() {
     };
     const isCustom = gameState.gameMode === 'custom';
     const canBuy = (price: number) => gameState.status === 'playing' && (isCustom || gameState.gold >= price);
-    const offers = gameState.shopOffers.length > 0 ? gameState.shopOffers : (['tower', 'infra', 'airstrike'] as ShopItemType[]);
+    const offers = gameState.shopOffers.length > 0 ? gameState.shopOffers : (['tower', 'infra', 'command'] as ShopItemType[]);
     const refreshCost = gameState.shopRefreshCost ?? SHOP_CONFIG.initialRefreshCost;
     const canRefresh = gameState.status === 'playing' && (isCustom || gameState.gold >= refreshCost);
     const getShopItemUi = (offer: ShopItemType) => {
@@ -528,7 +567,10 @@ export default function App() {
         {gameState.gameMode !== 'custom' && gameState.status === 'playing' && gameState.enemiesToSpawn === 0 && gameState.enemies.length === 0 && !gameState.pendingBossBonusPick && (
           <div className="flex items-center gap-1 sm:gap-3 ml-1 sm:ml-2">
             <button
-              onClick={skipToNextWave}
+              onClick={() => {
+                setSidebarOpen(false);
+                skipToNextWave();
+              }}
               className="px-2 sm:px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white text-[10px] sm:text-xs font-bold rounded-lg transition-colors flex items-center gap-1"
             >
               <Play size={10} /> <span>{i.startNextWave}</span>
@@ -1031,7 +1073,7 @@ export default function App() {
         {(gameState.status === 'playing' || gameState.status === 'paused' || gameState.status === 'pick') && (isMobile ? (
           <>
             {/* Mobile sidebar toggle FAB */}
-            {(gameState.status === 'playing' || gameState.status === 'paused') && !sidebarOpen && (
+            {(gameState.status === 'playing' || gameState.status === 'paused') && !shopPanelHiddenForWave && !sidebarOpen && (
               <button
                 onClick={() => setSidebarOpen(true)}
                 className="absolute bottom-3 right-3 z-30 w-12 h-12 bg-gray-800/90 backdrop-blur-sm hover:bg-gray-700 rounded-full border border-gray-600 flex items-center justify-center text-gray-300 shadow-lg active:scale-95 transition-transform"
@@ -1041,7 +1083,7 @@ export default function App() {
               </button>
             )}
             {/* Mobile sidebar overlay */}
-            {sidebarOpen && (
+            {shopPanelVisible && (
               <div className="absolute inset-0 z-40 flex" onClick={() => setSidebarOpen(false)}>
                 <div className="flex-1" />
                 <div
@@ -1117,18 +1159,20 @@ export default function App() {
           /* Desktop: original sidebar */
           <div className="relative shrink-0 flex">
             {/* Toggle button */}
-            <button
-              onClick={() => setSidebarOpen(v => !v)}
-              className="absolute -left-9 top-1/2 -translate-y-1/2 z-10 w-9 h-16 bg-gray-800 hover:bg-gray-700 border border-gray-700 border-r-0 rounded-l-lg flex items-center justify-center text-gray-400 hover:text-white transition-colors"
-              title={sidebarOpen ? i.hidePanel : i.showPanel}
-            >
-              {sidebarOpen ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-            </button>
+            {!shopPanelHiddenForWave && (
+              <button
+                onClick={() => setSidebarOpen(v => !v)}
+                className="absolute -left-9 top-1/2 -translate-y-1/2 z-10 w-9 h-16 bg-gray-800 hover:bg-gray-700 border border-gray-700 border-r-0 rounded-l-lg flex items-center justify-center text-gray-400 hover:text-white transition-colors"
+                title={sidebarOpen ? i.hidePanel : i.showPanel}
+              >
+                {sidebarOpen ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+              </button>
+            )}
 
             {/* Right Build Panel — Inventory based */}
             <div
               className={`no-scrollbar bg-gray-900/80 border-l border-gray-800 p-3.5 flex flex-col gap-2.5 overflow-y-auto overflow-x-hidden transition-all duration-300 ease-in-out ${
-                sidebarOpen ? 'w-[260px] opacity-100' : 'w-0 opacity-0 p-0 border-l-0'
+                shopPanelVisible ? 'w-[260px] opacity-100 translate-x-0' : 'w-0 opacity-0 translate-x-8 p-0 border-l-0'
               } ${tutorialStep === 3 || tutorialStep === 4 ? 'shadow-[0_0_20px_rgba(6,182,212,0.4),inset_0_0_20px_rgba(6,182,212,0.15)] border-l-cyan-500/50' : ''}`}
             >
               <div className="min-w-[236px] flex flex-col h-full">

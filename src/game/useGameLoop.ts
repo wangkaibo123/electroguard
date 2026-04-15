@@ -311,6 +311,7 @@ export const useGameLoop = () => {
       } else {
         state.pickUiPhase = 'standard';
         state.waveTimer = 0;
+        state.shopRefreshCost = SHOP_CONFIG.initialRefreshCost;
       }
     }
     sync();
@@ -418,7 +419,7 @@ export const useGameLoop = () => {
       return;
     }
     state.gold -= refreshCost;
-    state.shopRefreshCost = SHOP_CONFIG.initialRefreshCost;
+    state.shopRefreshCost = SHOP_CONFIG.refreshCost;
     state.shopOffers = generateShopOffers();
     sync();
   };
@@ -632,20 +633,6 @@ export const useGameLoop = () => {
     return false;
   };
 
-  const damageEnemyFromCommand = (state: GameState, enemy: GameState['enemies'][number], damage: number) => {
-    let remainingDamage = damage;
-    if (enemy.shieldAbsorb > 0) {
-      const absorbed = Math.min(enemy.shieldAbsorb, remainingDamage);
-      enemy.shieldAbsorb -= absorbed;
-      remainingDamage -= absorbed;
-    }
-    enemy.hp -= remainingDamage;
-    createExplosion(state, enemy.x, enemy.y, enemy.color, enemy.hp <= 0 ? 12 : 5);
-    if (enemy.hp > 0) return;
-    state.score += SCORE_CONFIG[enemy.enemyType] ?? SCORE_CONFIG.default;
-    state.gold += enemy.goldReward ?? SHOP_CONFIG.goldPerEnemyKill;
-  };
-
   const applyCommandCardAtWorld = (
     cardType: CommandCardType,
     wx: number,
@@ -673,20 +660,7 @@ export const useGameLoop = () => {
       return false;
     }
 
-    if (cardType === 'airstrike') {
-      const cfg = COMMAND_CARD_CONFIG.airstrike;
-      const radius = cfg.airstrikeRadius ?? 90;
-      const damage = cfg.airstrikeDamage ?? 160;
-      for (const enemy of state.enemies) {
-        if (Math.hypot(enemy.x - wx, enemy.y - wy) <= radius + enemy.radius) {
-          damageEnemyFromCommand(state, enemy, damage);
-          used = true;
-        }
-      }
-      createExplosion(state, wx, wy, cfg.color, 24);
-      state.enemies = state.enemies.filter(enemy => enemy.hp > 0);
-      used = true;
-    } else if (cardType === 'add_input' || cardType === 'add_output') {
+    if (cardType === 'add_input' || cardType === 'add_output') {
       if (!targetTower || targetTower.type === 'core') return false;
       used = addMachinePort(state, targetTower, cardType === 'add_input' ? 'input' : 'output');
     } else if (cardType === 'self_power') {

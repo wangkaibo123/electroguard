@@ -552,7 +552,7 @@ export const drawCommandCardTargeting = (
   now: number,
   activeCommandCard: CommandCardType | null,
 ) => {
-  if (!activeCommandCard || activeCommandCard === 'airstrike' || state.status !== 'playing') return;
+  if (!activeCommandCard || state.status !== 'playing') return;
 
   const targets = state.towers.filter(tower => canUseCommandCardOnTower(state, activeCommandCard, tower));
   if (!targets.length) return;

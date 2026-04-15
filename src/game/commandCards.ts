@@ -7,7 +7,7 @@ export const MAX_MACHINE_COMMAND_UPGRADES = 3;
 
 const PORT_DIRECTIONS: PortDirection[] = ['top', 'right', 'bottom', 'left'];
 
-export const isMachineCommandCard = (cardType: CommandCardType) => cardType !== 'airstrike';
+export const isMachineCommandCard = (_cardType: CommandCardType) => true;
 
 export const canAddMachinePort = (
   state: GameState,
@@ -69,7 +69,6 @@ export const canUseCommandCardOnTower = (
   cardType: CommandCardType,
   tower: Tower,
 ) => {
-  if (cardType === 'airstrike') return false;
   if (tower.type === 'core') return false;
   if ((tower.commandUpgradeCount ?? 0) >= MAX_MACHINE_COMMAND_UPGRADES) return false;
 

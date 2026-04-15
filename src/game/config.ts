@@ -270,7 +270,8 @@ export const SHOP_CONFIG = {
   startingGold: 100,
   goldPerWave: 10,
   goldPerEnemyKill: 1,
-  initialRefreshCost: 5,
+  initialRefreshCost: 0,
+  refreshCost: 5,
   sellPrice: 5,
 } as const;
 
@@ -286,7 +287,6 @@ export const SHOP_MACHINE_ITEM_TYPES = [
 ] as const satisfies readonly ShopMachineItemType[];
 
 export const SHOP_COMMAND_CARD_ITEM_TYPES = [
-  'airstrike',
   'add_input',
   'add_output',
   'self_power',
@@ -327,7 +327,6 @@ export const SHOP_ITEM_CONFIG = {
   shield: { kind: 'machine', name: 'Shield', price: 80, towerType: 'shield' },
   battery: { kind: 'machine', name: 'Battery', price: 80, towerType: 'battery' },
   bus: { kind: 'machine', name: 'Bus', price: 80, towerType: 'bus' },
-  airstrike: { kind: 'command_card', name: 'Airstrike', price: 50, commandCardType: 'airstrike' },
   add_input: { kind: 'command_card', name: 'Add Input', price: 50, commandCardType: 'add_input' },
   add_output: { kind: 'command_card', name: 'Add Output', price: 50, commandCardType: 'add_output' },
   self_power: { kind: 'command_card', name: 'Self Power', price: 50, commandCardType: 'self_power' },
@@ -386,13 +385,10 @@ export const SHOP_OFFER_BUCKETS = [
 
 export const COMMAND_CARD_CONFIG: Record<CommandCardType, {
   color: string;
-  airstrikeRadius?: number;
-  airstrikeDamage?: number;
   selfPowerInterval?: number;
   selfPowerAmount?: number;
   rangeBoostMultiplier?: number;
 }> = {
-  airstrike: { color: '#fb7185', airstrikeRadius: 90, airstrikeDamage: 160 },
   add_input: { color: '#34d399' },
   add_output: { color: '#38bdf8' },
   self_power: { color: '#facc15', selfPowerInterval: 2, selfPowerAmount: 1 },
