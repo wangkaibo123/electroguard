@@ -239,6 +239,75 @@ export const drawProjectiles = (ctx: CanvasRenderingContext2D, state: GameState)
     const color = p.color ?? PROJ_CLR;
     const sz = p.size ?? 3;
 
+    if (p.arcHeight !== undefined) {
+      const points = [...(p.trail ?? []), { x: p.x, y: p.y }];
+      const angle = p.angle ?? 0;
+      const headX = p.x;
+      const headY = p.y;
+
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 10;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      for (let pass = 0; pass < 2; pass++) {
+        ctx.beginPath();
+        for (let i = 0; i < points.length; i++) {
+          const point = points[i];
+          if (i === 0) {
+            ctx.moveTo(point.x, point.y);
+          } else {
+            const prev = points[i - 1];
+            ctx.quadraticCurveTo(prev.x, prev.y, (prev.x + point.x) / 2, (prev.y + point.y) / 2);
+          }
+        }
+        ctx.lineWidth = pass === 0 ? sz * 2.6 : sz * 0.9;
+        ctx.strokeStyle = pass === 0 ? 'rgba(251,113,133,0.18)' : 'rgba(254,205,211,0.82)';
+        ctx.stroke();
+      }
+
+      const flareX = headX - Math.cos(angle) * sz * 3.2;
+      const flareY = headY - Math.sin(angle) * sz * 3.2;
+      ctx.strokeStyle = 'rgba(251,191,36,0.72)';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(flareX, flareY);
+      ctx.lineTo(flareX - Math.cos(angle) * sz * 2.2, flareY - Math.sin(angle) * sz * 2.2);
+      ctx.stroke();
+
+      ctx.save();
+      ctx.translate(headX, headY);
+      ctx.rotate(angle);
+      ctx.fillStyle = 'rgba(15,23,42,0.88)';
+      ctx.strokeStyle = '#fecdd3';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.moveTo(sz * 2.4, 0);
+      ctx.lineTo(sz * 0.9, -sz * 1.05);
+      ctx.lineTo(-sz * 1.5, -sz * 0.7);
+      ctx.lineTo(-sz * 2.15, -sz * 1.55);
+      ctx.lineTo(-sz * 1.72, 0);
+      ctx.lineTo(-sz * 2.15, sz * 1.55);
+      ctx.lineTo(-sz * 1.5, sz * 0.7);
+      ctx.lineTo(sz * 0.9, sz * 1.05);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(-sz * 1.2, 0);
+      ctx.lineTo(sz * 1.2, 0);
+      ctx.moveTo(sz * 0.45, -sz * 0.76);
+      ctx.lineTo(sz * 1.4, 0);
+      ctx.lineTo(sz * 0.45, sz * 0.76);
+      ctx.stroke();
+      ctx.restore();
+      ctx.shadowBlur = 0;
+      continue;
+    }
+
     if (p.piercing && p.angle !== undefined) {
       const trailLen = 28;
       const tailX = p.x - Math.cos(p.angle) * trailLen;

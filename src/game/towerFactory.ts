@@ -90,6 +90,7 @@ export const createTowerAt = (type: TowerType, x: number, y: number): Tower => {
     heat: 0,
     overloaded: false,
     gatlingAmmo: 0,
+    missileSiloCursor: type === 'missile' ? 0 : undefined,
     collider: makeTowerCollider(type, stats.width, stats.height),
   };
 };

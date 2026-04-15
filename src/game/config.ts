@@ -86,7 +86,7 @@ export const TOWER_CONFIG: Record<TowerType, {
   battery:   { hp: 150,  description: 'Stores 4 units of power and discharges quickly.',            color: '#34d399', width: 3, height: 3, maxPower: 4, maxShieldHp: 0,   shieldRadius: 0 },
   /* 汇流器：将 3 条输入线合并为 3 条输出线 */
   bus:       { hp: 120,  description: 'Merges up to 3 input wires into 3 outputs.',                color: '#38bdf8', width: 3, height: 2, maxPower: 0, maxShieldHp: 0,   shieldRadius: 0 },
-  missile:   { hp: 180,  description: 'Long-range tower. Converts 3 power into one homing missile with splash damage.', color: '#fb7185', width: 4, height: 4, maxPower: 3, maxShieldHp: 0, shieldRadius: 0 },
+  missile:   { hp: 180,  description: 'Long-range tower with four missile silos. Each missile costs 2 power and lands with splash damage.', color: '#fb7185', width: 4, height: 4, maxPower: 8, maxShieldHp: 0, shieldRadius: 0 },
   big_generator: { hp: 220, description: 'Large power source. Produces 4 power every 2 seconds.', color: '#fde047', width: 4, height: 4, maxPower: 0, maxShieldHp: 0, shieldRadius: 0 },
   repair_drone: { hp: 170, description: 'Deploys a drone that spends power to repair buildings, or attacks enemies when idle.', color: '#2dd4bf', width: 4, height: 4, maxPower: 4, maxShieldHp: 0, shieldRadius: 0 },
 };
@@ -163,7 +163,7 @@ export const WEAPON_CONFIG = {
     range: 720,
     damage: 120,
     splashRadius: 70,
-    powerCost: 3,
+    powerCost: 2,
     bulletSpeed: 240,
   },
   repairDrone: {

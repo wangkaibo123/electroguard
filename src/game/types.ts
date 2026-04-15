@@ -85,6 +85,7 @@ export interface Tower {
   overloaded: boolean;   // gatling overload lockout until fully cooled
   gatlingAmmo: number;   // queued bullets converted from incoming power
   sniperAimSince?: number; // sniper: time (performance.now) when barrel locked on target
+  missileSiloCursor?: number; // missile tower: next silo to spend/reload visually
   selfPowerLevel?: number;
   selfPowerTimer?: number;
   rangeMultiplier?: number;
@@ -135,6 +136,10 @@ export interface Projectile {
   splashRadius?: number;   // area damage radius on hit (missile)
   color?: string;          // custom projectile color
   size?: number;           // custom projectile size
+  arcHeight?: number;      // missile arc trail intensity
+  initialDistance?: number;// distance used to normalize arc trail progress
+  turnRate?: number;       // homing turn speed in rad/s
+  trail?: Position[];      // recent positions for curved projectile trails
 }
 
 export interface ChainLightning {

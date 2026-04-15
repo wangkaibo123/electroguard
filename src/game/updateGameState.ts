@@ -107,6 +107,34 @@ const SELF_POWER_AMOUNT = COMMAND_CARD_CONFIG.self_power.selfPowerAmount ?? 1;
 const CORE_TURRET_RANGE = BASE_UPGRADE_CONFIG.core_turret_unlock.coreTurretRange ?? 220;
 const CORE_TURRET_DAMAGE = BASE_UPGRADE_CONFIG.core_turret_unlock.coreTurretDamage ?? 30;
 const CORE_TURRET_COOLDOWN = BASE_UPGRADE_CONFIG.core_turret_unlock.coreTurretCooldown ?? 1200;
+const MISSILE_SILO_COUNT = 4;
+const MISSILE_TURN_RATE = Math.PI * 1.45;
+
+const getMissileSiloOffset = (index: number, span: number) => {
+  const gap = span * 0.18;
+  return {
+    x: (index % 2 === 0 ? -1 : 1) * gap,
+    y: (index < 2 ? -1 : 1) * gap,
+  };
+};
+
+const getMissileSiloWorldPosition = (tower: Tower, index: number) => {
+  const centerX = (tower.x + tower.width / 2) * GLOBAL_CONFIG.cellSize;
+  const centerY = (tower.y + tower.height / 2) * GLOBAL_CONFIG.cellSize;
+  const offset = getMissileSiloOffset(index, Math.min(tower.width, tower.height) * GLOBAL_CONFIG.cellSize);
+  const cos = Math.cos(tower.rotation);
+  const sin = Math.sin(tower.rotation);
+  return {
+    x: centerX + offset.x * cos - offset.y * sin,
+    y: centerY + offset.x * sin + offset.y * cos,
+  };
+};
+
+const normalizeAngleDelta = (angle: number) => {
+  while (angle > Math.PI) angle -= TWO_PI;
+  while (angle < -Math.PI) angle += TWO_PI;
+  return angle;
+};
 
 const applyDamageToEnemy = (
   state: GameState,
@@ -205,6 +233,7 @@ const ruinTower = (state: GameState, tower: Tower) => {
   tower.overloaded = false;
   tower.gatlingAmmo = 0;
   tower.sniperAimSince = undefined;
+  tower.missileSiloCursor = tower.type === 'missile' ? 0 : tower.missileSiloCursor;
   state.wires = state.wires.filter((wire) => wire.startTowerId !== tower.id && wire.endTowerId !== tower.id);
   state.pulses = state.pulses.filter((pulse) => pulse.sourceTowerId !== tower.id && pulse.targetTowerId !== tower.id);
   updatePowerGrid(state);
@@ -538,18 +567,31 @@ const updateCombatTowers = (state: GameState, dt: number, now: number) => {
     if (tower.type === 'missile') {
       if (tower.storedPower < MISSILE_POWER_COST || now - tower.lastActionTime <= MISSILE_COOLDOWN) continue;
 
+      const siloIndex = tower.missileSiloCursor ?? 0;
+      const silo = getMissileSiloWorldPosition(tower, siloIndex);
+      const targetDistance = bestEnemy ? Math.hypot(bestEnemy.x - silo.x, bestEnemy.y - silo.y) : MISSILE_RANGE;
+
       tower.storedPower -= MISSILE_POWER_COST;
       state.projectiles.push({
         id: genId(),
-        x: muzzleX,
-        y: muzzleY,
+        x: silo.x,
+        y: silo.y,
         targetId: bestEnemy?.id ?? '',
         speed: MISSILE_SPEED,
         damage: MISSILE_DAMAGE,
+        sourceTowerId: tower.id,
+        angle: bestEnemy ? Math.atan2(bestEnemy.y - silo.y, bestEnemy.x - silo.x) : tower.barrelAngle,
         splashRadius: MISSILE_SPLASH_RADIUS,
         color: '#fb7185',
         size: 5,
+        traveled: 0,
+        maxRange: Math.max(MISSILE_RANGE * (tower.rangeMultiplier ?? 1), targetDistance * 1.8),
+        arcHeight: 34 + Math.min(46, targetDistance * 0.08),
+        initialDistance: Math.max(120, targetDistance),
+        turnRate: MISSILE_TURN_RATE,
+        trail: [{ x: silo.x, y: silo.y }],
       });
+      tower.missileSiloCursor = (siloIndex + 1) % MISSILE_SILO_COUNT;
       tower.lastActionTime = now;
       changed = true;
       continue;
@@ -959,6 +1001,64 @@ const updateProjectiles = (state: GameState, dt: number) => {
 
   for (let index = state.projectiles.length - 1; index >= 0; index--) {
     const projectile = state.projectiles[index];
+
+    if (projectile.arcHeight !== undefined) {
+      let target = findEnemyById(state, projectile.targetId);
+      if (!target) {
+        target = findNearestEnemy(state.enemies, projectile.x, projectile.y, 360);
+        if (target) projectile.targetId = target.id;
+      }
+
+      const step = projectile.speed * dt;
+      if (target) {
+        const desired = Math.atan2(target.y - projectile.y, target.x - projectile.x);
+        const current = projectile.angle ?? desired;
+        const maxTurn = (projectile.turnRate ?? MISSILE_TURN_RATE) * dt;
+        const diff = normalizeAngleDelta(desired - current);
+        projectile.angle = current + (Math.abs(diff) <= maxTurn ? diff : Math.sign(diff) * maxTurn);
+      }
+
+      const angle = projectile.angle ?? 0;
+      projectile.x += Math.cos(angle) * step;
+      projectile.y += Math.sin(angle) * step;
+      projectile.traveled = (projectile.traveled ?? 0) + step;
+      projectile.trail = [...(projectile.trail ?? []), { x: projectile.x, y: projectile.y }].slice(-10);
+
+      if (target && Math.hypot(target.x - projectile.x, target.y - projectile.y) < target.radius + 5) {
+        applySplashDamage(
+          state,
+          target.x,
+          target.y,
+          projectile.damage,
+          projectile.splashRadius ?? 0,
+          projectile.color ?? '#fbbf24',
+          target.id,
+        );
+        state.projectiles.splice(index, 1);
+        changed = true;
+        continue;
+      }
+
+      if (projectile.maxRange && (projectile.traveled ?? 0) > projectile.maxRange) {
+        if (projectile.splashRadius && target) {
+          applySplashDamage(
+            state,
+            projectile.x,
+            projectile.y,
+            projectile.damage * 0.65,
+            projectile.splashRadius,
+            projectile.color ?? '#fbbf24',
+            target.id,
+          );
+        }
+        state.projectiles.splice(index, 1);
+        changed = true;
+        continue;
+      }
+
+      changed = true;
+      continue;
+    }
 
     if (projectile.angle !== undefined) {
       const step = projectile.speed * dt;

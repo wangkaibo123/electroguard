@@ -1348,22 +1348,80 @@ function drawTowerDetails(
       drawMuzzleFlash(ctx, cx, cy, 0, tFlashT / FLASH_DUR_TESLA, tColor, '232,121,249', 14, false, t.lastActionTime);
     }
   } else if (t.type === 'missile') {
+    const span = Math.min(tw, th);
+    const siloSize = span * 0.25;
+    const siloGap = span * 0.12;
+    const loadedCount = Math.floor(t.storedPower / 2);
+    const partialLoad = (t.storedPower % 2) / 2;
+    const cursor = t.missileSiloCursor ?? 0;
+    const flashAge = now - t.lastActionTime;
+
+    ctx.strokeStyle = tColor;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.roundRect(cx - span * 0.36, cy - span * 0.36, span * 0.72, span * 0.72, 6);
+    ctx.stroke();
+
+    for (let i = 0; i < 4; i++) {
+      const col = i % 2;
+      const row = i < 2 ? 0 : 1;
+      const sx = cx + (col === 0 ? -1 : 1) * (siloSize / 2 + siloGap / 2);
+      const sy = cy + (row === 0 ? -1 : 1) * (siloSize / 2 + siloGap / 2);
+      const loadOrder = (i - cursor + 4) % 4;
+      const isLoaded = loadOrder < loadedCount;
+      const partial = loadOrder === loadedCount ? partialLoad : 0;
+
+      ctx.fillStyle = 'rgba(15,23,42,0.95)';
+      ctx.strokeStyle = isLoaded ? '#fecdd3' : tColor;
+      ctx.shadowColor = isLoaded ? '#fb7185' : 'transparent';
+      ctx.shadowBlur = isLoaded ? 8 : 0;
+      ctx.beginPath();
+      ctx.roundRect(sx - siloSize / 2, sy - siloSize / 2, siloSize, siloSize, 5);
+      ctx.fill();
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      ctx.strokeStyle = 'rgba(254,205,211,0.22)';
+      ctx.beginPath();
+      ctx.arc(sx, sy, siloSize * 0.28, 0, TWO_PI);
+      ctx.stroke();
+
+      if (isLoaded || partial > 0) {
+        ctx.save();
+        ctx.translate(sx, sy);
+        ctx.fillStyle = isLoaded ? '#fb7185' : `rgba(251,113,133,${0.18 + partial * 0.42})`;
+        ctx.strokeStyle = '#fecdd3';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, -siloSize * 0.3);
+        ctx.lineTo(siloSize * 0.17, siloSize * 0.18);
+        ctx.lineTo(0, siloSize * 0.28);
+        ctx.lineTo(-siloSize * 0.17, siloSize * 0.18);
+        ctx.closePath();
+        ctx.fill();
+        if (isLoaded) ctx.stroke();
+        ctx.restore();
+      }
+
+      if (flashAge < 240 && i === ((cursor + 3) % 4) && t.lastActionTime > 0) {
+        const k = 1 - flashAge / 240;
+        ctx.fillStyle = `rgba(254,205,211,${0.35 * k})`;
+        ctx.beginPath();
+        ctx.arc(sx, sy, siloSize * (0.45 + 0.35 * (1 - k)), 0, TWO_PI);
+        ctx.fill();
+      }
+    }
+
     const localAngle = t.barrelAngle - t.rotation;
-    const rackW = Math.min(tw, th) * 0.24;
-    const rackLen = Math.min(tw, th) * 0.44;
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(localAngle);
-    ctx.strokeStyle = tColor;
-    ctx.fillStyle = 'rgba(15,23,42,0.95)';
-    ctx.lineWidth = 1.8;
-    for (const off of [-rackW * 0.65, rackW * 0.65]) {
-      ctx.beginPath();
-      ctx.roundRect(-rackLen * 0.35, off - rackW * 0.35, rackLen, rackW * 0.7, 4);
-      ctx.fill();
-      ctx.stroke();
-      ctx.fillStyle = t.storedPower >= t.maxPower ? '#fecdd3' : 'rgba(15,23,42,0.95)';
-    }
+    ctx.strokeStyle = `rgba(254,205,211,${t.powered ? 0.72 : 0.28})`;
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(span * 0.08, 0);
+    ctx.lineTo(span * 0.31, 0);
+    ctx.stroke();
     ctx.restore();
     drawPowerArc(ctx, cx, cy, Math.min(tw, th) / 2 - inset - 2, t.maxPower, t.storedPower, tColor);
   } else if (t.type === 'generator' || t.type === 'big_generator') {
