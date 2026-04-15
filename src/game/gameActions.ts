@@ -10,7 +10,7 @@ import {
   updatePowerGrid,
 } from './engine';
 import type { BaseUpgradeType, CommandCardType, GameState, PortDirection, ShopItemType, TowerType } from './types';
-import { getTowerRange } from './types';
+import { CELL_SIZE, TOWER_STATS, getTowerRange } from './types';
 
 const PORT_DIRECTIONS: PortDirection[] = ['top', 'right', 'bottom', 'left'];
 
@@ -22,6 +22,30 @@ export const deployStartingLoadout = (state: GameState) => {
     if (!placement) continue;
     addTowerToState(state, createTowerAt(type, placement.x, placement.y));
   }
+};
+
+export const queueTowerDropNearCore = (
+  state: GameState,
+  type: TowerType,
+  sourceWorld?: { wx: number; wy: number } | null,
+) => {
+  const placement = findAutoPlacementNearCore(state, type, 2, 1);
+  if (!placement) return false;
+
+  const stats = TOWER_STATS[type];
+  state.incomingDrops.push({
+    id: genId(),
+    towerType: type,
+    startX: sourceWorld?.wx ?? (placement.x + stats.width / 2) * CELL_SIZE,
+    startY: sourceWorld?.wy ?? -CELL_SIZE * 4,
+    targetGridX: placement.x,
+    targetGridY: placement.y,
+    targetX: (placement.x + stats.width / 2) * CELL_SIZE,
+    targetY: (placement.y + stats.height / 2) * CELL_SIZE,
+    life: 0,
+    duration: 0.55,
+  });
+  return true;
 };
 
 export const applyBaseUpgradeToCore = (state: GameState, upgradeType: BaseUpgradeType) => {

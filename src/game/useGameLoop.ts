@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  GameState, TowerType, CommandCardType, ShopItemType, ShopPackType, Port, Wire, CELL_SIZE, EnemyType,
-  TOWER_STATS, CANVAS_WIDTH, CANVAS_HEIGHT, WIRE_MAX_HP,
+  GameState, TowerType, CommandCardType, ShopItemType, ShopPackType, Port, Wire, EnemyType,
+  CANVAS_WIDTH, CANVAS_HEIGHT, WIRE_MAX_HP,
   VIEWPORT_WIDTH, VIEWPORT_HEIGHT,
 } from './types';
 import {
@@ -15,10 +15,7 @@ import { renderGame } from './renderer';
 import { COMMAND_CARD_CONFIG, GLOBAL_CONFIG, SHOP_CONFIG, SHOP_ITEM_CONFIG } from './config';
 import { t } from './i18n';
 import { addTowerToState, createTowerAt } from './towerFactory';
-import { findAutoPlacementNearCore } from './placement';
 import { startNextWave, updateGameState } from './updateGameState';
-import { getDeleteButtonLayout, getRotationKnobLayout } from './render/towers';
-import { isWorldPointInTowerFootprint } from './footprint';
 import { isMachineCommandCard } from './commandCards';
 import { centerCameraOnCore, clampCamera, createInitialCamera, getMinZoom, screenToWorld } from './camera';
 import {
@@ -28,8 +25,18 @@ import {
   clearPurchasedShopOffer,
   deployStartingLoadout,
   findTowerAtWorldPoint,
+  queueTowerDropNearCore,
 } from './gameActions';
-import { getGridCell, getHoverCell, moveDraggedTower, previewWirePath } from './pointerActions';
+import {
+  getGridCell,
+  getHoverCell,
+  hitRotatingControl,
+  moveDraggedTower,
+  previewWirePath,
+  rotateTowerQuarterTurn,
+  startTowerDragAt,
+  startWireDragAt,
+} from './pointerActions';
 
 const { maxZoom: MAX_ZOOM } = GLOBAL_CONFIG;
 const COMMAND_CARD_TYPES = Object.keys(COMMAND_CARD_CONFIG) as CommandCardType[];
@@ -127,31 +134,6 @@ export const useGameLoop = () => {
 
   // 鈹€鈹€ Actions 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
-  const queueTowerDropNearCore = (
-    state: GameState,
-    type: TowerType,
-    sourceClientPos?: { x: number; y: number },
-  ) => {
-    const placement = findAutoPlacementNearCore(state, type, 2, 1);
-    if (!placement) return false;
-
-    const stats = TOWER_STATS[type];
-    const sourceWorld = sourceClientPos ? clientToWorld(sourceClientPos.x, sourceClientPos.y) : null;
-    state.incomingDrops.push({
-      id: genId(),
-      towerType: type,
-      startX: sourceWorld?.wx ?? (placement.x + stats.width / 2) * CELL_SIZE,
-      startY: sourceWorld?.wy ?? -CELL_SIZE * 4,
-      targetGridX: placement.x,
-      targetGridY: placement.y,
-      targetX: (placement.x + stats.width / 2) * CELL_SIZE,
-      targetY: (placement.y + stats.height / 2) * CELL_SIZE,
-      life: 0,
-      duration: 0.55,
-    });
-    return true;
-  };
-
   const startGame = () => {
     const s = createInitialState();
     deployStartingLoadout(s);
@@ -217,8 +199,9 @@ export const useGameLoop = () => {
     if (!option) return;
 
     if (option.kind === 'tower' && option.towerType) {
+      const sourceWorld = sourceClientPos ? clientToWorld(sourceClientPos.x, sourceClientPos.y) : null;
       for (let n = 0; n < option.count; n++) {
-        if (!queueTowerDropNearCore(state, option.towerType, sourceClientPos)) {
+        if (!queueTowerDropNearCore(state, option.towerType, sourceWorld)) {
           showToast(t().autoDeployFailed);
           break;
         }
@@ -570,26 +553,23 @@ export const useGameLoop = () => {
     return true;
   };
 
-  const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const spos = canvasScreenXY(e);
-    if (!spos) return;
-    const { sx, sy } = spos;
+  const startPanning = (sx: number, sy: number) => {
+    isPanningRef.current = true;
+    panLastRef.current = { x: sx, y: sy };
+  };
+
+  const handlePrimaryPointerDown = (
+    sx: number,
+    sy: number,
+    options: { wireHitRadius: number; touchPadding?: number; panWhenNotPlaying: 'pick' | 'always' },
+  ) => {
     const state = stateRef.current;
 
-    // Right-click: start pan
-    if (e.button === 2) {
-      isPanningRef.current = true;
-      panLastRef.current = { x: sx, y: sy };
+    if (state.status !== 'playing') {
+      if (options.panWhenNotPlaying === 'always' || state.status === 'pick') startPanning(sx, sy);
       return;
     }
 
-    if (state.status !== 'playing') {
-      if (state.status === 'pick') {
-        isPanningRef.current = true;
-        panLastRef.current = { x: sx, y: sy };
-      }
-      return;
-    }
     const { wx, wy } = toWorld(sx, sy);
     mouseDownPosRef.current = { x: wx, y: wy };
 
@@ -606,85 +586,98 @@ export const useGameLoop = () => {
       return;
     }
 
-    if (rotatingRef.current && state.gameMode !== 'custom') {
-      const tower = state.towerMap.get(rotatingRef.current);
-      if (tower && tower.type !== 'core') {
-        const { buttonX, buttonY, buttonWidth, buttonHeight } = getDeleteButtonLayout(tower);
-        if (wx >= buttonX && wx <= buttonX + buttonWidth && wy >= buttonY && wy <= buttonY + buttonHeight) {
-          sellTower(tower.id);
-          return;
-        }
-      }
+    const rotatingControl = hitRotatingControl(state, rotatingRef.current, wx, wy, options.touchPadding ?? 0);
+    if (rotatingControl === 'delete' && rotatingRef.current) {
+      sellTower(rotatingRef.current);
+      return;
     }
-
-    // Rotation knob check — click to rotate 90°
-    if (rotatingRef.current) {
-      const tower = state.towerMap.get(rotatingRef.current);
-      if (tower) {
-        const { buttonX, buttonY, buttonWidth, buttonHeight } = getRotationKnobLayout(tower);
-        if (wx >= buttonX && wx <= buttonX + buttonWidth && wy >= buttonY && wy <= buttonY + buttonHeight) {
-          const oldAngle = snapRotation(tower.rotation);
-          const newAngle = snapRotation(oldAngle + Math.PI / 2);
-          applyTowerRotation(tower, newAngle, oldAngle, state);
-          isRotKnobRef.current = true;
-          sync();
-          return;
-        }
-      }
-    }
-
-    // Port check
-    for (const tower of state.towers) {
-      for (const port of tower.ports) {
-        const pp = getPortPos(tower, port);
-        if (Math.hypot(pp.x - wx, pp.y - wy) >= 11) continue;
-        const existIdx = state.wires.findIndex(w => w.startPortId === port.id || w.endPortId === port.id);
-        if (existIdx !== -1) {
-          if (state.wires[existIdx].direct) return;
-          state.wires.splice(existIdx, 1);
-          if (state.gameMode !== 'custom') state.wireInventory++;
-          updatePowerGrid(state);
-          sync();
-        } else if (state.gameMode !== 'custom' && state.wireInventory <= 0) {
-          showToast(t().noWires);
-          return;
-        } else if (!isPortAccessible(state, tower, port)) {
-          return;
-        }
-        dragWireStartRef.current = { towerId: tower.id, portId: port.id };
-        return;
-      }
-    }
-
-    // Tower drag check (core cannot be dragged or rotated)
-    for (const tower of state.towers) {
-      if (isWorldPointInTowerFootprint(tower, wx, wy)) {
-        if (tower.type === 'core') {
-          showToast(t().coreCannotMove);
-          return;
-        }
-        dragTowerRef.current = tower.id;
-        dragOrigPosRef.current = { x: tower.x, y: tower.y };
-        // Save connected wires for ESC restore
-        const connWires = state.wires.filter(w => w.startTowerId === tower.id || w.endTowerId === tower.id);
-        dragOrigWiresRef.current = connWires.map(w => ({ ...w, path: w.path.map(p => ({ ...p })) }));
-        dragOrigInventoryRef.current = state.wireInventory;
-        return;
-      }
-    }
-
-    // Place tower from inventory
-    const { x: gx, y: gy } = getGridCell(wx, wy);
-    const sel = selectedTowerRef.current;
-    if (sel && placeTowerFromSelection(state, sel, gx, gy)) {
+    if (rotatingControl === 'rotate' && rotatingRef.current) {
+      rotateTowerQuarterTurn(state, rotatingRef.current);
+      isRotKnobRef.current = true;
+      sync();
       return;
     }
 
-    // Left-click on empty space: deselect tower & start pan
+    const wireDrag = startWireDragAt(state, wx, wy, options.wireHitRadius);
+    if (wireDrag.kind === 'direct_wire') return;
+    if (wireDrag.kind === 'no_wires') {
+      showToast(t().noWires);
+      return;
+    }
+    if (wireDrag.kind === 'inaccessible') return;
+    if (wireDrag.kind === 'started') {
+      dragWireStartRef.current = wireDrag.dragStart;
+      if (wireDrag.removedWire) sync();
+      return;
+    }
+
+    const towerDrag = startTowerDragAt(state, wx, wy);
+    if (towerDrag.kind === 'core') {
+      showToast(t().coreCannotMove);
+      return;
+    }
+    if (towerDrag.kind === 'tower') {
+      dragTowerRef.current = towerDrag.towerId;
+      dragOrigPosRef.current = towerDrag.originalPos;
+      dragOrigWiresRef.current = towerDrag.connectedWires;
+      dragOrigInventoryRef.current = towerDrag.wireInventory;
+      return;
+    }
+
+    const { x: gx, y: gy } = getGridCell(wx, wy);
+    const selectedType = selectedTowerRef.current;
+    if (selectedType && placeTowerFromSelection(state, selectedType, gx, gy)) return;
+
     setSelectedTower(null);
     updateRotating(null);
-    isPanningRef.current = true;
-    panLastRef.current = { x: sx, y: sy };
+    startPanning(sx, sy);
+  };
+
+  const finishPrimaryPointer = (
+    pointer: { x: number; y: number } | null,
+    wireHitRadius: number,
+    clearRotatingOnEmpty: boolean,
+  ) => {
+    if (isPanningRef.current) {
+      isPanningRef.current = false;
+      panLastRef.current = null;
+      return;
+    }
+
+    if (isRotKnobRef.current) {
+      isRotKnobRef.current = false;
+      mouseDownPosRef.current = null;
+      return;
+    }
+
+    const state = stateRef.current;
+
+    if (dragTowerRef.current) {
+      const dragStart = mouseDownPosRef.current;
+      if (dragStart && pointer && Math.hypot(pointer.x - dragStart.x, pointer.y - dragStart.y) < 5) {
+        updateRotating(rotatingRef.current === dragTowerRef.current ? null : dragTowerRef.current);
+      }
+      clearTowerDragState();
+    } else if (clearRotatingOnEmpty && pointer && !dragWireStartRef.current) {
+      if (!findTowerAtWorldPoint(state, pointer.x, pointer.y)) updateRotating(null);
+    }
+
+    if (dragWireStartRef.current && mousePxRef.current) {
+      commitWireDrag(state, mousePxRef.current, wireHitRadius);
+    }
+  };
+
+  const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const spos = canvasScreenXY(e);
+    if (!spos) return;
+    const { sx, sy } = spos;
+
+    if (e.button === 2) {
+      startPanning(sx, sy);
+      return;
+    }
+
+    handlePrimaryPointerDown(sx, sy, { wireHitRadius: 11, panWhenNotPlaying: 'pick' });
   };
 
   const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -719,43 +712,9 @@ export const useGameLoop = () => {
   };
 
   const handleCanvasMouseUp = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    // End pan
-    if (isPanningRef.current) {
-      isPanningRef.current = false;
-      panLastRef.current = null;
-      return;
-    }
-
     const spos = canvasScreenXY(e);
-    if (!spos) return;
-    const { wx, wy } = toWorld(spos.sx, spos.sy);
-    const state = stateRef.current;
-
-    if (isRotKnobRef.current) {
-      isRotKnobRef.current = false;
-      mouseDownPosRef.current = null;
-      return;
-    }
-
-    if (dragTowerRef.current) {
-      const dp = mouseDownPosRef.current;
-      if (dp && Math.hypot(wx - dp.x, wy - dp.y) < 5) {
-        updateRotating(rotatingRef.current === dragTowerRef.current ? null : dragTowerRef.current);
-      }
-      dragTowerRef.current = null;
-      dragOrigPosRef.current = null;
-      dragOrigWiresRef.current = null;
-    } else if (!dragWireStartRef.current) {
-      let hit = false;
-      for (const t of state.towers) {
-        if (isWorldPointInTowerFootprint(t, wx, wy)) { hit = true; break; }
-      }
-      if (!hit) updateRotating(null);
-    }
-
-    if (dragWireStartRef.current && mousePxRef.current) {
-      commitWireDrag(state, mousePxRef.current, 15);
-    }
+    const world = spos ? toWorld(spos.sx, spos.sy) : null;
+    finishPrimaryPointer(world ? { x: world.wx, y: world.wy } : null, 15, true);
   };
 
   const handleCanvasMouseLeave = () => {
@@ -816,121 +775,11 @@ export const useGameLoop = () => {
     const touch = e.touches[0];
     const spos = touchScreenXY(touch);
     if (!spos) return;
-    const { sx, sy } = spos;
-    const state = stateRef.current;
-
-    if (state.status !== 'playing') {
-      // Just start panning outside of playing state
-      isPanningRef.current = true;
-      panLastRef.current = { x: sx, y: sy };
-      return;
-    }
-    const { wx, wy } = toWorld(sx, sy);
-    mouseDownPosRef.current = { x: wx, y: wy };
-
-    if (activeCommandCardRef.current) {
-      commitActiveCommandCardAtWorld(wx, wy);
-      return;
-    }
-
-    if (placeMonsterModeRef.current) {
-      if (spawnStaticMonsterAt(state, wx, wy)) {
-        updateRotating(null);
-        setSelectedTower(null);
-      }
-      return;
-    }
-
-    if (rotatingRef.current && state.gameMode !== 'custom') {
-      const tower = state.towerMap.get(rotatingRef.current);
-      if (tower && tower.type !== 'core') {
-        const { buttonX, buttonY, buttonWidth, buttonHeight } = getDeleteButtonLayout(tower);
-        const touchPadding = 8;
-        if (
-          wx >= buttonX - touchPadding &&
-          wx <= buttonX + buttonWidth + touchPadding &&
-          wy >= buttonY - touchPadding &&
-          wy <= buttonY + buttonHeight + touchPadding
-        ) {
-          sellTower(tower.id);
-          return;
-        }
-      }
-    }
-
-    // Rotation knob check — tap to rotate 90°
-    if (rotatingRef.current) {
-      const tower = state.towerMap.get(rotatingRef.current);
-      if (tower) {
-        const { buttonX, buttonY, buttonWidth, buttonHeight } = getRotationKnobLayout(tower);
-        const touchPadding = 8;
-        if (
-          wx >= buttonX - touchPadding &&
-          wx <= buttonX + buttonWidth + touchPadding &&
-          wy >= buttonY - touchPadding &&
-          wy <= buttonY + buttonHeight + touchPadding
-        ) {
-          const oldAngle = snapRotation(tower.rotation);
-          const newAngle = snapRotation(oldAngle + Math.PI / 2);
-          applyTowerRotation(tower, newAngle, oldAngle, state);
-          isRotKnobRef.current = true;
-          sync();
-          return;
-        }
-      }
-    }
-
-    // Port check
-    for (const tower of state.towers) {
-      for (const port of tower.ports) {
-        const pp = getPortPos(tower, port);
-        if (Math.hypot(pp.x - wx, pp.y - wy) >= 18) continue;
-        const existIdx = state.wires.findIndex(w => w.startPortId === port.id || w.endPortId === port.id);
-        if (existIdx !== -1) {
-          if (state.wires[existIdx].direct) return;
-          state.wires.splice(existIdx, 1);
-          if (state.gameMode !== 'custom') state.wireInventory++;
-          updatePowerGrid(state);
-          sync();
-        } else if (state.gameMode !== 'custom' && state.wireInventory <= 0) {
-          showToast(t().noWires);
-          return;
-        } else if (!isPortAccessible(state, tower, port)) {
-          return;
-        }
-        dragWireStartRef.current = { towerId: tower.id, portId: port.id };
-        return;
-      }
-    }
-
-    // Tower drag check (core cannot be dragged or rotated)
-    for (const tower of state.towers) {
-      if (isWorldPointInTowerFootprint(tower, wx, wy)) {
-        if (tower.type === 'core') {
-          showToast(t().coreCannotMove);
-          return;
-        }
-        dragTowerRef.current = tower.id;
-        dragOrigPosRef.current = { x: tower.x, y: tower.y };
-        const connWires = state.wires.filter(w => w.startTowerId === tower.id || w.endTowerId === tower.id);
-        dragOrigWiresRef.current = connWires.map(w => ({ ...w, path: w.path.map(p => ({ ...p })) }));
-        dragOrigInventoryRef.current = state.wireInventory;
-        return;
-      }
-    }
-
-    // Place tower from inventory
-    const { x: gx, y: gy } = getGridCell(wx, wy);
-    const sel = selectedTowerRef.current;
-    if (sel && placeTowerFromSelection(state, sel, gx, gy)) {
-      return;
-    }
-
-    // Empty space: start pan
-    setSelectedTower(null);
-    updateRotating(null);
-    isPanningRef.current = true;
-    panLastRef.current = { x: sx, y: sy };
+    handlePrimaryPointerDown(spos.sx, spos.sy, {
+      wireHitRadius: 18,
+      touchPadding: 8,
+      panWhenNotPlaying: 'always',
+    });
   };
 
   const handleCanvasTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
@@ -998,33 +847,7 @@ export const useGameLoop = () => {
       return;
     }
 
-    // End pan
-    if (isPanningRef.current) {
-      isPanningRef.current = false;
-      panLastRef.current = null;
-      return;
-    }
-
-    const state = stateRef.current;
-
-    if (isRotKnobRef.current) {
-      isRotKnobRef.current = false;
-      mouseDownPosRef.current = null;
-      return;
-    }
-
-    if (dragTowerRef.current) {
-      const dragStart = mouseDownPosRef.current;
-      const pointer = mousePxRef.current;
-      if (dragStart && pointer && Math.hypot(pointer.x - dragStart.x, pointer.y - dragStart.y) < 5) {
-        updateRotating(rotatingRef.current === dragTowerRef.current ? null : dragTowerRef.current);
-      }
-      clearTowerDragState();
-    }
-
-    if (dragWireStartRef.current && mousePxRef.current) {
-      commitWireDrag(state, mousePxRef.current, 20);
-    }
+    finishPrimaryPointer(mousePxRef.current, 20, false);
   };
 
   // 鈹€鈹€ Game loop 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
