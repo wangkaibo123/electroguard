@@ -264,15 +264,23 @@ export const STARTING_INVENTORY = {
 // ── 7b. 商店与金币 ────────────────────────────────────────────────────────────
 
 export const SHOP_CONFIG = {
-  startingGold: 100,
-  goldPerWave: 10,
+  startingGold: 30,
+  goldPerWave: 0,
   goldPerEnemyKill: 1,
   initialRefreshCost: 0,
   refreshCost: 5,
-  repairCost: 2,
+  repairCost: 5,
   sellPrice: 5,
-  advancedRuinSellPrice: 20,
+  advancedRuinSellPrice: 25,
 } as const;
+
+export const ENEMY_GOLD_REWARD: Record<EnemyType, number> = {
+  scout: 1,
+  grunt: 2,
+  tank: 3,
+  saboteur: 2,
+  overlord: 15,
+};
 
 export const ADVANCED_TOWER_TYPES = ['missile', 'big_generator', 'repair_drone'] as const satisfies readonly TowerType[];
 
@@ -304,12 +312,12 @@ export const SHOP_ITEM_CONFIG = {
   tower: {
     kind: 'pack',
     name: 'Tower Pack',
-    price: 50,
+    price: 25,
   },
   infra: {
     kind: 'pack',
     name: 'Infrastructure Pack',
-    price: 50,
+    price: 15,
   },
   advanced: {
     kind: 'pack',
@@ -319,25 +327,25 @@ export const SHOP_ITEM_CONFIG = {
   command: {
     kind: 'pack',
     name: 'Command Card Pack',
-    price: 50,
+    price: 30,
   },
   base_upgrade: {
     kind: 'pack',
     name: 'Base Upgrade Pack',
     price: 50,
   },
-  blaster: { kind: 'machine', name: 'Blaster', price: 80, towerType: 'blaster' },
-  gatling: { kind: 'machine', name: 'Gatling', price: 80, towerType: 'gatling' },
-  sniper: { kind: 'machine', name: 'Sniper', price: 80, towerType: 'sniper' },
-  tesla: { kind: 'machine', name: 'Tesla', price: 80, towerType: 'tesla' },
-  generator: { kind: 'machine', name: 'Generator', price: 80, towerType: 'generator' },
-  shield: { kind: 'machine', name: 'Shield', price: 80, towerType: 'shield' },
-  battery: { kind: 'machine', name: 'Battery', price: 80, towerType: 'battery' },
-  bus: { kind: 'machine', name: 'Bus', price: 80, towerType: 'bus' },
-  add_input: { kind: 'command_card', name: 'Add Input', price: 50, commandCardType: 'add_input' },
-  add_output: { kind: 'command_card', name: 'Add Output', price: 50, commandCardType: 'add_output' },
-  self_power: { kind: 'command_card', name: 'Self Power', price: 50, commandCardType: 'self_power' },
-  range_boost: { kind: 'command_card', name: 'Range Boost', price: 50, commandCardType: 'range_boost' },
+  blaster: { kind: 'machine', name: 'Blaster', price: 20, towerType: 'blaster' },
+  gatling: { kind: 'machine', name: 'Gatling', price: 20, towerType: 'gatling' },
+  sniper: { kind: 'machine', name: 'Sniper', price: 20, towerType: 'sniper' },
+  tesla: { kind: 'machine', name: 'Tesla', price: 20, towerType: 'tesla' },
+  generator: { kind: 'machine', name: 'Generator', price: 20, towerType: 'generator' },
+  shield: { kind: 'machine', name: 'Shield', price: 25, towerType: 'shield' },
+  battery: { kind: 'machine', name: 'Battery', price: 20, towerType: 'battery' },
+  bus: { kind: 'machine', name: 'Bus', price: 15, towerType: 'bus' },
+  add_input: { kind: 'command_card', name: 'Add Input', price: 35, commandCardType: 'add_input' },
+  add_output: { kind: 'command_card', name: 'Add Output', price: 35, commandCardType: 'add_output' },
+  self_power: { kind: 'command_card', name: 'Self Power', price: 35, commandCardType: 'self_power' },
+  range_boost: { kind: 'command_card', name: 'Range Boost', price: 35, commandCardType: 'range_boost' },
 } as const satisfies Record<ShopItemType, {
   kind: 'pack' | 'machine' | 'command_card';
   /** Developer-facing item name. Player-facing text still comes from i18n. */

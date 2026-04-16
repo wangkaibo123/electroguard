@@ -746,7 +746,6 @@ const updateWaveState = (state: GameState, dt: number) => {
     if (state.needsPick) {
       if (state.wave > 0) {
         state.score += state.wave * WAVE_CLEAR_SCORE_MUL;
-        state.gold += SHOP_CONFIG.goldPerWave;
       }
       const isBossWave = state.wave > 0 && state.wave % BOSS_WAVE_INTERVAL === 0;
       state.bossBonusPickQueued = isBossWave;

@@ -4,7 +4,7 @@ import {
   GRID_WIDTH, GRID_HEIGHT, CELL_SIZE, HALF_CELL, TOWER_STATS, CANVAS_WIDTH, CANVAS_HEIGHT, WIRE_MAX_HP,
 } from './types';
 import { t, pickKey } from './i18n';
-import { GLOBAL_CONFIG, ENEMY_CONFIG, STARTING_INVENTORY, PICK_POOL_CONFIG, WEAPON_CONFIG, COMMAND_CARD_CONFIG, BASE_UPGRADE_CONFIG, SHOP_CONFIG, SHOP_ITEM_CONFIG, SHOP_OFFER_BUCKETS, ADVANCED_TOWER_TYPES } from './config';
+import { GLOBAL_CONFIG, ENEMY_CONFIG, ENEMY_GOLD_REWARD, STARTING_INVENTORY, PICK_POOL_CONFIG, WEAPON_CONFIG, COMMAND_CARD_CONFIG, BASE_UPGRADE_CONFIG, SHOP_CONFIG, SHOP_ITEM_CONFIG, SHOP_OFFER_BUCKETS, ADVANCED_TOWER_TYPES } from './config';
 import { makeTowerCollider, makeEnemyCollider } from './collider';
 import { getLinearTowerBodyAspectRatio, getLinearTowerBodyRect } from './linearTowerGeometry';
 import { footprintsOverlap, getTowerCells, getTowerFootprintCells } from './footprint';
@@ -861,7 +861,7 @@ const pushEnemy = (state: GameState, type: EnemyType, _wave: number) => {
     hp, maxHp: hp,
     speed: (def.speedMin + Math.random() * (def.speedMax - def.speedMin)) * ENEMY_SPEED_MUL,
     damage: def.baseDamage,
-    goldReward: SHOP_CONFIG.goldPerEnemyKill,
+    goldReward: ENEMY_GOLD_REWARD[type] ?? SHOP_CONFIG.goldPerEnemyKill,
     attackCooldown: def.cooldown, lastAttackTime: 0, targetId: null, heading: 0,
     radius: def.radius, color: def.color, wireDamageMul: def.wireDamageMul,
     shieldAbsorb: shieldHp, maxShieldAbsorb: shieldHp,
@@ -896,7 +896,7 @@ export const spawnEnemyAt = (
       ? 0
       : (def.speedMin + Math.random() * (def.speedMax - def.speedMin)) * ENEMY_SPEED_MUL,
     damage: def.baseDamage,
-    goldReward: options?.goldReward ?? SHOP_CONFIG.goldPerEnemyKill,
+    goldReward: options?.goldReward ?? ENEMY_GOLD_REWARD[type] ?? SHOP_CONFIG.goldPerEnemyKill,
     attackCooldown: def.cooldown, lastAttackTime: 0, targetId: null, heading: 0,
     radius: def.radius, color: def.color, wireDamageMul: def.wireDamageMul,
     shieldAbsorb: shieldHp, maxShieldAbsorb: shieldHp,
