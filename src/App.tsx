@@ -103,10 +103,7 @@ export default function App() {
     status: gameState.status,
     pickUiPhase: gameState.pickUiPhase,
   });
-  const shopPanelHiddenForWave =
-    gameState.gameMode !== 'custom' &&
-    gameState.status === 'playing' &&
-    (gameState.needsPick || gameState.enemiesToSpawn > 0 || gameState.enemies.length > 0);
+  const shopPanelHiddenForWave = false;
   const shopPanelVisible = sidebarOpen && !shopPanelHiddenForWave;
   const canStartNextWave =
     gameState.gameMode !== 'custom' &&
@@ -684,10 +681,7 @@ export default function App() {
         {canStartNextWave && (
           <button
             type="button"
-            onClick={() => {
-              setSidebarOpen(false);
-              skipToNextWave();
-            }}
+            onClick={skipToNextWave}
             className={`absolute bottom-4 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-lg border border-blue-400/70 bg-blue-600 px-5 py-3 text-sm font-black text-white shadow-[0_10px_30px_rgba(37,99,235,0.35)] transition-colors hover:bg-blue-500 active:scale-95 sm:bottom-6 sm:px-6 sm:text-base ${nextWavePromptActive ? 'next-wave-breathe' : ''}`}
           >
             <Play size={18} />
