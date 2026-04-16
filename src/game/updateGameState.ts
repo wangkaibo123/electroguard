@@ -99,6 +99,7 @@ const {
   repairRange: REPAIR_DRONE_REPAIR_RANGE,
 } = WEAPON_CONFIG.repairDrone;
 const SNIPER_AIM_THRESHOLD = 0.05;
+const BLASTER_AIM_THRESHOLD = SNIPER_AIM_THRESHOLD;
 const SELF_POWER_INTERVAL = COMMAND_CARD_CONFIG.self_power.selfPowerInterval ?? 2;
 const SELF_POWER_AMOUNT = COMMAND_CARD_CONFIG.self_power.selfPowerAmount ?? 1;
 const CORE_TURRET_RANGE = BASE_UPGRADE_CONFIG.core_turret_unlock.coreTurretRange ?? 220;
@@ -110,6 +111,12 @@ const MISSILE_MAX_SPEED = MISSILE_SPEED * 2;
 const MISSILE_INITIAL_SPEED = MISSILE_MAX_SPEED * 0.19;
 const MISSILE_ACCELERATION = 260;
 const MISSILE_ACCELERATION_GROWTH = 720;
+
+const normalizeAngleDiff = (angle: number) => {
+  while (angle > Math.PI) angle -= TWO_PI;
+  while (angle < -Math.PI) angle += TWO_PI;
+  return angle;
+};
 
 const getMissileSiloOffset = (index: number, span: number) => {
   const gap = span * 0.18;
@@ -531,9 +538,7 @@ const updateCombatTowers = (state: GameState, dt: number, now: number) => {
 
     if (hasTarget) {
       const desired = Math.atan2(targetY - baseY, targetX - baseX);
-      let diff = desired - tower.barrelAngle;
-      while (diff > Math.PI) diff -= TWO_PI;
-      while (diff < -Math.PI) diff += TWO_PI;
+      const diff = normalizeAngleDiff(desired - tower.barrelAngle);
       const maxRotation = BARREL_SPEED * dt;
       tower.barrelAngle += Math.abs(diff) < maxRotation ? diff : Math.sign(diff) * maxRotation;
       changed = true;
@@ -554,6 +559,10 @@ const updateCombatTowers = (state: GameState, dt: number, now: number) => {
     if (tower.type === 'blaster') {
       if (tower.storedPower < BLASTER_POWER_COST || now - tower.lastActionTime <= BLASTER_COOLDOWN) continue;
 
+      const desiredAngle = Math.atan2(targetY - baseY, targetX - baseX);
+      const aimDiff = normalizeAngleDiff(desiredAngle - tower.barrelAngle);
+      if (Math.abs(aimDiff) > BLASTER_AIM_THRESHOLD) continue;
+
       tower.storedPower -= BLASTER_POWER_COST;
       state.projectiles.push({
         id: genId(),
@@ -562,6 +571,11 @@ const updateCombatTowers = (state: GameState, dt: number, now: number) => {
         targetId: bestEnemy?.id ?? '',
         speed: BLASTER_BULLET_SPEED,
         damage: BLASTER_DAMAGE,
+        angle: tower.barrelAngle,
+        traveled: 0,
+        maxRange: BLASTER_RANGE * (tower.rangeMultiplier ?? 1),
+        color: '#f87171',
+        size: 3,
       });
       tower.lastActionTime = now;
       changed = true;
@@ -620,9 +634,7 @@ const updateCombatTowers = (state: GameState, dt: number, now: number) => {
     }
 
     const desiredAngle = Math.atan2(targetY - baseY, targetX - baseX);
-    let aimDiff = desiredAngle - tower.barrelAngle;
-    while (aimDiff > Math.PI) aimDiff -= TWO_PI;
-    while (aimDiff < -Math.PI) aimDiff += TWO_PI;
+    const aimDiff = normalizeAngleDiff(desiredAngle - tower.barrelAngle);
 
     const aligned = Math.abs(aimDiff) <= SNIPER_AIM_THRESHOLD;
     if (!aligned) tower.sniperAimSince = undefined;

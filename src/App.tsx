@@ -275,10 +275,10 @@ export default function App() {
           </p>
           <button
             onClick={() => setTipHidden(true)}
-            className="shrink-0 p-1 rounded hover:bg-gray-700 text-gray-500 hover:text-gray-300 transition-colors"
+            className="shrink-0 rounded p-1.5 text-red-500 transition-colors hover:bg-red-500/10 hover:text-red-400"
             title={i.hidePanel}
           >
-            <X size={14} />
+            <X size={24} />
           </button>
         </div>
       )}
