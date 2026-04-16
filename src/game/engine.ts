@@ -699,7 +699,7 @@ export const dispatchPulse = (state: GameState, src: Tower, isBattery = false): 
 
   const queue = [{ tower: src, path: [] as Wire[] }];
   const visited = new Set([src.id]);
-  const launchDuration = src.type === 'generator' || src.type === 'big_generator' ? 0.28 : 0;
+  const launchDuration = src.type === 'core' || src.type === 'generator' || src.type === 'big_generator' ? 0.28 : 0;
 
   while (queue.length > 0) {
     const { tower, path } = queue.shift()!;

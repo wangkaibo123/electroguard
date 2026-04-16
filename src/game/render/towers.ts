@@ -91,6 +91,7 @@ const drawEnergyEffect = (
   powered: boolean,
   color: string,
   powerProgress?: number,
+  particlesActive = powered,
 ) => {
   const s = ENERGY_EFFECT_SIZE;
   const useRhythmRing = powered && powerProgress != null;
@@ -161,7 +162,7 @@ const drawEnergyEffect = (
   ctx.lineTo(cx - s * 0.1, cy + s);
   ctx.stroke();
 
-  if (powered && !useRhythmRing) {
+  if (powered && (!useRhythmRing || particlesActive)) {
     ctx.lineWidth = 1;
     for (let sp = 0; sp < 4; sp++) {
       const spAngle = (sp / 4) * TWO_PI + now / 600;
@@ -179,6 +180,55 @@ const drawEnergyEffect = (
       ctx.stroke();
     }
   }
+};
+
+const gatlingHasTarget = (state: GameState, tower: Tower) => {
+  if (tower.overloaded) return false;
+
+  const range = getTowerRange(tower);
+  if (range == null) return false;
+
+  const cx = (tower.x + tower.width / 2) * CELL_SIZE;
+  const cy = (tower.y + tower.height / 2) * CELL_SIZE;
+
+  return state.enemies.some((enemy) => Math.hypot(enemy.x - cx, enemy.y - cy) < range);
+};
+
+const towerCanReceiveGeneratorPower = (state: GameState, source: Tower, tower: Tower) => {
+  if (tower.isRuined || tower.id === source.id) return false;
+  if (tower.type === 'repair_drone' && state.repairDrones.some((drone) => drone.sourceTowerId === tower.id)) return false;
+  if (tower.type === 'gatling') return gatlingHasTarget(state, tower);
+
+  return tower.maxPower > 0 && (tower.storedPower + tower.incomingPower) < tower.maxPower;
+};
+
+const hasGeneratorOutputTarget = (state: GameState, source: Tower) => {
+  if (source.isRuined || !source.powered) return false;
+
+  const queue = [source];
+  const visited = new Set([source.id]);
+
+  while (queue.length > 0) {
+    const tower = queue.shift()!;
+    if (towerCanReceiveGeneratorPower(state, source, tower)) return true;
+
+    for (const wire of state.wires) {
+      let nextId: string | null = null;
+      if (wire.startTowerId === tower.id) {
+        if (tower.ports.find(port => port.id === wire.startPortId)?.portType === 'output') nextId = wire.endTowerId;
+      } else if (wire.endTowerId === tower.id) {
+        if (tower.ports.find(port => port.id === wire.endPortId)?.portType === 'output') nextId = wire.startTowerId;
+      }
+
+      if (!nextId || visited.has(nextId)) continue;
+      const next = state.towerMap.get(nextId);
+      if (!next || next.isRuined) continue;
+      visited.add(nextId);
+      queue.push(next);
+    }
+  }
+
+  return false;
 };
 
 const drawFootprintCells = (
@@ -594,10 +644,10 @@ export const drawTowers = (ctx: CanvasRenderingContext2D, state: GameState, now:
         getLinearTowerVisualLandscape(tower),
         getLinearTowerBodyAspectRatio(tower.type),
       );
-      drawTowerDetails(ctx, tower, body.x, body.y, body.width, body.height, cx, cy, tColor, inset, now, generatorPowerProgress);
+      drawTowerDetails(ctx, state, tower, body.x, body.y, body.width, body.height, cx, cy, tColor, inset, now, generatorPowerProgress);
       if (tower.isRuined) drawRuinOverlay(ctx, body.x, body.y, body.width, body.height, inset);
     } else {
-      drawTowerDetails(ctx, tower, visual.px, visual.py, visual.tw, visual.th, cx, cy, tColor, inset, now, generatorPowerProgress);
+      drawTowerDetails(ctx, state, tower, visual.px, visual.py, visual.tw, visual.th, cx, cy, tColor, inset, now, generatorPowerProgress);
       if (tower.isRuined) drawRuinOverlay(ctx, visual.px, visual.py, visual.tw, visual.th, inset);
     }
 
@@ -1077,13 +1127,14 @@ const drawMuzzleBrake = (
 
 // ── Tower detail drawing (called within rotation transform) ──────────────────
 function drawTowerDetails(
-  ctx: CanvasRenderingContext2D, t: Tower,
+  ctx: CanvasRenderingContext2D, state: GameState, t: Tower,
   px: number, py: number, tw: number, th: number, cx: number, cy: number,
   tColor: string, inset: number, now: number, generatorPowerProgress: number,
 ) {
   if (t.type === 'core') {
     const R = Math.min(tw, th);
-    drawEnergyEffect(ctx, cx, cy, now, t.powered, tColor);
+    const outputting = hasGeneratorOutputTarget(state, t);
+    drawEnergyEffect(ctx, cx, cy, now, t.powered, tColor, outputting ? generatorPowerProgress : 0, outputting);
     ctx.strokeStyle = tColor; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.arc(cx, cy, R / 3 - 2, 0, TWO_PI); ctx.stroke();
     ctx.beginPath(); ctx.arc(cx, cy, R / 5, 0, TWO_PI); ctx.stroke();
@@ -1449,7 +1500,8 @@ function drawTowerDetails(
     }
 
   } else if (t.type === 'generator' || t.type === 'big_generator') {
-    drawEnergyEffect(ctx, cx, cy, now, t.powered, tColor, generatorPowerProgress);
+    const outputting = hasGeneratorOutputTarget(state, t);
+    drawEnergyEffect(ctx, cx, cy, now, t.powered, tColor, outputting ? generatorPowerProgress : 0, outputting);
     if (t.type === 'big_generator') {
       ctx.strokeStyle = tColor;
       ctx.lineWidth = 1.5;
