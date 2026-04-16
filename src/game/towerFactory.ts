@@ -8,6 +8,9 @@ import {
 import { genId, generatePorts, syncDirectPortLinks, updatePowerGrid } from './engine';
 import { makeTowerCollider } from './collider';
 
+const INITIAL_DIAGONAL_BARREL_ANGLE = Math.PI / 4;
+const DIAGONAL_BARREL_TOWER_TYPES = new Set<TowerType>(['blaster', 'gatling', 'sniper']);
+
 const createTowerPorts = (type: TowerType): Port[] => {
   const allSideInputPorts = (): Port[] => [
     { id: genId(), direction: 'top', portType: 'input' },
@@ -65,6 +68,7 @@ const createTowerPorts = (type: TowerType): Port[] => {
 
 export const createTowerAt = (type: TowerType, x: number, y: number): Tower => {
   const stats = TOWER_STATS[type];
+  const barrelAngle = DIAGONAL_BARREL_TOWER_TYPES.has(type) ? INITIAL_DIAGONAL_BARREL_ANGLE : 0;
 
   return {
     id: genId(),
@@ -86,7 +90,7 @@ export const createTowerAt = (type: TowerType, x: number, y: number): Tower => {
     lastDamagedAt: 0,
     ports: createTowerPorts(type),
     rotation: 0,
-    barrelAngle: 0,
+    barrelAngle,
     heat: 0,
     overloaded: false,
     gatlingAmmo: 0,

@@ -115,6 +115,21 @@ export default function App() {
     gameState.enemiesToSpawn === 0 &&
     gameState.enemies.length === 0 &&
     !gameState.pendingBossBonusPick;
+  const [nextWavePromptActive, setNextWavePromptActive] = useState(false);
+
+  useEffect(() => {
+    if (!canStartNextWave) {
+      setNextWavePromptActive(false);
+      return;
+    }
+
+    setNextWavePromptActive(false);
+    const timeoutId = window.setTimeout(() => {
+      setNextWavePromptActive(true);
+    }, 20_000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [canStartNextWave]);
 
   // Mobile detection
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
@@ -673,7 +688,7 @@ export default function App() {
               setSidebarOpen(false);
               skipToNextWave();
             }}
-            className="absolute bottom-4 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-lg border border-blue-400/70 bg-blue-600 px-5 py-3 text-sm font-black text-white shadow-[0_10px_30px_rgba(37,99,235,0.35)] transition-colors hover:bg-blue-500 active:scale-95 sm:bottom-6 sm:px-6 sm:text-base"
+            className={`absolute bottom-4 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-lg border border-blue-400/70 bg-blue-600 px-5 py-3 text-sm font-black text-white shadow-[0_10px_30px_rgba(37,99,235,0.35)] transition-colors hover:bg-blue-500 active:scale-95 sm:bottom-6 sm:px-6 sm:text-base ${nextWavePromptActive ? 'next-wave-breathe' : ''}`}
           >
             <Play size={18} />
             <span>{i.startNextWave}</span>

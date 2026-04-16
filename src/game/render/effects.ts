@@ -62,9 +62,22 @@ export const drawDraggedWire = (
 };
 
 // ── Pulses ────────────────────────────────────────────────────────────────
-export const drawPulses = (ctx: CanvasRenderingContext2D, state: GameState, now: number) => {
+type PulseDrawOptions = {
+  launchEffects?: boolean;
+  travellingPulses?: boolean;
+};
+
+export const drawPulses = (
+  ctx: CanvasRenderingContext2D,
+  state: GameState,
+  now: number,
+  options: PulseDrawOptions = {},
+) => {
+  const drawLaunchEffects = options.launchEffects ?? true;
+  const drawTravellingPulses = options.travellingPulses ?? true;
+
   for (const p of state.pulses) {
-    if (p.launchDelay > 0 && p.launchDuration > 0) {
+    if (drawLaunchEffects && p.launchDelay > 0 && p.launchDuration > 0) {
       const source = state.towerMap.get(p.sourceTowerId);
       if (source) {
         const cx = (source.x + source.width / 2) * CELL_SIZE;
@@ -135,6 +148,7 @@ export const drawPulses = (ctx: CanvasRenderingContext2D, state: GameState, now:
     }
 
     if (p.launchDelay > 0) continue;
+    if (!drawTravellingPulses) continue;
 
     ctx.fillStyle = PULSE_CLR;
     ctx.shadowColor = PULSE_CLR;

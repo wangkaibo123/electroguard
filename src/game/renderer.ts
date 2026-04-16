@@ -74,7 +74,7 @@ export const renderGame = (
   drawOccupiedGround(ctx, state);
   drawWires(ctx, state);
   drawDraggedWire(ctx, state, draggedWireStart, mouseWorldPos, draggedWirePath);
-  drawPulses(ctx, state, now);
+  drawPulses(ctx, state, now, { launchEffects: false });
   drawWireHpBars(ctx, state);
 
   drawShields(ctx, state, now);
@@ -82,6 +82,7 @@ export const renderGame = (
 
   drawPorts(ctx, state);
   drawTowers(ctx, state, now, activeRepair);
+  drawPulses(ctx, state, now, { travellingPulses: false });
   drawCommandCardTargeting(ctx, state, now, activeCommandCard);
   drawRepairTargeting(ctx, state, now, activeRepair);
 
