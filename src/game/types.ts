@@ -179,6 +179,23 @@ export interface ShieldBreakEffect {
   fragments: { angle: number; dist: number; size: number; speed: number }[];
 }
 
+export interface RepairDroneTask {
+  id: string;
+  sourceTowerId: string;
+  targetId: string;
+  phase: 'outbound' | 'repairing' | 'returning';
+  x: number;
+  y: number;
+  homeX: number;
+  homeY: number;
+  targetX: number;
+  targetY: number;
+  speed: number;
+  amount: number;
+  energy: number;
+  repairTimer: number;
+}
+
 export interface IncomingDrop {
   id: string;
   towerType: TowerType;
@@ -229,6 +246,7 @@ export interface GameState {
   particles: Particle[];
   hitEffects: HitEffect[];
   shieldBreakEffects: ShieldBreakEffect[];
+  repairDrones: RepairDroneTask[];
   incomingDrops: IncomingDrop[];
   waveTimer: number;
   enemiesToSpawn: number;
@@ -272,7 +290,7 @@ export const TURRET_RANGE: Partial<Record<TowerType, number>> = {
   sniper: WEAPON_CONFIG.sniper.range,
   tesla: WEAPON_CONFIG.tesla.range,
   missile: WEAPON_CONFIG.missile.range,
-  repair_drone: WEAPON_CONFIG.repairDrone.attackRange,
+  repair_drone: WEAPON_CONFIG.repairDrone.repairRange,
 };
 
 export const getTowerRange = (tower: Tower | TowerType): number | undefined => {

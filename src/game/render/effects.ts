@@ -308,6 +308,135 @@ export const drawProjectiles = (ctx: CanvasRenderingContext2D, state: GameState)
   ctx.shadowBlur = 0;
 };
 
+const drawRepairDroneModel = (
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  angle: number,
+  now: number,
+  color: string,
+  energy: number,
+) => {
+  const pulse = 0.75 + Math.sin(now / 80 + x * 0.02) * 0.25;
+
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 10;
+
+  ctx.fillStyle = 'rgba(15,23,42,0.94)';
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.roundRect(-7, -4, 14, 8, 3);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.strokeStyle = `rgba(153,246,228,${0.65 + 0.25 * pulse})`;
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(-4, -5);
+  ctx.lineTo(-10, -9);
+  ctx.moveTo(-4, 5);
+  ctx.lineTo(-10, 9);
+  ctx.moveTo(4, -5);
+  ctx.lineTo(10, -9);
+  ctx.moveTo(4, 5);
+  ctx.lineTo(10, 9);
+  ctx.stroke();
+
+  ctx.lineWidth = 1.2;
+  for (const rotor of [
+    { x: -10, y: -9 },
+    { x: -10, y: 9 },
+    { x: 10, y: -9 },
+    { x: 10, y: 9 },
+  ]) {
+    ctx.beginPath();
+    ctx.ellipse(rotor.x, rotor.y, 5 + pulse * 2, 1.5, now / 50, 0, TWO_PI);
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = color;
+  ctx.shadowBlur = 5;
+  ctx.beginPath();
+  ctx.arc(5, 0, 2.2, 0, TWO_PI);
+  ctx.fill();
+
+  if (energy > 0) {
+    ctx.fillStyle = '#fef08a';
+    ctx.shadowColor = '#fef08a';
+    ctx.shadowBlur = 4;
+    for (let i = 0; i < energy; i++) {
+      ctx.fillRect(-5 + i * 5, -1.5, 3, 3);
+    }
+  }
+
+  ctx.restore();
+};
+
+export const drawRepairDrones = (ctx: CanvasRenderingContext2D, state: GameState, now: number) => {
+  const activeDroneTowerIds = new Set(state.repairDrones.map((drone) => drone.sourceTowerId));
+  const dockedDrones = state.towers.filter((tower) =>
+    tower.type === 'repair_drone' &&
+    !tower.isRuined &&
+    !activeDroneTowerIds.has(tower.id)
+  );
+
+  if (!state.repairDrones.length && !dockedDrones.length) return;
+
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  for (const tower of dockedDrones) {
+    const x = (tower.x + tower.width / 2) * CELL_SIZE;
+    const y = (tower.y + tower.height / 2) * CELL_SIZE;
+    drawRepairDroneModel(ctx, x, y, -Math.PI / 2, now, '#2dd4bf', 0);
+  }
+
+  for (const drone of state.repairDrones) {
+    const destinationX = drone.phase === 'returning' ? drone.homeX : drone.targetX;
+    const destinationY = drone.phase === 'returning' ? drone.homeY : drone.targetY;
+    const angle = Math.atan2(destinationY - drone.y, destinationX - drone.x);
+    const color = drone.phase === 'repairing' ? '#99f6e4' : '#2dd4bf';
+
+    ctx.save();
+    const trail = ctx.createLinearGradient(
+      drone.x - Math.cos(angle) * 22,
+      drone.y - Math.sin(angle) * 22,
+      drone.x,
+      drone.y,
+    );
+    trail.addColorStop(0, 'rgba(45,212,191,0)');
+    trail.addColorStop(1, `rgba(45,212,191,${drone.phase === 'outbound' ? 0.45 : 0.22})`);
+    ctx.strokeStyle = trail;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(drone.x - Math.cos(angle) * 22, drone.y - Math.sin(angle) * 22);
+    ctx.lineTo(drone.x, drone.y);
+    ctx.stroke();
+    ctx.restore();
+
+    drawRepairDroneModel(ctx, drone.x, drone.y, angle, now, color, drone.energy);
+
+    if (drone.phase === 'repairing') {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(94,234,212,0.65)';
+      ctx.lineWidth = 1.2;
+      ctx.setLineDash([3, 4]);
+      ctx.beginPath();
+      ctx.moveTo(drone.x, drone.y);
+      ctx.lineTo(drone.targetX, drone.targetY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+  }
+
+  ctx.shadowBlur = 0;
+};
+
 // ── Chain Lightning ─────────────────────────────────────────────────────
 export const drawChainLightning = (ctx: CanvasRenderingContext2D, state: GameState) => {
   for (const cl of state.chainLightnings) {

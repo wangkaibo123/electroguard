@@ -9,7 +9,7 @@ import { drawEnemies, drawEnemyPreview } from './render/enemies';
 import {
   drawWires, drawDraggedWire, drawPulses, drawWireHpBars,
   drawShields, drawProjectiles, drawChainLightning,
-  drawParticles, drawHitEffects, drawShieldBreakEffects, drawIncomingDrops,
+  drawParticles, drawHitEffects, drawShieldBreakEffects, drawIncomingDrops, drawRepairDrones,
 } from './render/effects';
 
 export const renderGame = (
@@ -94,6 +94,7 @@ export const renderGame = (
   drawEnemies(ctx, state, now);
   drawEnemyPreview(ctx, enemyPreview, now);
 
+  drawRepairDrones(ctx, state, now);
   drawProjectiles(ctx, state);
   drawChainLightning(ctx, state);
   drawParticles(ctx, state);

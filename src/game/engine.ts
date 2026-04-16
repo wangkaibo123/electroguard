@@ -653,7 +653,7 @@ export const createInitialState = (): GameState => {
     pendingBossBonusPick: false,
     pickUiPhase: 'standard' satisfies PickUiPhase,
     needsPick: true,
-    towers: [core], wires: [], pulses: [], enemies: [], projectiles: [], chainLightnings: [], particles: [], hitEffects: [], shieldBreakEffects: [], incomingDrops: [],
+    towers: [core], wires: [], pulses: [], enemies: [], projectiles: [], chainLightnings: [], particles: [], hitEffects: [], shieldBreakEffects: [], repairDrones: [], incomingDrops: [],
     waveTimer: 0, enemiesToSpawn: 0, spawnTimer: 0, score: 0, towerMap,
   };
 };

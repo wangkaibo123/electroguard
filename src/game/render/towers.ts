@@ -586,7 +586,7 @@ export const drawTowers = (ctx: CanvasRenderingContext2D, state: GameState, now:
         ctx.restore();
       }
     }
-    if (!tower.isRuined && tower.maxPower > 0 && tower.type !== 'core' && tower.type !== 'battery' && tower.type !== 'blaster' && tower.type !== 'gatling' && tower.type !== 'sniper' && tower.type !== 'tesla' && tower.type !== 'missile') {
+    if (!tower.isRuined && tower.maxPower > 0 && tower.type !== 'core' && tower.type !== 'battery' && tower.type !== 'blaster' && tower.type !== 'gatling' && tower.type !== 'sniper' && tower.type !== 'tesla' && tower.type !== 'missile' && tower.type !== 'repair_drone') {
       const pr = Math.min(tw, th) / 3;
       const pcx = px + tw / 2, pcy = py + th / 2;
       if (tower.storedPower > 0) {
@@ -1429,17 +1429,14 @@ function drawTowerDetails(
       }
     }
   } else if (t.type === 'repair_drone') {
-    drawPowerArc(ctx, cx, cy, Math.min(tw, th) / 2 - inset - 2, t.maxPower, t.storedPower, tColor);
-    const orbit = Math.min(tw, th) * 0.28;
-    const a = now / 850;
-    const dx = cx + Math.cos(a) * orbit;
-    const dy = cy + Math.sin(a) * orbit * 0.55;
     ctx.strokeStyle = tColor;
     ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.arc(cx, cy, orbit, 0, TWO_PI); ctx.stroke();
-    ctx.fillStyle = 'rgba(15,23,42,0.95)';
-    ctx.beginPath(); ctx.arc(dx, dy, 6, 0, TWO_PI); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(dx - 10, dy); ctx.lineTo(dx + 10, dy); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx - 11, cy);
+    ctx.lineTo(cx + 11, cy);
+    ctx.moveTo(cx, cy - 11);
+    ctx.lineTo(cx, cy + 11);
+    ctx.stroke();
   } else if (t.type === 'battery') {
     const isLandscape = tw >= th;
     const cc = t.maxPower;

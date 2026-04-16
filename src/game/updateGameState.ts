@@ -93,9 +93,6 @@ const {
   splashRadius: MISSILE_SPLASH_RADIUS,
 } = WEAPON_CONFIG.missile;
 const {
-  attackCooldown: REPAIR_DRONE_ATTACK_COOLDOWN,
-  attackDamage: REPAIR_DRONE_ATTACK_DAMAGE,
-  attackRange: REPAIR_DRONE_ATTACK_RANGE,
   repairAmount: REPAIR_DRONE_REPAIR_AMOUNT,
   repairCooldown: REPAIR_DRONE_REPAIR_COOLDOWN,
   repairCost: REPAIR_DRONE_REPAIR_COST,
@@ -235,6 +232,35 @@ const ruinTower = (state: GameState, tower: Tower) => {
   state.wires = state.wires.filter((wire) => wire.startTowerId !== tower.id && wire.endTowerId !== tower.id);
   state.pulses = state.pulses.filter((pulse) => pulse.sourceTowerId !== tower.id && pulse.targetTowerId !== tower.id);
   updatePowerGrid(state);
+};
+
+const launchRepairDrone = (
+  state: GameState,
+  tower: Tower,
+  targetId: string,
+  targetX: number,
+  targetY: number,
+  amount: number,
+) => {
+  const homeX = (tower.x + tower.width / 2) * GLOBAL_CONFIG.cellSize;
+  const homeY = (tower.y + tower.height / 2) * GLOBAL_CONFIG.cellSize;
+
+  state.repairDrones.push({
+    id: genId(),
+    sourceTowerId: tower.id,
+    targetId,
+    phase: 'outbound',
+    x: homeX,
+    y: homeY,
+    homeX,
+    homeY,
+    targetX,
+    targetY,
+    speed: 360,
+    amount,
+    energy: REPAIR_DRONE_REPAIR_COST,
+    repairTimer: 0,
+  });
 };
 
 const updateIncomingDrops = (state: GameState, dt: number) => {
@@ -458,6 +484,8 @@ const updateCombatTowers = (state: GameState, dt: number, now: number) => {
     const baseY = (tower.y + tower.height / 2) * GLOBAL_CONFIG.cellSize;
 
     if (tower.type === 'repair_drone') {
+      if (state.repairDrones.some((drone) => drone.sourceTowerId === tower.id)) continue;
+
       const repairTarget = state.towers
         .filter((other) => !other.isRuined && other.id !== tower.id && other.hp < other.maxHp)
         .map((other) => ({ tower: other, distance: Math.hypot((other.x + other.width / 2) * GLOBAL_CONFIG.cellSize - baseX, (other.y + other.height / 2) * GLOBAL_CONFIG.cellSize - baseY) }))
@@ -466,19 +494,15 @@ const updateCombatTowers = (state: GameState, dt: number, now: number) => {
 
       if (repairTarget) {
         if (tower.storedPower >= REPAIR_DRONE_REPAIR_COST && now - tower.lastActionTime >= REPAIR_DRONE_REPAIR_COOLDOWN) {
+          const targetX = (repairTarget.x + repairTarget.width / 2) * GLOBAL_CONFIG.cellSize;
+          const targetY = (repairTarget.y + repairTarget.height / 2) * GLOBAL_CONFIG.cellSize;
           tower.storedPower -= REPAIR_DRONE_REPAIR_COST;
-          repairTarget.hp = Math.min(repairTarget.maxHp, repairTarget.hp + REPAIR_DRONE_REPAIR_AMOUNT);
-          repairTarget.lastDamagedAt = now;
-          state.chainLightnings.push({
-            segments: [{ x1: baseX, y1: baseY, x2: (repairTarget.x + repairTarget.width / 2) * GLOBAL_CONFIG.cellSize, y2: (repairTarget.y + repairTarget.height / 2) * GLOBAL_CONFIG.cellSize }],
-            life: 0,
-            maxLife: 0.25,
-          });
+          launchRepairDrone(state, tower, repairTarget.id, targetX, targetY, REPAIR_DRONE_REPAIR_AMOUNT);
           tower.lastActionTime = now;
           changed = true;
         }
-        continue;
       }
+      continue;
     }
 
     const range: number =
@@ -486,7 +510,6 @@ const updateCombatTowers = (state: GameState, dt: number, now: number) => {
       (tower.type === 'sniper' ? SNIPER_RANGE :
       tower.type === 'gatling' ? GATLING_RANGE :
       tower.type === 'missile' ? MISSILE_RANGE :
-      tower.type === 'repair_drone' ? REPAIR_DRONE_ATTACK_RANGE :
       BLASTER_RANGE);
 
     let bestDistance = range;
@@ -591,24 +614,6 @@ const updateCombatTowers = (state: GameState, dt: number, now: number) => {
         initialDistance: Math.max(120, targetDistance),
       });
       tower.missileSiloCursor = (siloIndex + 1) % MISSILE_SILO_COUNT;
-      tower.lastActionTime = now;
-      changed = true;
-      continue;
-    }
-
-    if (tower.type === 'repair_drone') {
-      if (now - tower.lastActionTime <= REPAIR_DRONE_ATTACK_COOLDOWN) continue;
-
-      state.projectiles.push({
-        id: genId(),
-        x: baseX,
-        y: baseY,
-        targetId: bestEnemy?.id ?? '',
-        speed: 420,
-        damage: REPAIR_DRONE_ATTACK_DAMAGE,
-        color: '#2dd4bf',
-        size: 3,
-      });
       tower.lastActionTime = now;
       changed = true;
       continue;
@@ -995,6 +1000,115 @@ const applySplashDamage = (
   state.hitEffects.push({ x, y, life: 0, maxLife: 0.35, color, radius });
 };
 
+const moveToward = (
+  currentX: number,
+  currentY: number,
+  targetX: number,
+  targetY: number,
+  distance: number,
+) => {
+  const dx = targetX - currentX;
+  const dy = targetY - currentY;
+  const length = Math.hypot(dx, dy);
+  if (length <= distance || length <= 0.001) {
+    return { x: targetX, y: targetY, reached: true };
+  }
+
+  const t = distance / length;
+  return { x: currentX + dx * t, y: currentY + dy * t, reached: false };
+};
+
+const updateRepairDrones = (state: GameState, dt: number, now: number) => {
+  let changed = false;
+
+  for (let index = state.repairDrones.length - 1; index >= 0; index--) {
+    const drone = state.repairDrones[index];
+    const sourceTower = state.towerMap.get(drone.sourceTowerId);
+    if (sourceTower && !sourceTower.isRuined) {
+      drone.homeX = (sourceTower.x + sourceTower.width / 2) * GLOBAL_CONFIG.cellSize;
+      drone.homeY = (sourceTower.y + sourceTower.height / 2) * GLOBAL_CONFIG.cellSize;
+    }
+
+    const target = state.towerMap.get(drone.targetId);
+    if ((drone.phase === 'outbound' || drone.phase === 'repairing') && target && !target.isRuined) {
+      drone.targetX = (target.x + target.width / 2) * GLOBAL_CONFIG.cellSize;
+      drone.targetY = (target.y + target.height / 2) * GLOBAL_CONFIG.cellSize;
+    } else if (drone.phase !== 'returning') {
+      drone.phase = 'returning';
+      changed = true;
+    }
+
+    if (drone.phase === 'repairing') {
+      if (!target || target.isRuined || target.hp >= target.maxHp || drone.energy <= 0) {
+        drone.phase = 'returning';
+        changed = true;
+      } else {
+        const hoverAngle = now / 500 + drone.id.length;
+        const hoverRadius = Math.max(18, Math.min(target.width, target.height) * GLOBAL_CONFIG.cellSize * 0.42);
+        const hoverX = drone.targetX + Math.cos(hoverAngle) * hoverRadius;
+        const hoverY = drone.targetY + Math.sin(hoverAngle) * hoverRadius * 0.55;
+        const moved = moveToward(drone.x, drone.y, hoverX, hoverY, drone.speed * dt);
+        drone.x = moved.x;
+        drone.y = moved.y;
+
+        drone.repairTimer += dt * 1000;
+        while (drone.repairTimer >= REPAIR_DRONE_REPAIR_COOLDOWN && drone.energy > 0 && target.hp < target.maxHp) {
+          drone.repairTimer -= REPAIR_DRONE_REPAIR_COOLDOWN;
+          drone.energy--;
+          target.hp = Math.min(target.maxHp, target.hp + drone.amount);
+          target.lastDamagedAt = now;
+          state.hitEffects.push({
+            x: drone.targetX,
+            y: drone.targetY,
+            life: 0,
+            maxLife: 0.32,
+            color: '#2dd4bf',
+            radius: 16,
+          });
+          for (let i = 0; i < 8; i++) {
+            const angle = (i / 8) * TWO_PI;
+            state.particles.push({
+              x: drone.x,
+              y: drone.y,
+              vx: Math.cos(angle) * 35,
+              vy: Math.sin(angle) * 35,
+              life: 0,
+              maxLife: 0.35,
+              color: '#5eead4',
+              size: 2,
+            });
+          }
+        }
+
+        if (drone.energy <= 0 || target.hp >= target.maxHp) {
+          drone.phase = 'returning';
+        }
+
+        changed = true;
+        continue;
+      }
+    }
+
+    const destinationX = drone.phase === 'outbound' ? drone.targetX : drone.homeX;
+    const destinationY = drone.phase === 'outbound' ? drone.targetY : drone.homeY;
+    const moved = moveToward(drone.x, drone.y, destinationX, destinationY, drone.speed * dt);
+    drone.x = moved.x;
+    drone.y = moved.y;
+
+    if (moved.reached) {
+      if (drone.phase === 'outbound') {
+        drone.phase = target && !target.isRuined && target.hp < target.maxHp ? 'repairing' : 'returning';
+      } else {
+        state.repairDrones.splice(index, 1);
+      }
+    }
+
+    changed = true;
+  }
+
+  return changed;
+};
+
 const updateProjectiles = (state: GameState, dt: number) => {
   let changed = false;
 
@@ -1230,6 +1344,7 @@ export const updateGameState = (state: GameState, dt: number) => {
   changed = updateWaveState(state, dt) || changed;
   changed = updateEnemyState(state, dt, now) || changed;
   changed = updateBossEffects(state, now) || changed;
+  changed = updateRepairDrones(state, dt, now) || changed;
   changed = updateProjectiles(state, dt) || changed;
   changed = updateTransientEffects(state, dt) || changed;
 
