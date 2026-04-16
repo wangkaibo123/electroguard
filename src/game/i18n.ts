@@ -82,7 +82,6 @@ export interface I18nStrings {
   // Toast
   noWires: string;
   autoDeployFailed: string;
-  cannotPlaceHere: string;
   coreCannotMove: string;
   commandCardCannotUse: string;
   commandCardMachineMaxed: string;
@@ -203,7 +202,6 @@ const en: I18nStrings = {
   startNextWave: 'Start Next Wave',
   noWires: 'No wires available!',
   autoDeployFailed: 'No open space near the Core for this tower.',
-  cannotPlaceHere: 'Cannot place machine here.',
   coreCannotMove: 'Core cannot be moved or rotated!',
   commandCardCannotUse: 'Cannot use command card',
   commandCardMachineMaxed: 'This machine is already fully upgraded',
@@ -452,7 +450,6 @@ const zh: I18nStrings = {
   startNextWave: '开启下一波',
   noWires: '没有可用的线缆！',
   autoDeployFailed: '主基地附近没有可部署这座防御塔的空地。',
-  cannotPlaceHere: '这里不能放置机器。',
   coreCannotMove: '主基地无法拖动和旋转！',
   commandCardCannotUse: '无法使用指令卡',
   commandCardMachineMaxed: '这台机器已经满级',

@@ -70,7 +70,6 @@ export default function App() {
     handlePick,
     openCustomPick,
     buyShopPack,
-    buyShopItemAtClientPoint,
     selectedTower,
     setSelectedTower,
     placeMonsterMode,
@@ -659,7 +658,6 @@ export default function App() {
             setMonsterSubTab={setMonsterSubTab}
             openCustomPick={openCustomPick}
             buyShopPack={buyShopPack}
-            buyShopItemAtClientPoint={buyShopItemAtClientPoint}
             refreshShopOffers={refreshShopOffers}
             activeCommandCard={activeCommandCard}
             activeRepair={activeRepair}
