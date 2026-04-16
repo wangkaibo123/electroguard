@@ -1,4 +1,4 @@
-import { useState, type ComponentType, type Dispatch, type SetStateAction } from 'react';
+import { useRef, useState, type ComponentType, type Dispatch, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type SetStateAction } from 'react';
 import { Activity, BookOpen, Cable, ChevronLeft, ChevronRight, Coins, Menu, Play, RotateCcw, ShoppingBag, Wrench, X, Crosshair, Zap, Rocket } from 'lucide-react';
 import { SHOP_CONFIG, SHOP_ITEM_CONFIG } from '../config';
 import type { I18nStrings } from '../i18n';
@@ -42,6 +42,7 @@ type ShopPanelProps = {
   setMonsterSubTab: Dispatch<SetStateAction<'type' | 'static'>>;
   openCustomPick: () => void;
   buyShopPack: (type: ShopItemType) => void;
+  buyShopItemAtClientPoint: (type: ShopItemType, clientX: number, clientY: number) => boolean;
   refreshShopOffers: () => void;
   activeCommandCard: CommandCardType | null;
   activeRepair: boolean;
@@ -70,6 +71,7 @@ export const ShopPanel = (props: ShopPanelProps) => {
     setMonsterSubTab,
     openCustomPick,
     buyShopPack,
+    buyShopItemAtClientPoint,
     refreshShopOffers,
     activeCommandCard,
     activeRepair,
@@ -77,6 +79,104 @@ export const ShopPanel = (props: ShopPanelProps) => {
     tutorialStep,
   } = props;
   const [refreshAnimationId, setRefreshAnimationId] = useState(0);
+  const [shopDrag, setShopDrag] = useState<{
+    startX: number;
+    startY: number;
+    currentX: number;
+    currentY: number;
+  } | null>(null);
+  const shopDragRef = useRef<{
+    offer: ShopItemType;
+    pointerId: number;
+    startX: number;
+    startY: number;
+    initialX: number;
+    initialY: number;
+    closeSidebar: boolean;
+    isDragging: boolean;
+  } | null>(null);
+  const suppressShopClickRef = useRef(false);
+
+  const beginShopItemDrag = (
+    event: ReactPointerEvent<HTMLButtonElement>,
+    offer: ShopItemType,
+    enabled: boolean,
+    closeSidebar: boolean,
+  ) => {
+    if (!enabled || event.button !== 0) return;
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    shopDragRef.current = {
+      offer,
+      pointerId: event.pointerId,
+      startX: rect.left + rect.width / 2,
+      startY: rect.top + rect.height / 2,
+      initialX: event.clientX,
+      initialY: event.clientY,
+      closeSidebar,
+      isDragging: false,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const moveShopItemDrag = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const drag = shopDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+
+    const moved = Math.hypot(event.clientX - drag.initialX, event.clientY - drag.initialY);
+    if (!drag.isDragging && moved < 6) return;
+
+    drag.isDragging = true;
+    event.preventDefault();
+    event.stopPropagation();
+    setShopDrag({
+      startX: drag.startX,
+      startY: drag.startY,
+      currentX: event.clientX,
+      currentY: event.clientY,
+    });
+  };
+
+  const endShopItemDrag = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const drag = shopDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+
+    try {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    } catch {}
+
+    shopDragRef.current = null;
+    setShopDrag(null);
+
+    if (!drag.isDragging) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    suppressShopClickRef.current = true;
+
+    const handled = buyShopItemAtClientPoint(drag.offer, event.clientX, event.clientY);
+    if (handled && drag.closeSidebar) setSidebarOpen(false);
+  };
+
+  const cancelShopItemDrag = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const drag = shopDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+
+    try {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    } catch {}
+
+    shopDragRef.current = null;
+    setShopDrag(null);
+  };
+
+  const consumeSuppressedShopClick = (event: ReactMouseEvent<HTMLButtonElement>) => {
+    if (!suppressShopClickRef.current) return false;
+    suppressShopClickRef.current = false;
+    event.preventDefault();
+    event.stopPropagation();
+    return true;
+  };
 
   const renderTowerButton = (type: TowerType) => {
     const isCustom = gameState.gameMode === 'custom';
@@ -355,14 +455,22 @@ export const ShopPanel = (props: ShopPanelProps) => {
             }
             const item = getShopItemUi(offer);
             const activeShopCommand = item.commandCardType && activeCommandCard === item.commandCardType;
+            const itemEnabled = canBuy(item.price);
             return (
               <button
                 key={`${refreshAnimationId}-${offer}-${index}`}
                 type="button"
-                onClick={() => handleBuy(offer)}
-                disabled={!canBuy(item.price)}
+                onPointerDown={(event) => beginShopItemDrag(event, offer, itemEnabled, closeSidebar)}
+                onPointerMove={moveShopItemDrag}
+                onPointerUp={endShopItemDrag}
+                onPointerCancel={cancelShopItemDrag}
+                onClick={(event) => {
+                  if (consumeSuppressedShopClick(event)) return;
+                  handleBuy(offer);
+                }}
+                disabled={!itemEnabled}
                 className={`flex h-[70px] items-center gap-2.5 px-3 py-3 rounded-lg border text-left transition-all ${
-                  canBuy(item.price)
+                  itemEnabled
                     ? activeShopCommand
                       ? 'border-cyan-300 bg-cyan-400/20 text-cyan-50 ring-2 ring-cyan-300/70 ring-offset-2 ring-offset-gray-950'
                       : item.enabledClass
@@ -469,9 +577,33 @@ export const ShopPanel = (props: ShopPanelProps) => {
     </>
   );
 
+  const shopDragGuide = shopDrag && (
+    <svg className="pointer-events-none fixed inset-0 z-50 h-screen w-screen" aria-hidden="true">
+      <line
+        x1={shopDrag.startX}
+        y1={shopDrag.startY}
+        x2={shopDrag.currentX}
+        y2={shopDrag.currentY}
+        stroke="rgba(250, 204, 21, 0.9)"
+        strokeWidth="2"
+        strokeDasharray="7 7"
+        strokeLinecap="round"
+      />
+      <circle
+        cx={shopDrag.currentX}
+        cy={shopDrag.currentY}
+        r="6"
+        fill="rgba(250, 204, 21, 0.22)"
+        stroke="rgba(250, 204, 21, 0.95)"
+        strokeWidth="2"
+      />
+    </svg>
+  );
+
   if (isMobile) {
     return (
       <>
+        {shopDragGuide}
         {(gameState.status === 'playing' || gameState.status === 'paused') && !shopPanelHiddenForWave && !sidebarOpen && (
           <button
             onClick={() => setSidebarOpen(true)}
@@ -504,6 +636,7 @@ export const ShopPanel = (props: ShopPanelProps) => {
 
   return (
     <div className="relative shrink-0 flex">
+      {shopDragGuide}
       {!shopPanelHiddenForWave && (
         <button
           onClick={() => setSidebarOpen(v => !v)}

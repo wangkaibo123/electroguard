@@ -297,7 +297,7 @@ export const useGameLoop = () => {
     if (!state.shopOffers?.includes(shopItemType)) return;
     const shopItem = SHOP_ITEM_CONFIG[shopItemType];
     const price = shopItem.price;
-    if (state.gold < price) {
+    if (state.gameMode !== 'custom' && state.gold < price) {
       showToast(t().notEnoughGold);
       return;
     }
@@ -360,6 +360,71 @@ export const useGameLoop = () => {
     state.bossBonusPickQueued = false;
     state.status = 'pick';
     sync();
+  };
+
+  const buyShopItemAtClientPoint = (shopItemType: ShopItemType, clientX: number, clientY: number) => {
+    const state = stateRef.current;
+    if (state.status !== 'playing') return false;
+    if (!state.shopOffers?.includes(shopItemType)) return false;
+
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (
+      !rect ||
+      clientX < rect.left ||
+      clientX > rect.right ||
+      clientY < rect.top ||
+      clientY > rect.bottom
+    ) {
+      return false;
+    }
+
+    const world = clientToWorld(clientX, clientY);
+    if (!world) return false;
+
+    const shopItem = SHOP_ITEM_CONFIG[shopItemType];
+    const price = shopItem.price;
+    if (state.gameMode !== 'custom' && state.gold < price) {
+      showToast(t().notEnoughGold);
+      return true;
+    }
+
+    if (shopItem.kind === 'machine') {
+      const towerType = shopItem.towerType;
+      if (!towerType) return false;
+      const { x, y } = getGridCell(world.wx, world.wy);
+      if (!canPlace(x, y, towerType, state)) {
+        showToast(t().cannotPlaceHere);
+        return true;
+      }
+
+      if (state.gameMode !== 'custom') state.gold -= price;
+      addTowerToState(state, createTowerAt(towerType, x, y));
+      clearPurchasedShopOffer(state, shopItemType);
+      setSelectedTower(null);
+      updateRotating(null);
+      cancelTowerDrag();
+      clearWireDragState();
+      sync();
+      return true;
+    }
+
+    if (shopItem.kind === 'command_card') {
+      const commandCardType = shopItem.commandCardType;
+      if (!commandCardType) return false;
+      activeShopCommandPurchaseRef.current = { shopItemType, price };
+      activeCommandCardRef.current = commandCardType;
+      setActiveCommandCardState(commandCardType);
+      setSelectedTower(null);
+      updateRotating(null);
+      cancelTowerDrag();
+      clearWireDragState();
+      setActiveRepair(false);
+      commitActiveCommandCardAtWorld(world.wx, world.wy);
+      return true;
+    }
+
+    buyShopPack(shopItemType);
+    return true;
   };
 
   const refreshShopOffers = () => {
@@ -1128,7 +1193,7 @@ export const useGameLoop = () => {
 
   return {
     canvasRef, cameraRef, gameState, startGame, startCustomGame, togglePause, returnToMenu, handlePick,
-    openCustomPick, buyShopPack, refreshShopOffers, sellTower, rotatingTowerId,
+    openCustomPick, buyShopPack, buyShopItemAtClientPoint, refreshShopOffers, sellTower, rotatingTowerId,
     startCommandCardUse, activeCommandCard, startRepair, activeRepair,
     selectedTower, setSelectedTower, placeMonsterMode, setPlaceMonsterMode, skipToNextWave, toastMessage,
     selectedMonsterType, setSelectedMonsterType, staticMonster, setStaticMonster,
