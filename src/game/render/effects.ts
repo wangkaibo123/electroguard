@@ -240,55 +240,16 @@ export const drawProjectiles = (ctx: CanvasRenderingContext2D, state: GameState)
     const sz = p.size ?? 3;
 
     if (p.arcHeight !== undefined) {
-      const points = [...(p.trail ?? []), { x: p.x, y: p.y }];
-      const angle = p.angle ?? 0;
+      const flightT = Math.min(1, (p.traveled ?? 0) / Math.max(1, p.initialDistance ?? 1));
+      const liftAt = (t: number) => Math.sin(Math.min(1, Math.max(0, t)) * Math.PI) * p.arcHeight!;
+      const lift = liftAt(flightT);
+      const target = state.enemies.find((enemy) => enemy.id === p.targetId);
+      const angle = target ? Math.atan2(target.y - (p.y - lift), target.x - p.x) : (p.angle ?? 0);
       const headX = p.x;
-      const headY = p.y;
+      const headY = p.y - lift;
 
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
-
-      ctx.beginPath();
-      for (let i = 0; i < points.length; i++) {
-        const point = points[i];
-        if (i === 0) {
-          ctx.moveTo(point.x, point.y);
-        } else {
-          const prev = points[i - 1];
-          ctx.quadraticCurveTo(prev.x, prev.y, (prev.x + point.x) / 2, (prev.y + point.y) / 2);
-        }
-      }
-      ctx.lineWidth = sz * 0.9;
-      ctx.strokeStyle = 'rgba(254,205,211,0.82)';
-      ctx.stroke();
-
-      ctx.strokeStyle = 'rgba(251,113,133,0.72)';
-      ctx.lineWidth = 1;
-      for (let i = 2; i < points.length - 1; i += 2) {
-        const prev = points[i - 1];
-        const point = points[i];
-        const next = points[i + 1];
-        const dx = next.x - prev.x;
-        const dy = next.y - prev.y;
-        const len = Math.hypot(dx, dy) || 1;
-        const nx = -dy / len;
-        const ny = dx / len;
-        const t = i / Math.max(1, points.length - 1);
-        const radius = sz * (0.65 + t * 0.9);
-        ctx.beginPath();
-        ctx.moveTo(point.x - nx * radius, point.y - ny * radius);
-        ctx.quadraticCurveTo(point.x, point.y, point.x + nx * radius, point.y + ny * radius);
-        ctx.stroke();
-      }
-
-      const flareX = headX - Math.cos(angle) * sz * 3.2;
-      const flareY = headY - Math.sin(angle) * sz * 3.2;
-      ctx.strokeStyle = 'rgba(251,191,36,0.72)';
-      ctx.lineWidth = 1.6;
-      ctx.beginPath();
-      ctx.moveTo(flareX, flareY);
-      ctx.lineTo(flareX - Math.cos(angle) * sz * 2.2, flareY - Math.sin(angle) * sz * 2.2);
-      ctx.stroke();
 
       ctx.save();
       ctx.translate(headX, headY);

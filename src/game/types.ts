@@ -136,13 +136,11 @@ export interface Projectile {
   splashRadius?: number;   // area damage radius on hit (missile)
   color?: string;          // custom projectile color
   size?: number;           // custom projectile size
-  arcHeight?: number;      // missile arc trail intensity
-  initialDistance?: number;// distance used to normalize arc trail progress
-  turnRate?: number;       // homing turn speed in rad/s
-  trail?: Position[];      // recent positions for curved projectile trails
-  spiralPhase?: number;    // missile: phase for 2D spiral flight
-  spiralAmplitude?: number;// missile: side-to-side spiral radius
-  spiralAngularSpeed?: number; // missile: radians per second
+  acceleration?: number;   // optional acceleration in px/s^2
+  accelerationGrowth?: number; // optional acceleration gain in px/s^3
+  maxSpeed?: number;       // optional speed cap after acceleration
+  arcHeight?: number;      // visual ballistic arc height above ground
+  initialDistance?: number;// distance used to normalize arc progress
 }
 
 export interface ChainLightning {
