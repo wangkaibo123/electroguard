@@ -1,4 +1,4 @@
-import { GameState, Tower, TowerType, CommandCardType, CELL_SIZE, HALF_CELL, TOWER_STATS, CANVAS_WIDTH, CANVAS_HEIGHT, getTowerRange } from '../types';
+import { GameState, Tower, TowerType, CommandCardType, CELL_SIZE, HALF_CELL, TOWER_STATS, getCanvasHeight, getCanvasWidth, getTowerRange } from '../types';
 import { getPortPos, isPortAccessible } from '../engine';
 import { getLinearTowerBodyAspectRatio, getLinearTowerBodyRect } from '../linearTowerGeometry';
 import { COMMAND_CARD_CONFIG, GLOBAL_CONFIG, getTowerSellPrice } from '../config';
@@ -744,7 +744,7 @@ const drawTowerTargeting = (
 
   ctx.save();
   const mask = new Path2D();
-  mask.rect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+  mask.rect(0, 0, getCanvasWidth(state), getCanvasHeight(state));
   for (const tower of targets) {
     const px = tower.x * CELL_SIZE;
     const py = tower.y * CELL_SIZE;
@@ -785,7 +785,7 @@ const drawTowerTargeting = (
     ctx.arc(cx, py + th / 2, Math.max(tw, th) * 0.9, 0, TWO_PI);
     ctx.fill();
 
-    const arrowTipY = Math.min(CANVAS_HEIGHT - 42, bottomY + 30 + bounce);
+    const arrowTipY = Math.min(getCanvasHeight(state) - 42, bottomY + 30 + bounce);
     const arrowTailY = arrowTipY + 28;
     const arrowHeadY = arrowTipY + 12;
     ctx.lineWidth = 4;

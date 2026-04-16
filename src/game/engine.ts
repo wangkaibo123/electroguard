@@ -1,7 +1,8 @@
 import {
   GameState, Tower, TowerType, CommandCardType, BaseUpgradeType, Position, Port, PortDirection, PortType, Wire, PickOption, EnemyType, ShopItemType,
   PickUiPhase,
-  GRID_WIDTH, GRID_HEIGHT, CELL_SIZE, HALF_CELL, TOWER_STATS, CANVAS_WIDTH, CANVAS_HEIGHT, WIRE_MAX_HP,
+  INITIAL_GRID_WIDTH, INITIAL_GRID_HEIGHT, CELL_SIZE, HALF_CELL, TOWER_STATS, WIRE_MAX_HP,
+  getCanvasHeight, getCanvasWidth, getGridHeight, getGridWidth,
 } from './types';
 import { t, pickKey } from './i18n';
 import { GLOBAL_CONFIG, ENEMY_CONFIG, ENEMY_GOLD_REWARD, STARTING_INVENTORY, PICK_POOL_CONFIG, WEAPON_CONFIG, COMMAND_CARD_CONFIG, BASE_UPGRADE_CONFIG, SHOP_CONFIG, SHOP_ITEM_CONFIG, SHOP_OFFER_BUCKETS, ADVANCED_TOWER_TYPES } from './config';
@@ -148,7 +149,7 @@ export const isPortAccessible = (
   ignoreWireId?: string,
 ): boolean => {
   const cell = getPortCell(tower, port);
-  if (cell.x < 0 || cell.x >= GRID_WIDTH || cell.y < 0 || cell.y >= GRID_HEIGHT) return false;
+  if (cell.x < 0 || cell.x >= getGridWidth(state) || cell.y < 0 || cell.y >= getGridHeight(state)) return false;
 
   for (const other of state.towers) {
     if (getTowerCells(other).some(otherCell => otherCell.x === cell.x && otherCell.y === cell.y)) {
@@ -311,7 +312,7 @@ export const canPlace = (
 ): boolean => {
   const s = TOWER_STATS[type];
   if (state.gameMode !== 'custom' && (state.towerInventory[type] ?? 0) <= 0) return false;
-  if (x < 0 || y < 0 || x + s.width > GRID_WIDTH || y + s.height > GRID_HEIGHT) return false;
+  if (x < 0 || y < 0 || x + s.width > getGridWidth(state) || y + s.height > getGridHeight(state)) return false;
   return !collidesWithTowers(x, y, s.width, s.height, state.towers, undefined, 0, type)
       && !collidesWithWires(x, y, s.width, s.height, state.wires, undefined, 0, type);
 };
@@ -321,11 +322,13 @@ export const canPlace = (
 export const findWirePath = (
   start: Position, end: Position, state: GameState, ignoreWireId?: string
 ): Position[] | null => {
-  if (start.x < 0 || start.x >= GRID_WIDTH || start.y < 0 || start.y >= GRID_HEIGHT) return null;
-  if (end.x < 0 || end.x >= GRID_WIDTH || end.y < 0 || end.y >= GRID_HEIGHT) return null;
+  const gridWidth = getGridWidth(state);
+  const gridHeight = getGridHeight(state);
+  if (start.x < 0 || start.x >= gridWidth || start.y < 0 || start.y >= gridHeight) return null;
+  if (end.x < 0 || end.x >= gridWidth || end.y < 0 || end.y >= gridHeight) return null;
 
   const blocked = new Set<number>();
-  const key = (x: number, y: number) => y * GRID_WIDTH + x;
+  const key = (x: number, y: number) => y * gridWidth + x;
 
   for (const t of state.towers) {
     for (const cell of getTowerCells(t)) blocked.add(key(cell.x, cell.y));
@@ -361,7 +364,7 @@ export const findWirePath = (
       const path: Position[] = [];
       let pk: number | undefined = cur.k;
       while (pk !== undefined) {
-        path.push({ x: pk % GRID_WIDTH, y: (pk / GRID_WIDTH) | 0 });
+        path.push({ x: pk % gridWidth, y: (pk / gridWidth) | 0 });
         pk = parent.get(pk);
       }
       path.reverse();
@@ -373,7 +376,7 @@ export const findWirePath = (
     for (let di = 0; di < 4; di++) {
       const [dx, dy] = NEIGHBOR_OFFSETS[di];
       const nx = cur.x + dx, ny = cur.y + dy;
-      if (nx < 0 || nx >= GRID_WIDTH || ny < 0 || ny >= GRID_HEIGHT) continue;
+      if (nx < 0 || nx >= gridWidth || ny < 0 || ny >= gridHeight) continue;
       const nk = key(nx, ny);
       if (blocked.has(nk)) continue;
       const turn = (curDir !== undefined && curDir !== di) ? TURN_COST : 0;
@@ -619,8 +622,8 @@ export const createInitialState = (): GameState => {
   const ch = TOWER_STATS.core.height;
   const core: Tower = {
     id: genId(), type: 'core',
-    x: (GRID_WIDTH >> 1) - Math.floor(cw / 2),
-    y: (GRID_HEIGHT >> 1) - Math.floor(ch / 2),
+    x: (INITIAL_GRID_WIDTH >> 1) - Math.floor(cw / 2),
+    y: (INITIAL_GRID_HEIGHT >> 1) - Math.floor(ch / 2),
     width: cw, height: ch,
     hp: TOWER_STATS.core.hp, maxHp: TOWER_STATS.core.hp,
     powered: true, storedPower: 0, maxPower: TOWER_STATS.core.maxPower, incomingPower: 0,
@@ -641,6 +644,8 @@ export const createInitialState = (): GameState => {
     status: 'menu',
     gameMode: 'normal',
     wave: 0,
+    mapWidth: INITIAL_GRID_WIDTH,
+    mapHeight: INITIAL_GRID_HEIGHT,
     powerTimer: 0,
     wireInventory: STARTING_INVENTORY.wires,
     gold: SHOP_CONFIG.startingGold,
@@ -814,7 +819,7 @@ export const applyTowerRotation = (
   const nw = needsSwap ? tower.height : tower.width;
   const nh = needsSwap ? tower.width : tower.height;
 
-  if (tower.x < 0 || tower.y < 0 || tower.x + nw > GRID_WIDTH || tower.y + nh > GRID_HEIGHT) return false;
+  if (tower.x < 0 || tower.y < 0 || tower.x + nw > getGridWidth(state) || tower.y + nh > getGridHeight(state)) return false;
   if (collidesWithTowers(tower.x, tower.y, nw, nh, state.towers, tower.id, 0, tower.type)) return false;
   if (collidesWithWires(tower.x, tower.y, nw, nh, state.wires, tower.id, 0, tower.type)) return false;
 
@@ -841,20 +846,22 @@ const pickEnemyType = (wave: number): EnemyType => {
   return pool[(Math.random() * pool.length) | 0];
 };
 
-const spawnPos = (): { x: number; y: number } => {
+const spawnPos = (state: GameState): { x: number; y: number } => {
   const side = (Math.random() * 4) | 0;
   let x = 0, y = 0;
-  if (side === 0)      { x = Math.random() * CANVAS_WIDTH;  y = -CELL_SIZE; }
-  else if (side === 1) { x = CANVAS_WIDTH + CELL_SIZE;      y = Math.random() * CANVAS_HEIGHT; }
-  else if (side === 2) { x = Math.random() * CANVAS_WIDTH;  y = CANVAS_HEIGHT + CELL_SIZE; }
-  else                 { x = -CELL_SIZE;                     y = Math.random() * CANVAS_HEIGHT; }
+  const canvasWidth = getCanvasWidth(state);
+  const canvasHeight = getCanvasHeight(state);
+  if (side === 0)      { x = Math.random() * canvasWidth;  y = -CELL_SIZE; }
+  else if (side === 1) { x = canvasWidth + CELL_SIZE;      y = Math.random() * canvasHeight; }
+  else if (side === 2) { x = Math.random() * canvasWidth;  y = canvasHeight + CELL_SIZE; }
+  else                 { x = -CELL_SIZE;                     y = Math.random() * canvasHeight; }
   return { x, y };
 };
 
 const pushEnemy = (state: GameState, type: EnemyType, _wave: number) => {
   const def = ENEMY_CONFIG[type];
   const hp = def.baseHp;
-  const { x, y } = spawnPos();
+  const { x, y } = spawnPos(state);
   const shieldHp = def.baseShield;
   state.enemies.push({
     id: genId(), enemyType: type, x, y,

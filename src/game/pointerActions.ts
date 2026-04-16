@@ -11,7 +11,7 @@ import {
   snapRotation,
   updatePowerGrid,
 } from './engine';
-import { CELL_SIZE, GRID_HEIGHT, GRID_WIDTH, GameState, WIRE_MAX_HP, Wire } from './types';
+import { CELL_SIZE, GameState, WIRE_MAX_HP, Wire, getGridHeight, getGridWidth } from './types';
 import { getDeleteButtonLayout, getRotationKnobLayout } from './render/towers';
 import { isWorldPointInTowerFootprint } from './footprint';
 
@@ -20,9 +20,9 @@ export const getGridCell = (wx: number, wy: number) => ({
   y: (wy / CELL_SIZE) | 0,
 });
 
-export const getHoverCell = (wx: number, wy: number) => {
+export const getHoverCell = (state: GameState, wx: number, wy: number) => {
   const cell = getGridCell(wx, wy);
-  return cell.x >= 0 && cell.x < GRID_WIDTH && cell.y >= 0 && cell.y < GRID_HEIGHT ? cell : null;
+  return cell.x >= 0 && cell.x < getGridWidth(state) && cell.y >= 0 && cell.y < getGridHeight(state) ? cell : null;
 };
 
 export const previewWirePath = (
@@ -71,7 +71,7 @@ export const moveDraggedTower = (
 
   const nx = ((wx / CELL_SIZE) | 0) - (tower.width >> 1);
   const ny = ((wy / CELL_SIZE) | 0) - (tower.height >> 1);
-  if (nx < 0 || ny < 0 || nx + tower.width > GRID_WIDTH || ny + tower.height > GRID_HEIGHT) return false;
+  if (nx < 0 || ny < 0 || nx + tower.width > getGridWidth(state) || ny + tower.height > getGridHeight(state)) return false;
   if (collidesWithTowers(nx, ny, tower.width, tower.height, state.towers, tower.id, 0, tower.type)) return false;
   if (collidesWithWires(nx, ny, tower.width, tower.height, state.wires, tower.id, 0, tower.type)) return false;
   if (tower.x === nx && tower.y === ny) return false;

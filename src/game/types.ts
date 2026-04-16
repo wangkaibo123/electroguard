@@ -224,6 +224,8 @@ export interface GameState {
   status: GameStatus;
   gameMode: GameMode;
   wave: number;
+  mapWidth: number;
+  mapHeight: number;
   powerTimer: number;
   wireInventory: number;
   gold: number;
@@ -269,6 +271,8 @@ export interface TowerStats {
 export const TOWER_STATS: Record<TowerType, TowerStats> = TOWER_CONFIG;
 
 export const WIRE_MAX_HP = GLOBAL_CONFIG.wireMaxHp;
+export const INITIAL_GRID_WIDTH = GLOBAL_CONFIG.initialGridWidth;
+export const INITIAL_GRID_HEIGHT = GLOBAL_CONFIG.initialGridHeight;
 export const GRID_WIDTH = GLOBAL_CONFIG.gridWidth;
 export const GRID_HEIGHT = GLOBAL_CONFIG.gridHeight;
 export const CELL_SIZE = GLOBAL_CONFIG.cellSize;
@@ -283,6 +287,11 @@ export interface Camera {
   y: number;    // world Y of viewport top-left
   zoom: number;
 }
+
+export const getGridWidth = (state: Pick<GameState, 'mapWidth'>) => state.mapWidth;
+export const getGridHeight = (state: Pick<GameState, 'mapHeight'>) => state.mapHeight;
+export const getCanvasWidth = (state: Pick<GameState, 'mapWidth'>) => state.mapWidth * CELL_SIZE;
+export const getCanvasHeight = (state: Pick<GameState, 'mapHeight'>) => state.mapHeight * CELL_SIZE;
 
 export const TURRET_RANGE: Partial<Record<TowerType, number>> = {
   blaster: WEAPON_CONFIG.blaster.range,

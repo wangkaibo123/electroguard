@@ -1,4 +1,4 @@
-import { GameState, TowerType, CommandCardType, CELL_SIZE, CANVAS_WIDTH, CANVAS_HEIGHT, Camera } from './types';
+import { GameState, TowerType, CommandCardType, CELL_SIZE, Camera, getCanvasHeight, getCanvasWidth } from './types';
 import { BG_DARK, BG_MID, BG_GRID, MAP_BORDER } from './render/constants';
 import { updateAndDrawDecorations } from './render/decorations';
 import {
@@ -49,16 +49,19 @@ export const renderGame = (
   ctx.scale(camera.zoom, camera.zoom);
   ctx.translate(-camera.x, -camera.y);
 
-  updateAndDrawDecorations(ctx, CANVAS_WIDTH, CANVAS_HEIGHT, now);
+  const canvasWidth = getCanvasWidth(state);
+  const canvasHeight = getCanvasHeight(state);
+
+  updateAndDrawDecorations(ctx, canvasWidth, canvasHeight, now);
 
   ctx.beginPath();
-  for (let i = 0; i <= CANVAS_WIDTH; i += CELL_SIZE) {
+  for (let i = 0; i <= canvasWidth; i += CELL_SIZE) {
     ctx.moveTo(i, 0);
-    ctx.lineTo(i, CANVAS_HEIGHT);
+    ctx.lineTo(i, canvasHeight);
   }
-  for (let i = 0; i <= CANVAS_HEIGHT; i += CELL_SIZE) {
+  for (let i = 0; i <= canvasHeight; i += CELL_SIZE) {
     ctx.moveTo(0, i);
-    ctx.lineTo(CANVAS_WIDTH, i);
+    ctx.lineTo(canvasWidth, i);
   }
   ctx.strokeStyle = BG_GRID;
   ctx.lineWidth = 1;
@@ -66,10 +69,10 @@ export const renderGame = (
 
   const borderW = Math.max(1.5, CELL_SIZE * 0.12);
   ctx.fillStyle = MAP_BORDER;
-  ctx.fillRect(0, 0, CANVAS_WIDTH, borderW);
-  ctx.fillRect(0, CANVAS_HEIGHT - borderW, CANVAS_WIDTH, borderW);
-  ctx.fillRect(0, 0, borderW, CANVAS_HEIGHT);
-  ctx.fillRect(CANVAS_WIDTH - borderW, 0, borderW, CANVAS_HEIGHT);
+  ctx.fillRect(0, 0, canvasWidth, borderW);
+  ctx.fillRect(0, canvasHeight - borderW, canvasWidth, borderW);
+  ctx.fillRect(0, 0, borderW, canvasHeight);
+  ctx.fillRect(canvasWidth - borderW, 0, borderW, canvasHeight);
 
   drawOccupiedGround(ctx, state);
   drawWires(ctx, state);

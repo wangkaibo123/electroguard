@@ -1,8 +1,9 @@
 ﻿import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   GameState, TowerType, CommandCardType, ShopItemType, ShopPackType, Port, Wire, EnemyType,
-  CANVAS_WIDTH, CANVAS_HEIGHT, WIRE_MAX_HP,
+  WIRE_MAX_HP,
   VIEWPORT_WIDTH, VIEWPORT_HEIGHT,
+  getCanvasHeight, getCanvasWidth,
 } from './types';
 import {
   createInitialState, updatePowerGrid, getPortPos, getPortCell, findWirePath,
@@ -101,6 +102,10 @@ export const useGameLoop = () => {
   const lastTimeRef = useRef(0);
 
   const cameraRef = useRef(createInitialCamera());
+  const lastMapSizeRef = useRef({
+    width: stateRef.current.mapWidth,
+    height: stateRef.current.mapHeight,
+  });
 
   // Pan state
   const isPanningRef = useRef(false);
@@ -175,10 +180,12 @@ export const useGameLoop = () => {
   const startGame = () => {
     const s = createInitialState();
     deployStartingLoadout(s);
-    s.status = 'pick';
+    s.status = 'playing';
     s.gameMode = 'normal';
-    s.pickOptions = generatePickOptions();
+    s.needsPick = false;
+    s.pickOptions = [];
     stateRef.current = s;
+    lastMapSizeRef.current = { width: s.mapWidth, height: s.mapHeight };
     setPlaceMonsterMode(false);
     setSelectedMonsterType('grunt');
     setStaticMonster(true);
@@ -196,6 +203,7 @@ export const useGameLoop = () => {
     s.commandCardInventory = Object.fromEntries(COMMAND_CARD_TYPES.map(type => [type, 1]));
     s.needsPick = false;
     stateRef.current = s;
+    lastMapSizeRef.current = { width: s.mapWidth, height: s.mapHeight };
     setPlaceMonsterMode(false);
     setSelectedMonsterType('grunt');
     setStaticMonster(true);
@@ -214,6 +222,7 @@ export const useGameLoop = () => {
     const s = createInitialState();
     s.status = 'menu';
     stateRef.current = s;
+    lastMapSizeRef.current = { width: s.mapWidth, height: s.mapHeight };
     setSelectedTower(null);
     setPlaceMonsterMode(false);
     setSelectedMonsterType('grunt');
@@ -223,7 +232,7 @@ export const useGameLoop = () => {
   };
 
   const spawnStaticMonsterAt = (state: GameState, x: number, y: number) => {
-    if (x < 0 || y < 0 || x > CANVAS_WIDTH || y > CANVAS_HEIGHT) return false;
+    if (x < 0 || y < 0 || x > getCanvasWidth(state) || y > getCanvasHeight(state)) return false;
     spawnEnemyAt(state, selectedMonsterTypeRef.current, Math.max(1, state.wave || 1), x, y, {
       isStatic: staticMonsterRef.current,
     });
@@ -397,7 +406,7 @@ export const useGameLoop = () => {
   const repairTowerAtWorld = (wx: number, wy: number) => {
     const state = stateRef.current;
     if (state.status !== 'playing') return false;
-    if (wx < 0 || wy < 0 || wx > CANVAS_WIDTH || wy > CANVAS_HEIGHT) {
+    if (wx < 0 || wy < 0 || wx > getCanvasWidth(state) || wy > getCanvasHeight(state)) {
       showToast(t().repairCannotUse);
       setActiveRepair(false);
       sync();
@@ -574,7 +583,7 @@ export const useGameLoop = () => {
     const state = stateRef.current;
     if (state.status !== 'playing') return false;
     if (requireInventory && (state.commandCardInventory[cardType] ?? 0) <= 0) return false;
-    if (wx < 0 || wy < 0 || wx > CANVAS_WIDTH || wy > CANVAS_HEIGHT) return false;
+    if (wx < 0 || wy < 0 || wx > getCanvasWidth(state) || wy > getCanvasHeight(state)) return false;
 
     const targetTower = findTowerAtWorldPoint(state, wx, wy);
     if (!canApplyMachineCommandCard(state, cardType, targetTower)) {
@@ -793,7 +802,7 @@ export const useGameLoop = () => {
       const cam = cameraRef.current;
       cam.x -= (sx - panLastRef.current.x) / cam.zoom;
       cam.y -= (sy - panLastRef.current.y) / cam.zoom;
-      clampCamera(cam, viewportRef.current);
+      clampCamera(cam, viewportRef.current, stateRef.current);
       panLastRef.current = { x: sx, y: sy };
       return;
     }
@@ -803,7 +812,7 @@ export const useGameLoop = () => {
     const { wx, wy } = toWorld(sx, sy);
     mousePxRef.current = { x: wx, y: wy };
 
-    hoverRef.current = getHoverCell(wx, wy);
+    hoverRef.current = getHoverCell(state, wx, wy);
 
     if (dragWireStartRef.current) {
       dragWirePathRef.current = previewWirePath(state, dragWireStartRef.current, wx, wy, 15);
@@ -843,13 +852,13 @@ export const useGameLoop = () => {
 
     // Adjust zoom
     const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
-    const minZoom = getMinZoom(viewportRef.current);
+    const minZoom = getMinZoom(viewportRef.current, stateRef.current);
     cam.zoom = Math.max(minZoom, Math.min(MAX_ZOOM, cam.zoom * factor));
 
     // Keep world point under cursor after zoom
     cam.x = wx - sx / cam.zoom;
     cam.y = wy - sy / cam.zoom;
-    clampCamera(cam, viewportRef.current);
+    clampCamera(cam, viewportRef.current, stateRef.current);
   };
 
   const handleCanvasContextMenu = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -901,11 +910,11 @@ export const useGameLoop = () => {
         const wx = mx / cam.zoom + cam.x;
         const wy = my / cam.zoom + cam.y;
         const factor = dist / lastPinchDistRef.current;
-        const minZoom = getMinZoom(viewportRef.current);
+        const minZoom = getMinZoom(viewportRef.current, stateRef.current);
         cam.zoom = Math.max(minZoom, Math.min(MAX_ZOOM, cam.zoom * factor));
         cam.x = wx - mx / cam.zoom;
         cam.y = wy - my / cam.zoom;
-        clampCamera(cam, viewportRef.current);
+        clampCamera(cam, viewportRef.current, stateRef.current);
       }
       lastPinchDistRef.current = dist;
       return;
@@ -921,7 +930,7 @@ export const useGameLoop = () => {
       const cam = cameraRef.current;
       cam.x -= (sx - panLastRef.current.x) / cam.zoom;
       cam.y -= (sy - panLastRef.current.y) / cam.zoom;
-      clampCamera(cam, viewportRef.current);
+      clampCamera(cam, viewportRef.current, stateRef.current);
       panLastRef.current = { x: sx, y: sy };
       return;
     }
@@ -931,7 +940,7 @@ export const useGameLoop = () => {
     const { wx, wy } = toWorld(sx, sy);
     mousePxRef.current = { x: wx, y: wy };
 
-    hoverRef.current = getHoverCell(wx, wy);
+    hoverRef.current = getHoverCell(state, wx, wy);
 
     if (dragWireStartRef.current) {
       dragWirePathRef.current = previewWirePath(state, dragWireStartRef.current, wx, wy, 20);
@@ -964,6 +973,16 @@ export const useGameLoop = () => {
       sync();
     }
 
+    const previousMapSize = lastMapSizeRef.current;
+    if (state.mapWidth !== previousMapSize.width || state.mapHeight !== previousMapSize.height) {
+      cameraRef.current.x += ((state.mapWidth - previousMapSize.width) * GLOBAL_CONFIG.cellSize) / 2;
+      cameraRef.current.y += ((state.mapHeight - previousMapSize.height) * GLOBAL_CONFIG.cellSize) / 2;
+      lastMapSizeRef.current = { width: state.mapWidth, height: state.mapHeight };
+      const minZoom = getMinZoom(viewportRef.current, state);
+      if (cameraRef.current.zoom < minZoom) cameraRef.current.zoom = minZoom;
+      clampCamera(cameraRef.current, viewportRef.current, state);
+    }
+
     // 鈹€鈹€ Render 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
     const pending = pendingCanvasSizeRef.current;
     if (pending && canvasRef.current) {
@@ -972,9 +991,9 @@ export const useGameLoop = () => {
       if (c.height !== pending.ph) c.height = pending.ph;
       viewportRef.current = { width: pending.w, height: pending.h };
       const cam = cameraRef.current;
-      const minZoom = getMinZoom(viewportRef.current);
+      const minZoom = getMinZoom(viewportRef.current, stateRef.current);
       if (cam.zoom < minZoom) cam.zoom = minZoom;
-      clampCamera(cam, viewportRef.current);
+      clampCamera(cam, viewportRef.current, stateRef.current);
       pendingCanvasSizeRef.current = null;
     }
     const ctx = canvasRef.current?.getContext('2d');
@@ -1024,9 +1043,9 @@ export const useGameLoop = () => {
       if (canvas.height !== pixelH) canvas.height = pixelH;
       viewportRef.current = { width, height };
       const cam = cameraRef.current;
-      const minZoom = getMinZoom(viewportRef.current);
+      const minZoom = getMinZoom(viewportRef.current, stateRef.current);
       if (cam.zoom < minZoom) cam.zoom = minZoom;
-      clampCamera(cam, viewportRef.current);
+      clampCamera(cam, viewportRef.current, stateRef.current);
     };
 
     const updateCanvasSize = (immediate?: boolean) => {

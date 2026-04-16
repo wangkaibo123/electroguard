@@ -1,4 +1,4 @@
-import { GameState, GRID_HEIGHT, GRID_WIDTH, TOWER_STATS, TowerType } from './types';
+import { GameState, TOWER_STATS, TowerType, getGridHeight, getGridWidth } from './types';
 import { collidesWithTowers, collidesWithWires } from './engine';
 import { footprintsOverlap } from './footprint';
 
@@ -12,7 +12,7 @@ export const canPlaceTowerAt = (
 ) => {
   const stats = TOWER_STATS[type];
 
-  if (x < 0 || y < 0 || x + stats.width > GRID_WIDTH || y + stats.height > GRID_HEIGHT) {
+  if (x < 0 || y < 0 || x + stats.width > getGridWidth(state) || y + stats.height > getGridHeight(state)) {
     return false;
   }
 
@@ -60,8 +60,8 @@ export const findAutoPlacementNearCore = (
   const coreCy = core.y + core.height / 2;
   const candidates: { x: number; y: number; distance: number }[] = [];
 
-  for (let y = 0; y <= GRID_HEIGHT - stats.height; y++) {
-    for (let x = 0; x <= GRID_WIDTH - stats.width; x++) {
+  for (let y = 0; y <= getGridHeight(state) - stats.height; y++) {
+    for (let x = 0; x <= getGridWidth(state) - stats.width; x++) {
       if (!canPlaceTowerAt(state, type, x, y, undefined, clearance)) continue;
       if (getTowerGapFromCore(core, x, y, stats.width, stats.height) < minGapFromCore) continue;
       const towerCx = x + stats.width / 2;

@@ -8,10 +8,16 @@ import type { Tower, TowerType, EnemyType, CommandCardType, BaseUpgradeType, Sho
 // ── 1. 全局参数 ─────────────────────────────────────────────────────────────
 
 export const GLOBAL_CONFIG = {
+  /** Starting map width in grid cells. */
+  initialGridWidth: 60,
+  /** Starting map height in grid cells. */
+  initialGridHeight: 60,
   /** 地图宽度（格子数） */
   gridWidth: 100,
   /** 地图高度（格子数） */
   gridHeight: 100,
+  /** Grid cells added to both width and height after each boss clear. */
+  mapExpandStep: 10,
   /** 每格像素边长（px），地图实际像素 = gridWidth × cellSize */
   cellSize: 20,
   /** 视口初始宽度（CSS px） */
