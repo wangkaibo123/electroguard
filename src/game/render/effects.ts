@@ -262,6 +262,25 @@ export const drawProjectiles = (ctx: CanvasRenderingContext2D, state: GameState)
       ctx.strokeStyle = 'rgba(254,205,211,0.82)';
       ctx.stroke();
 
+      ctx.strokeStyle = 'rgba(251,113,133,0.72)';
+      ctx.lineWidth = 1;
+      for (let i = 2; i < points.length - 1; i += 2) {
+        const prev = points[i - 1];
+        const point = points[i];
+        const next = points[i + 1];
+        const dx = next.x - prev.x;
+        const dy = next.y - prev.y;
+        const len = Math.hypot(dx, dy) || 1;
+        const nx = -dy / len;
+        const ny = dx / len;
+        const t = i / Math.max(1, points.length - 1);
+        const radius = sz * (0.65 + t * 0.9);
+        ctx.beginPath();
+        ctx.moveTo(point.x - nx * radius, point.y - ny * radius);
+        ctx.quadraticCurveTo(point.x, point.y, point.x + nx * radius, point.y + ny * radius);
+        ctx.stroke();
+      }
+
       const flareX = headX - Math.cos(angle) * sz * 3.2;
       const flareY = headY - Math.sin(angle) * sz * 3.2;
       ctx.strokeStyle = 'rgba(251,191,36,0.72)';

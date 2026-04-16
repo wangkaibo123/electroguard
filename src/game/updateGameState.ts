@@ -109,6 +109,8 @@ const CORE_TURRET_DAMAGE = BASE_UPGRADE_CONFIG.core_turret_unlock.coreTurretDama
 const CORE_TURRET_COOLDOWN = BASE_UPGRADE_CONFIG.core_turret_unlock.coreTurretCooldown ?? 1200;
 const MISSILE_SILO_COUNT = 4;
 const MISSILE_TURN_RATE = Math.PI * 1.45;
+const MISSILE_SPIRAL_AMPLITUDE = 7;
+const MISSILE_SPIRAL_ANGULAR_SPEED = 18;
 
 const getMissileSiloOffset = (index: number, span: number) => {
   const gap = span * 0.18;
@@ -590,6 +592,9 @@ const updateCombatTowers = (state: GameState, dt: number, now: number) => {
         initialDistance: Math.max(120, targetDistance),
         turnRate: MISSILE_TURN_RATE,
         trail: [{ x: silo.x, y: silo.y }],
+        spiralPhase: (siloIndex / MISSILE_SILO_COUNT) * TWO_PI,
+        spiralAmplitude: MISSILE_SPIRAL_AMPLITUDE,
+        spiralAngularSpeed: MISSILE_SPIRAL_ANGULAR_SPEED,
       });
       tower.missileSiloCursor = (siloIndex + 1) % MISSILE_SILO_COUNT;
       tower.lastActionTime = now;
@@ -1019,10 +1024,20 @@ const updateProjectiles = (state: GameState, dt: number) => {
       }
 
       const angle = projectile.angle ?? 0;
-      projectile.x += Math.cos(angle) * step;
-      projectile.y += Math.sin(angle) * step;
+      const prevPhase = projectile.spiralPhase ?? 0;
+      const nextPhase = prevPhase + (projectile.spiralAngularSpeed ?? MISSILE_SPIRAL_ANGULAR_SPEED) * dt;
+      const amplitude = projectile.spiralAmplitude ?? MISSILE_SPIRAL_AMPLITUDE;
+      const prevOffset = Math.sin(prevPhase) * amplitude;
+      const nextOffset = Math.sin(nextPhase) * amplitude;
+      const lateralStep = nextOffset - prevOffset;
+      const perpX = -Math.sin(angle);
+      const perpY = Math.cos(angle);
+
+      projectile.x += Math.cos(angle) * step + perpX * lateralStep;
+      projectile.y += Math.sin(angle) * step + perpY * lateralStep;
       projectile.traveled = (projectile.traveled ?? 0) + step;
-      projectile.trail = [...(projectile.trail ?? []), { x: projectile.x, y: projectile.y }].slice(-10);
+      projectile.spiralPhase = nextPhase;
+      projectile.trail = [...(projectile.trail ?? []), { x: projectile.x, y: projectile.y }].slice(-16);
 
       if (target && Math.hypot(target.x - projectile.x, target.y - projectile.y) < target.radius + 5) {
         applySplashDamage(
