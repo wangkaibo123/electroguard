@@ -703,8 +703,11 @@ export const dispatchPulse = (state: GameState, src: Tower, isBattery = false): 
 
   while (queue.length > 0) {
     const { tower, path } = queue.shift()!;
+    const hasDockedRepairDrone =
+      tower.type !== 'repair_drone' ||
+      !state.repairDrones.some((drone) => drone.sourceTowerId === tower.id);
 
-    const canReceivePulse = !tower.isRuined && tower.id !== src.id && (
+    const canReceivePulse = !tower.isRuined && tower.id !== src.id && hasDockedRepairDrone && (
       tower.type === 'gatling'
         ? gatlingNeedsPower(state, tower)
         : (tower.storedPower + tower.incomingPower) < tower.maxPower

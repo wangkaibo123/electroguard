@@ -71,56 +71,42 @@ export const drawPulses = (ctx: CanvasRenderingContext2D, state: GameState, now:
         const cy = (source.y + source.height / 2) * CELL_SIZE;
         const sourceRadius = Math.min(source.width, source.height) * CELL_SIZE * 0.48;
         const t = 1 - p.launchDelay / p.launchDuration;
-        const shrink = 1 - t;
-        const outerRadius = Math.max(8, sourceRadius * (0.98 - 0.7 * t));
-        const innerRadius = Math.max(0, outerRadius - (8 + 10 * shrink));
-        const pulseRadius = 4 + 8 * t;
-        const haloRadius = pulseRadius + 12 + 8 * t;
-        const alpha = 0.35 + 0.6 * t;
+        const expandEnd = 0.38;
+        const expanding = t < expandEnd;
+        const phase = expanding ? t / expandEnd : (t - expandEnd) / (1 - expandEnd);
+        const easedExpand = 1 - Math.pow(1 - phase, 3);
+        const easedShrink = phase * phase * (3 - 2 * phase);
+        const startRadius = sourceRadius * 0.74;
+        const peakRadius = sourceRadius * 1.08;
+        const pulseRadius = 5;
+        const ringRadius = expanding
+          ? startRadius + (peakRadius - startRadius) * easedExpand
+          : peakRadius + (pulseRadius - peakRadius) * easedShrink;
+        const alpha = expanding ? 0.72 + 0.18 * easedExpand : 0.95 - 0.12 * easedShrink;
+        const ringWidth = expanding ? 5.4 + 1.4 * easedExpand : 7.2 - 1.4 * easedShrink;
 
         ctx.save();
-        ctx.shadowColor = PULSE_CLR;
-        ctx.shadowBlur = 18;
+        ctx.shadowBlur = 0;
+        ctx.lineCap = 'round';
 
-        // Filled energy ring that collapses inward to clearly telegraph the dispatch rhythm.
-        const ringFill = ctx.createRadialGradient(cx, cy, innerRadius, cx, cy, outerRadius);
-        ringFill.addColorStop(0, `rgba(255,245,180,${0.15 + 0.3 * shrink})`);
-        ringFill.addColorStop(0.45, `rgba(251,191,36,${0.55 + 0.25 * shrink})`);
-        ringFill.addColorStop(1, `rgba(251,191,36,${0.1 + 0.5 * shrink})`);
-        ctx.fillStyle = ringFill;
+        ctx.strokeStyle = `rgba(250,204,21,${alpha})`;
+        ctx.lineWidth = ringWidth;
         ctx.beginPath();
-        ctx.arc(cx, cy, outerRadius, 0, TWO_PI);
-        ctx.arc(cx, cy, innerRadius, 0, TWO_PI, true);
-        ctx.fill();
-
-        ctx.strokeStyle = `rgba(255,240,160,${0.35 + 0.45 * shrink})`;
-        ctx.lineWidth = 1.5 + 2 * shrink;
-        ctx.beginPath();
-        ctx.arc(cx, cy, outerRadius, 0, TWO_PI);
+        ctx.arc(cx, cy, ringRadius, 0, TWO_PI);
         ctx.stroke();
 
-        const halo = ctx.createRadialGradient(cx, cy, 0, cx, cy, haloRadius);
-        halo.addColorStop(0, `rgba(251,191,36,${alpha})`);
-        halo.addColorStop(0.55, `rgba(251,191,36,${alpha * 0.45})`);
-        halo.addColorStop(1, 'rgba(251,191,36,0)');
-        ctx.fillStyle = halo;
+        ctx.strokeStyle = `rgba(254,240,138,${0.78 * alpha})`;
+        ctx.lineWidth = Math.max(2, ringWidth * 0.35);
         ctx.beginPath();
-        ctx.arc(cx, cy, haloRadius, 0, TWO_PI);
-        ctx.fill();
+        ctx.arc(cx, cy, ringRadius, -Math.PI / 2, Math.PI / 2);
+        ctx.stroke();
 
-        ctx.fillStyle = PULSE_CLR;
-        ctx.beginPath();
-        ctx.arc(cx, cy, pulseRadius, 0, TWO_PI);
-        ctx.fill();
-
-        const coreFlash = ctx.createRadialGradient(cx, cy, 0, cx, cy, pulseRadius * 1.8);
-        coreFlash.addColorStop(0, `rgba(255,252,220,${0.75 + 0.2 * t})`);
-        coreFlash.addColorStop(0.6, `rgba(255,224,120,${0.3 + 0.25 * t})`);
-        coreFlash.addColorStop(1, 'rgba(255,224,120,0)');
-        ctx.fillStyle = coreFlash;
-        ctx.beginPath();
-        ctx.arc(cx, cy, pulseRadius * 1.8, 0, TWO_PI);
-        ctx.fill();
+        if (!expanding) {
+          ctx.fillStyle = PULSE_CLR;
+          ctx.beginPath();
+          ctx.arc(cx, cy, 3.5 + 2.5 * (1 - easedShrink), 0, TWO_PI);
+          ctx.fill();
+        }
 
         if (p.path.length > 1) {
           const lead = p.path[1];
@@ -316,24 +302,28 @@ const drawRepairDroneModel = (
   now: number,
   color: string,
   energy: number,
+  active = true,
 ) => {
-  const pulse = 0.75 + Math.sin(now / 80 + x * 0.02) * 0.25;
+  const pulse = active ? 0.75 + Math.sin(now / 80 + x * 0.02) * 0.25 : 0.45;
+  const bodyColor = active ? color : '#64748b';
+  const rotorColor = active ? `rgba(153,246,228,${0.65 + 0.25 * pulse})` : 'rgba(148,163,184,0.5)';
+  const rotorAngle = active ? now / 50 : 0;
 
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(angle);
-  ctx.shadowColor = color;
-  ctx.shadowBlur = 10;
+  ctx.shadowColor = bodyColor;
+  ctx.shadowBlur = active ? 10 : 0;
 
-  ctx.fillStyle = 'rgba(15,23,42,0.94)';
-  ctx.strokeStyle = color;
+  ctx.fillStyle = active ? 'rgba(15,23,42,0.94)' : 'rgba(30,41,59,0.92)';
+  ctx.strokeStyle = bodyColor;
   ctx.lineWidth = 1.4;
   ctx.beginPath();
   ctx.roundRect(-7, -4, 14, 8, 3);
   ctx.fill();
   ctx.stroke();
 
-  ctx.strokeStyle = `rgba(153,246,228,${0.65 + 0.25 * pulse})`;
+  ctx.strokeStyle = rotorColor;
   ctx.lineWidth = 1.6;
   ctx.beginPath();
   ctx.moveTo(-4, -5);
@@ -354,22 +344,33 @@ const drawRepairDroneModel = (
     { x: 10, y: 9 },
   ]) {
     ctx.beginPath();
-    ctx.ellipse(rotor.x, rotor.y, 5 + pulse * 2, 1.5, now / 50, 0, TWO_PI);
+    ctx.ellipse(rotor.x, rotor.y, 5 + pulse * 2, 1.5, rotorAngle, 0, TWO_PI);
     ctx.stroke();
   }
 
-  ctx.fillStyle = color;
-  ctx.shadowBlur = 5;
+  ctx.fillStyle = bodyColor;
+  ctx.shadowBlur = active ? 5 : 0;
   ctx.beginPath();
   ctx.arc(5, 0, 2.2, 0, TWO_PI);
   ctx.fill();
 
   if (energy > 0) {
-    ctx.fillStyle = '#fef08a';
+    ctx.fillStyle = 'rgba(254,240,138,0.24)';
     ctx.shadowColor = '#fef08a';
-    ctx.shadowBlur = 4;
+    ctx.shadowBlur = 7;
+    ctx.beginPath();
+    ctx.roundRect(-6.5, -3, 13, 6, 3);
+    ctx.fill();
+
+    ctx.fillStyle = '#fef08a';
+    ctx.strokeStyle = 'rgba(254,240,138,0.85)';
+    ctx.lineWidth = 0.8;
     for (let i = 0; i < energy; i++) {
-      ctx.fillRect(-5 + i * 5, -1.5, 3, 3);
+      const bx = -5.5 + i * 5.5;
+      ctx.beginPath();
+      ctx.roundRect(bx, -2, 4, 4, 1);
+      ctx.fill();
+      ctx.stroke();
     }
   }
 
@@ -392,7 +393,17 @@ export const drawRepairDrones = (ctx: CanvasRenderingContext2D, state: GameState
   for (const tower of dockedDrones) {
     const x = (tower.x + tower.width / 2) * CELL_SIZE;
     const y = (tower.y + tower.height / 2) * CELL_SIZE;
-    drawRepairDroneModel(ctx, x, y, -Math.PI / 2, now, '#2dd4bf', 0);
+    const hasPower = tower.storedPower > 0;
+    drawRepairDroneModel(
+      ctx,
+      x,
+      y,
+      -Math.PI / 2,
+      now,
+      tower.storedPower >= tower.maxPower ? '#99f6e4' : '#2dd4bf',
+      tower.storedPower,
+      hasPower,
+    );
   }
 
   for (const drone of state.repairDrones) {

@@ -88,7 +88,7 @@ export const TOWER_CONFIG: Record<TowerType, {
   bus:       { hp: 120,  description: 'Merges up to 3 input wires into 3 outputs.',                color: '#38bdf8', width: 3, height: 2, maxPower: 0, maxShieldHp: 0,   shieldRadius: 0 },
   missile:   { hp: 180,  description: 'Long-range tower with four missile silos. Each missile costs 4 power and lands with splash damage.', color: '#fb7185', width: 4, height: 4, maxPower: 16, maxShieldHp: 0, shieldRadius: 0 },
   big_generator: { hp: 220, description: 'Large power source. Produces 4 power every 2 seconds.', color: '#fde047', width: 4, height: 4, maxPower: 0, maxShieldHp: 0, shieldRadius: 0 },
-  repair_drone: { hp: 170, description: 'Deploys drones that carry power to repair damaged buildings.', color: '#2dd4bf', width: 4, height: 4, maxPower: 4, maxShieldHp: 0, shieldRadius: 0 },
+  repair_drone: { hp: 170, description: 'Deploys drones that carry power to repair damaged buildings.', color: '#2dd4bf', width: 4, height: 4, maxPower: 2, maxShieldHp: 0, shieldRadius: 0 },
 };
 
 // ── 3. 武器参数 ─────────────────────────────────────────────────────────────

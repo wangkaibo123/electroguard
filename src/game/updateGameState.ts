@@ -1099,6 +1099,9 @@ const updateRepairDrones = (state: GameState, dt: number, now: number) => {
       if (drone.phase === 'outbound') {
         drone.phase = target && !target.isRuined && target.hp < target.maxHp ? 'repairing' : 'returning';
       } else {
+        if (sourceTower && !sourceTower.isRuined && sourceTower.type === 'repair_drone') {
+          sourceTower.storedPower = Math.min(sourceTower.maxPower, drone.energy);
+        }
         state.repairDrones.splice(index, 1);
       }
     }

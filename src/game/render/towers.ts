@@ -1,7 +1,7 @@
 import { GameState, Tower, TowerType, CommandCardType, CELL_SIZE, HALF_CELL, TOWER_STATS, CANVAS_WIDTH, CANVAS_HEIGHT, getTowerRange } from '../types';
 import { getPortPos, isPortAccessible } from '../engine';
 import { getLinearTowerBodyAspectRatio, getLinearTowerBodyRect } from '../linearTowerGeometry';
-import { COMMAND_CARD_CONFIG, getTowerSellPrice } from '../config';
+import { COMMAND_CARD_CONFIG, GLOBAL_CONFIG, getTowerSellPrice } from '../config';
 import { __iconNode as coinsIconNode } from 'lucide-react/dist/esm/icons/coins.js';
 import { __iconNode as trash2IconNode } from 'lucide-react/dist/esm/icons/trash-2.js';
 import {
@@ -90,11 +90,44 @@ const drawEnergyEffect = (
   now: number,
   powered: boolean,
   color: string,
+  powerProgress?: number,
 ) => {
   const s = ENERGY_EFFECT_SIZE;
+  const useRhythmRing = powered && powerProgress != null;
 
   ctx.lineWidth = 1.5;
-  if (powered) {
+  if (useRhythmRing) {
+    const progress = Math.max(0, Math.min(1, powerProgress));
+    const ringRadius = s * 1.62;
+    const startAngle = -Math.PI / 2;
+    const endAngle = startAngle + TWO_PI * progress;
+
+    ctx.save();
+    ctx.shadowBlur = 0;
+    ctx.lineCap = 'round';
+
+    ctx.strokeStyle = 'rgba(113,63,18,0.7)';
+    ctx.lineWidth = 5.6;
+    ctx.beginPath();
+    ctx.arc(cx, cy, ringRadius, 0, TWO_PI);
+    ctx.stroke();
+
+    if (progress > 0.01) {
+      ctx.strokeStyle = 'rgba(250,204,21,0.96)';
+      ctx.lineWidth = 5.2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, ringRadius, startAngle, endAngle);
+      ctx.stroke();
+
+      ctx.strokeStyle = 'rgba(254,240,138,0.95)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, ringRadius, Math.max(startAngle, endAngle - 0.34), endAngle);
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  } else if (powered) {
     const arcCount = 3;
     for (let i = 0; i < arcCount; i++) {
       const baseAngle = (i / arcCount) * TWO_PI + now / 800;
@@ -107,7 +140,7 @@ const drawEnergyEffect = (
     }
   }
 
-  if (powered) {
+  if (powered && !useRhythmRing) {
     const pulse = 0.08 + 0.07 * Math.sin(now / 250);
     const glowR = s * 1.5;
     const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, glowR);
@@ -128,7 +161,7 @@ const drawEnergyEffect = (
   ctx.lineTo(cx - s * 0.1, cy + s);
   ctx.stroke();
 
-  if (powered) {
+  if (powered && !useRhythmRing) {
     ctx.lineWidth = 1;
     for (let sp = 0; sp < 4; sp++) {
       const spAngle = (sp / 4) * TWO_PI + now / 600;
@@ -470,6 +503,8 @@ export const drawPorts = (ctx: CanvasRenderingContext2D, state: GameState) => {
 
 // ── Tower bodies ────────────────────────────────────────────────────────────
 export const drawTowers = (ctx: CanvasRenderingContext2D, state: GameState, now: number, activeRepair = false) => {
+  const generatorPowerProgress = state.powerTimer / GLOBAL_CONFIG.powerInterval;
+
   for (const tower of state.towers) {
     const px = tower.x * CELL_SIZE, py = tower.y * CELL_SIZE;
     const tw = tower.width * CELL_SIZE, th = tower.height * CELL_SIZE;
@@ -559,10 +594,10 @@ export const drawTowers = (ctx: CanvasRenderingContext2D, state: GameState, now:
         getLinearTowerVisualLandscape(tower),
         getLinearTowerBodyAspectRatio(tower.type),
       );
-      drawTowerDetails(ctx, tower, body.x, body.y, body.width, body.height, cx, cy, tColor, inset, now);
+      drawTowerDetails(ctx, tower, body.x, body.y, body.width, body.height, cx, cy, tColor, inset, now, generatorPowerProgress);
       if (tower.isRuined) drawRuinOverlay(ctx, body.x, body.y, body.width, body.height, inset);
     } else {
-      drawTowerDetails(ctx, tower, visual.px, visual.py, visual.tw, visual.th, cx, cy, tColor, inset, now);
+      drawTowerDetails(ctx, tower, visual.px, visual.py, visual.tw, visual.th, cx, cy, tColor, inset, now, generatorPowerProgress);
       if (tower.isRuined) drawRuinOverlay(ctx, visual.px, visual.py, visual.tw, visual.th, inset);
     }
 
@@ -1044,7 +1079,7 @@ const drawMuzzleBrake = (
 function drawTowerDetails(
   ctx: CanvasRenderingContext2D, t: Tower,
   px: number, py: number, tw: number, th: number, cx: number, cy: number,
-  tColor: string, inset: number, now: number,
+  tColor: string, inset: number, now: number, generatorPowerProgress: number,
 ) {
   if (t.type === 'core') {
     const R = Math.min(tw, th);
@@ -1414,7 +1449,7 @@ function drawTowerDetails(
     }
 
   } else if (t.type === 'generator' || t.type === 'big_generator') {
-    drawEnergyEffect(ctx, cx, cy, now, t.powered, tColor);
+    drawEnergyEffect(ctx, cx, cy, now, t.powered, tColor, generatorPowerProgress);
     if (t.type === 'big_generator') {
       ctx.strokeStyle = tColor;
       ctx.lineWidth = 1.5;
