@@ -1175,12 +1175,10 @@ function drawTowerDetails(
   tColor: string, inset: number, now: number, generatorPowerProgress: number,
 ) {
   if (t.type === 'core') {
-    const R = Math.min(tw, th);
     const outputting = hasGeneratorOutputTarget(state, t);
-    drawEnergyEffect(ctx, cx, cy, now, t.powered, tColor, outputting ? generatorPowerProgress : 0, outputting);
-    ctx.strokeStyle = tColor; ctx.lineWidth = 1.5;
-    drawPowerOutputIndicator(ctx, cx, cy, GENERATOR_POWER_OUTPUT_RADIUS, getPowerOutputAmount(t), now, tColor);
-    ctx.beginPath(); ctx.arc(cx, cy, R / 5, 0, TWO_PI); ctx.stroke();
+    const generatorColor = TOWER_STATS.generator.color;
+    drawEnergyEffect(ctx, cx, cy, now, t.powered, generatorColor, outputting ? generatorPowerProgress : 0, outputting);
+    drawPowerOutputIndicator(ctx, cx, cy, GENERATOR_POWER_OUTPUT_RADIUS, getPowerOutputAmount(t), now, generatorColor);
   } else if (t.type === 'blaster') {
     const r = Math.min(tw, th) / 5;
     const hs = r * 0.9;
