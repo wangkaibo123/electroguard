@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { Activity, BookOpen, Cable, Coins, Globe, Keyboard, LogOut, Pause, Play, RotateCcw, Wrench, X } from 'lucide-react';
 import { useGameLoop } from './game/useGameLoop';
-import { TowerType } from './game/types';
+import type { GameState, TowerType } from './game/types';
 import { t, getLocale, setLocale, Locale } from './game/i18n';
 import { GLOBAL_CONFIG, TIPS_CONFIG } from './game/config';
 import { PickOverlay } from './game/ui/PickOverlay';
@@ -57,6 +57,28 @@ const ControlKeyIcon = ({ code }: { code: string }) => {
   }
   return <KeyCap>{code}</KeyCap>;
 };
+
+const AUTO_DEPLOY_TUTORIAL_STEP = 3;
+const WIRE_TUTORIAL_STEP = 4;
+const CORE_TOWER_TYPES = new Set<TowerType>(['core']);
+const TURRET_TOWER_TYPES = new Set<TowerType>(['blaster', 'gatling', 'sniper', 'tesla', 'missile']);
+const GENERATOR_TOWER_TYPES = new Set<TowerType>(['generator', 'big_generator']);
+
+const hasDirectPlugBetween = (
+  state: GameState,
+  sourceTypes: Set<TowerType>,
+  targetTypes: Set<TowerType>,
+) => state.wires.some((wire) => {
+  if (!wire.direct) return false;
+  const startTower = state.towerMap.get(wire.startTowerId);
+  const endTower = state.towerMap.get(wire.endTowerId);
+  if (!startTower || !endTower) return false;
+
+  return (
+    (sourceTypes.has(startTower.type) && targetTypes.has(endTower.type)) ||
+    (sourceTypes.has(endTower.type) && targetTypes.has(startTower.type))
+  );
+});
 
 export default function App() {
   const {
@@ -192,14 +214,32 @@ export default function App() {
   }, []);
 
   const [tutorialStep, setTutorialStep] = useState<number | null>(null);
-  const startTutorial = () => { startGame(); setTutorialStep(0); };
+  const [autoDeployTutorialPending, setAutoDeployTutorialPending] = useState(false);
+  const [directPlugProgress, setDirectPlugProgress] = useState({
+    coreToTurret: false,
+    generatorToTurret: false,
+  });
+  const startTutorial = () => {
+    startGame();
+    setAutoDeployTutorialPending(true);
+    setDirectPlugProgress({ coreToTurret: false, generatorToTurret: false });
+    setTutorialStep(0);
+  };
   const dismissTutorial = () => {
     setTutorialStep(null);
+    setAutoDeployTutorialPending(false);
+    setDirectPlugProgress({ coreToTurret: false, generatorToTurret: false });
     try { localStorage.setItem('electroguard_tutorial_done', '1'); } catch {}
   };
   const handleStartGame = () => {
     startGame();
-    try { if (localStorage.getItem('electroguard_tutorial_done') !== '1') setTutorialStep(0); } catch {}
+    try {
+      if (localStorage.getItem('electroguard_tutorial_done') !== '1') {
+        setAutoDeployTutorialPending(true);
+        setDirectPlugProgress({ coreToTurret: false, generatorToTurret: false });
+        setTutorialStep(0);
+      }
+    } catch {}
   };
 
   useEffect(() => {
@@ -212,8 +252,39 @@ export default function App() {
       return;
     }
     if (tutorialStep === 1 && gameState.status === 'playing') setTutorialStep(2);
-    else if (tutorialStep === 4 && gameState.wires.length > 0) setTutorialStep(5);
-  }, [tutorialStep, gameState]);
+    else if (
+      tutorialStep === WIRE_TUTORIAL_STEP &&
+      !(autoDeployTutorialPending && gameState.status === 'pick' && gameState.wave === 1)
+    ) {
+      const nextDirectPlugProgress = {
+        coreToTurret:
+          directPlugProgress.coreToTurret ||
+          hasDirectPlugBetween(gameState, CORE_TOWER_TYPES, TURRET_TOWER_TYPES),
+        generatorToTurret:
+          directPlugProgress.generatorToTurret ||
+          hasDirectPlugBetween(gameState, GENERATOR_TOWER_TYPES, TURRET_TOWER_TYPES),
+      };
+
+      if (
+        nextDirectPlugProgress.coreToTurret !== directPlugProgress.coreToTurret ||
+        nextDirectPlugProgress.generatorToTurret !== directPlugProgress.generatorToTurret
+      ) {
+        setDirectPlugProgress(nextDirectPlugProgress);
+      }
+
+      if (nextDirectPlugProgress.coreToTurret && nextDirectPlugProgress.generatorToTurret) {
+        setTutorialStep(5);
+      }
+    }
+    else if (
+      tutorialStep === null &&
+      autoDeployTutorialPending &&
+      gameState.status === 'pick' &&
+      gameState.wave === 1
+    ) {
+      setTutorialStep(AUTO_DEPLOY_TUTORIAL_STEP);
+    }
+  }, [tutorialStep, gameState, autoDeployTutorialPending, directPlugProgress]);
 
   return (
     <div className="h-screen bg-gray-950 text-gray-100 font-sans flex flex-col overflow-hidden">
@@ -458,14 +529,43 @@ export default function App() {
 
             {/* Tutorial Overlay */}
             {tutorialStep !== null && tutorialStep < i.tutorialSteps.length && (() => {
-              const step = i.tutorialSteps[tutorialStep];
-              const isInteractive = tutorialStep === 1 || tutorialStep === 4;
+              const isPostWaveTutorialStep =
+                autoDeployTutorialPending &&
+                gameState.status === 'pick' &&
+                gameState.wave === 1 &&
+                (tutorialStep === AUTO_DEPLOY_TUTORIAL_STEP || tutorialStep === WIRE_TUTORIAL_STEP);
+              const isPostWaveAutoDeployStep = isPostWaveTutorialStep && tutorialStep === AUTO_DEPLOY_TUTORIAL_STEP;
+              const isPostWaveWireStep = isPostWaveTutorialStep && tutorialStep === WIRE_TUTORIAL_STEP;
+              const step = isPostWaveTutorialStep
+                ? i.postWaveTutorialSteps[tutorialStep - AUTO_DEPLOY_TUTORIAL_STEP]
+                : i.tutorialSteps[tutorialStep];
+              const isDirectPlugStep = tutorialStep === WIRE_TUTORIAL_STEP && !isPostWaveWireStep;
+              const isInteractive = tutorialStep === 1 || isDirectPlugStep;
               const isFinal = tutorialStep === i.tutorialSteps.length - 1;
+              const directPlugDoneCount =
+                (directPlugProgress.coreToTurret ? 1 : 0) +
+                (directPlugProgress.generatorToTurret ? 1 : 0);
+              const actionText = isDirectPlugStep
+                ? `${step.action ?? ''} (${directPlugDoneCount}/2)`
+                : step.action;
+              const advanceTutorial = () => {
+                if (isPostWaveAutoDeployStep) {
+                  setTutorialStep(WIRE_TUTORIAL_STEP);
+                } else if (isPostWaveWireStep) {
+                  dismissTutorial();
+                } else if (tutorialStep === 2 && autoDeployTutorialPending) {
+                  setTutorialStep(WIRE_TUTORIAL_STEP);
+                } else if (isFinal && autoDeployTutorialPending) {
+                  setTutorialStep(null);
+                } else {
+                  setTutorialStep(tutorialStep + 1);
+                }
+              };
 
               const hlType: Record<number, string> = {
                 1: 'arrowDown',
                 2: 'spotlight',
-                4: 'worldPort',
+                [WIRE_TUTORIAL_STEP]: 'worldPort',
               };
               const ht = hlType[tutorialStep] ?? '';
 
@@ -473,7 +573,7 @@ export default function App() {
               if (isInteractive) {
                 posClass = tutorialStep === 1
                   ? 'items-start justify-center pt-4'
-                  : tutorialStep === 4
+                  : tutorialStep === WIRE_TUTORIAL_STEP
                     ? 'items-end justify-start pb-4 pl-6'
                     : 'items-end justify-center pb-4';
               } else {
@@ -597,13 +697,13 @@ export default function App() {
                     </div>
                     <h3 className="text-lg font-bold text-white mb-2">{step.title}</h3>
                     <p className="text-gray-300 text-sm leading-relaxed mb-4">{step.text}</p>
-                    {step.action && (
+                    {actionText && (
                       <div className="text-cyan-300/80 text-xs font-medium animate-pulse mb-3 flex items-center gap-1.5">
-                        <span>▸</span> {step.action}
+                        <span>▸</span> {actionText}
                       </div>
                     )}
                     {/* Tutorial Step 5 Images */}
-                    {tutorialStep === 4 && (
+                    {isPostWaveWireStep && (
                       <div className="flex flex-col gap-2 mb-4">
                         <img 
                           src="/images/tutorial_step5_1.png" 
@@ -619,10 +719,10 @@ export default function App() {
                     )}
                     {!isInteractive && (
                       <button
-                        onClick={() => isFinal ? dismissTutorial() : setTutorialStep(tutorialStep + 1)}
+                        onClick={advanceTutorial}
                         className="w-full px-4 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-lg transition-colors text-sm"
                       >
-                        {isFinal ? i.tutorialDone : i.tutorialNext}
+                        {isFinal || isPostWaveWireStep ? i.tutorialDone : i.tutorialNext}
                       </button>
                     )}
 
