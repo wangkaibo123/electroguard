@@ -103,7 +103,7 @@ export const WEAPON_CONFIG = {
     /** 单发伤害 */
     damage: 50,
     /** 每次开火消耗电力 */
-    powerCost: 4,
+    powerCost: 2,
     /** 子弹飞行速度（px/s） */
     bulletSpeed: 300,
   },
