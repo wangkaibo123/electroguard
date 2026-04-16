@@ -1,4 +1,4 @@
-import { Enemy, EnemyType, GameState } from '../types';
+import { Camera, Enemy, EnemyType, GameState } from '../types';
 import { TWO_PI, hexToRgb, HP_BG, HP_FG } from './constants';
 
 type EnemyRenderModel = Pick<Enemy, 'enemyType' | 'heading' | 'radius' | 'color' | 'shieldAbsorb' | 'maxShieldAbsorb'> & {
@@ -194,6 +194,73 @@ export const drawEnemies = (ctx: CanvasRenderingContext2D, state: GameState, now
       ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.fillRect(e.x - barW / 2, e.y - r - 11, barW * (e.shieldAbsorb / e.maxShieldAbsorb), 2);
     }
   }
+};
+
+export const drawOffscreenEnemyIndicators = (
+  ctx: CanvasRenderingContext2D,
+  state: GameState,
+  viewWidth: number,
+  viewHeight: number,
+  camera: Camera,
+  now: number,
+) => {
+  if (state.enemies.length === 0) return;
+
+  const edgePadding = 13;
+  const markLength = 10;
+  const markSpread = 0.72;
+  const cx = viewWidth / 2;
+  const cy = viewHeight / 2;
+  const pulse = 0.72 + Math.sin(now / 180) * 0.18;
+
+  ctx.save();
+  ctx.shadowColor = 'rgba(239,68,68,0.7)';
+  ctx.shadowBlur = 8;
+
+  for (const enemy of state.enemies) {
+    const sx = (enemy.x - camera.x) * camera.zoom;
+    const sy = (enemy.y - camera.y) * camera.zoom;
+    const screenRadius = Math.max(6, enemy.radius * camera.zoom);
+    const isVisible =
+      sx >= -screenRadius &&
+      sx <= viewWidth + screenRadius &&
+      sy >= -screenRadius &&
+      sy <= viewHeight + screenRadius;
+
+    if (isVisible) continue;
+
+    const dx = sx - cx;
+    const dy = sy - cy;
+    if (dx === 0 && dy === 0) continue;
+
+    const tx = dx > 0 ? (viewWidth - edgePadding - cx) / dx : (edgePadding - cx) / dx;
+    const ty = dy > 0 ? (viewHeight - edgePadding - cy) / dy : (edgePadding - cy) / dy;
+    const t = Math.min(
+      tx > 0 ? tx : Number.POSITIVE_INFINITY,
+      ty > 0 ? ty : Number.POSITIVE_INFINITY,
+    );
+    if (!Number.isFinite(t)) continue;
+
+    const px = cx + dx * t;
+    const py = cy + dy * t;
+    const angle = Math.atan2(dy, dx);
+    const armA = angle + Math.PI - markSpread;
+    const armB = angle + Math.PI + markSpread;
+
+    ctx.globalAlpha = pulse;
+    ctx.strokeStyle = '#f87171';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(px, py);
+    ctx.lineTo(px + Math.cos(armA) * markLength, py + Math.sin(armA) * markLength);
+    ctx.moveTo(px, py);
+    ctx.lineTo(px + Math.cos(armB) * markLength, py + Math.sin(armB) * markLength);
+    ctx.stroke();
+  }
+
+  ctx.restore();
 };
 
 export const drawEnemyPreview = (

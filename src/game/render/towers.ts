@@ -26,6 +26,8 @@ const TOWER_BAR_SHOW_MS = 1800;
 const TOWER_BAR_FADE_MS = 700;
 const ENERGY_EFFECT_SIZE = CELL_SIZE * 0.5;
 const POWER_RHYTHM_RING_RADIUS = ENERGY_EFFECT_SIZE * 1.62;
+const GENERATOR_POWER_OUTPUT_RADIUS =
+  (Math.min(TOWER_STATS.generator.width, TOWER_STATS.generator.height) * CELL_SIZE) / 2 - INSET - 4;
 const MAX_COMMAND_UPGRADE_MARKS = 3;
 type LucideIconNode = [string, Record<string, string>][];
 
@@ -1177,7 +1179,7 @@ function drawTowerDetails(
     const outputting = hasGeneratorOutputTarget(state, t);
     drawEnergyEffect(ctx, cx, cy, now, t.powered, tColor, outputting ? generatorPowerProgress : 0, outputting);
     ctx.strokeStyle = tColor; ctx.lineWidth = 1.5;
-    drawPowerOutputIndicator(ctx, cx, cy, R / 3 - 2, getPowerOutputAmount(t), now, tColor);
+    drawPowerOutputIndicator(ctx, cx, cy, GENERATOR_POWER_OUTPUT_RADIUS, getPowerOutputAmount(t), now, tColor);
     ctx.beginPath(); ctx.arc(cx, cy, R / 5, 0, TWO_PI); ctx.stroke();
   } else if (t.type === 'blaster') {
     const r = Math.min(tw, th) / 5;
@@ -1543,7 +1545,7 @@ function drawTowerDetails(
   } else if (t.type === 'generator' || t.type === 'big_generator') {
     const outputting = hasGeneratorOutputTarget(state, t);
     drawEnergyEffect(ctx, cx, cy, now, t.powered, tColor, outputting ? generatorPowerProgress : 0, outputting);
-    const r = Math.min(tw, th) / 2 - inset - 4;
+    const r = t.type === 'generator' ? GENERATOR_POWER_OUTPUT_RADIUS : Math.min(tw, th) / 2 - inset - 4;
     drawPowerOutputIndicator(ctx, cx, cy, r, getPowerOutputAmount(t), now, tColor);
   } else if (t.type === 'repair_drone') {
     ctx.strokeStyle = tColor;

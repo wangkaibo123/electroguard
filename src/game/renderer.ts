@@ -5,7 +5,7 @@ import {
   drawOccupiedGround, drawPorts, drawTowers, drawPlacementPreview, drawRangePreview,
   drawRotationKnob, drawDeleteButton, drawDraggedTowerFootprint, drawCommandCardTargeting, drawRepairTargeting,
 } from './render/towers';
-import { drawEnemies, drawEnemyPreview } from './render/enemies';
+import { drawEnemies, drawEnemyPreview, drawOffscreenEnemyIndicators } from './render/enemies';
 import {
   drawWires, drawDraggedWire, drawPulses, drawWireHpBars,
   drawShields, drawProjectiles, drawChainLightning,
@@ -106,4 +106,6 @@ export const renderGame = (
   drawShieldBreakEffects(ctx, state);
 
   ctx.restore();
+
+  drawOffscreenEnemyIndicators(ctx, state, viewWidth, viewHeight, camera, now);
 };
