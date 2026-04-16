@@ -25,6 +25,7 @@ export const DELETE_BUTTON_HEIGHT = 28;
 const TOWER_BAR_SHOW_MS = 1800;
 const TOWER_BAR_FADE_MS = 700;
 const ENERGY_EFFECT_SIZE = CELL_SIZE * 0.5;
+const POWER_RHYTHM_RING_RADIUS = ENERGY_EFFECT_SIZE * 1.62;
 const MAX_COMMAND_UPGRADE_MARKS = 3;
 type LucideIconNode = [string, Record<string, string>][];
 
@@ -99,7 +100,7 @@ const drawEnergyEffect = (
   ctx.lineWidth = 1.5;
   if (useRhythmRing) {
     const progress = Math.max(0, Math.min(1, powerProgress));
-    const ringRadius = s * 1.62;
+    const ringRadius = POWER_RHYTHM_RING_RADIUS;
     const startAngle = -Math.PI / 2;
     const endAngle = startAngle + TWO_PI * progress;
 
@@ -229,6 +230,46 @@ const hasGeneratorOutputTarget = (state: GameState, source: Tower) => {
   }
 
   return false;
+};
+
+const getPowerOutputAmount = (tower: Tower) => {
+  if (tower.type === 'core') return 1 + (tower.corePowerBonus ?? 0);
+  if (tower.type === 'big_generator') return 4;
+  if (tower.type === 'generator') return 1;
+  return 0;
+};
+
+const drawPowerOutputIndicator = (
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  radius: number,
+  amount: number,
+  now: number,
+  color: string,
+) => {
+  const count = Math.max(0, Math.floor(amount));
+  if (count <= 0) return;
+
+  const dotRadius = count > 6 ? 2.2 : 3;
+  const orbitRadius = POWER_RHYTHM_RING_RADIUS;
+  const rotation = now / 700;
+
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, 0, TWO_PI);
+  ctx.stroke();
+
+  ctx.fillStyle = '#facc15';
+  for (let i = 0; i < count; i++) {
+    const angle = rotation + (i / count) * TWO_PI;
+    ctx.beginPath();
+    ctx.arc(cx + Math.cos(angle) * orbitRadius, cy + Math.sin(angle) * orbitRadius, dotRadius, 0, TWO_PI);
+    ctx.fill();
+  }
+  ctx.restore();
 };
 
 const drawFootprintCells = (
@@ -1136,7 +1177,7 @@ function drawTowerDetails(
     const outputting = hasGeneratorOutputTarget(state, t);
     drawEnergyEffect(ctx, cx, cy, now, t.powered, tColor, outputting ? generatorPowerProgress : 0, outputting);
     ctx.strokeStyle = tColor; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.arc(cx, cy, R / 3 - 2, 0, TWO_PI); ctx.stroke();
+    drawPowerOutputIndicator(ctx, cx, cy, R / 3 - 2, getPowerOutputAmount(t), now, tColor);
     ctx.beginPath(); ctx.arc(cx, cy, R / 5, 0, TWO_PI); ctx.stroke();
   } else if (t.type === 'blaster') {
     const r = Math.min(tw, th) / 5;
@@ -1502,19 +1543,8 @@ function drawTowerDetails(
   } else if (t.type === 'generator' || t.type === 'big_generator') {
     const outputting = hasGeneratorOutputTarget(state, t);
     drawEnergyEffect(ctx, cx, cy, now, t.powered, tColor, outputting ? generatorPowerProgress : 0, outputting);
-    if (t.type === 'big_generator') {
-      ctx.strokeStyle = tColor;
-      ctx.lineWidth = 1.5;
-      const r = Math.min(tw, th) / 2 - inset - 4;
-      ctx.beginPath(); ctx.arc(cx, cy, r, 0, TWO_PI); ctx.stroke();
-      for (let i = 0; i < 4; i++) {
-        const a = i * Math.PI / 2 + now / 700;
-        ctx.beginPath();
-        ctx.arc(cx + Math.cos(a) * r * 0.5, cy + Math.sin(a) * r * 0.5, 3, 0, TWO_PI);
-        ctx.fillStyle = tColor;
-        ctx.fill();
-      }
-    }
+    const r = Math.min(tw, th) / 2 - inset - 4;
+    drawPowerOutputIndicator(ctx, cx, cy, r, getPowerOutputAmount(t), now, tColor);
   } else if (t.type === 'repair_drone') {
     ctx.strokeStyle = tColor;
     ctx.lineWidth = 1.5;
