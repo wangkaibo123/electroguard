@@ -108,6 +108,13 @@ export default function App() {
     gameState.status === 'playing' &&
     (gameState.needsPick || gameState.enemiesToSpawn > 0 || gameState.enemies.length > 0);
   const shopPanelVisible = sidebarOpen && !shopPanelHiddenForWave;
+  const canStartNextWave =
+    gameState.gameMode !== 'custom' &&
+    gameState.status === 'playing' &&
+    !gameState.needsPick &&
+    gameState.enemiesToSpawn === 0 &&
+    gameState.enemies.length === 0 &&
+    !gameState.pendingBossBonusPick;
 
   // Mobile detection
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
@@ -235,20 +242,6 @@ export default function App() {
           <span className="text-base sm:text-lg font-mono font-bold ml-0.5 sm:ml-1">{gameState.gameMode === 'custom' ? '\u221E' : gameState.gold}</span>
         </div>
 
-        {gameState.gameMode !== 'custom' && gameState.status === 'playing' && gameState.enemiesToSpawn === 0 && gameState.enemies.length === 0 && !gameState.pendingBossBonusPick && (
-          <div className="flex items-center gap-1 sm:gap-3 ml-1 sm:ml-2">
-            <button
-              onClick={() => {
-                setSidebarOpen(false);
-                skipToNextWave();
-              }}
-              className="px-2 sm:px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white text-[10px] sm:text-xs font-bold rounded-lg transition-colors flex items-center gap-1"
-            >
-              <Play size={10} /> <span>{i.startNextWave}</span>
-            </button>
-          </div>
-        )}
-
         <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
           <button
             onClick={toggleLocale}
@@ -327,10 +320,10 @@ export default function App() {
                       <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider">{locale === 'zh' ? '操作指南' : 'Controls'}</span>
                       <button
                         onClick={() => setControlsHidden(true)}
-                        className="p-0.5 rounded hover:bg-gray-700 text-gray-500 hover:text-gray-300 transition-colors ml-3"
+                        className="ml-3 rounded p-1.5 text-red-500 transition-colors hover:bg-red-500/10 hover:text-red-400"
                         title={i.hidePanel}
                       >
-                        <X size={12} />
+                        <X size={24} />
                       </button>
                     </div>
                     <ul className="space-y-1.5 pointer-events-none">
@@ -671,6 +664,20 @@ export default function App() {
             startRepair={startRepair}
             tutorialStep={tutorialStep}
           />
+        )}
+
+        {canStartNextWave && (
+          <button
+            type="button"
+            onClick={() => {
+              setSidebarOpen(false);
+              skipToNextWave();
+            }}
+            className="absolute bottom-4 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-lg border border-blue-400/70 bg-blue-600 px-5 py-3 text-sm font-black text-white shadow-[0_10px_30px_rgba(37,99,235,0.35)] transition-colors hover:bg-blue-500 active:scale-95 sm:bottom-6 sm:px-6 sm:text-base"
+          >
+            <Play size={18} />
+            <span>{i.startNextWave}</span>
+          </button>
         )}
       </div>
 
