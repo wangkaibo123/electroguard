@@ -47,6 +47,7 @@ type ShopPanelProps = {
   activeRepair: boolean;
   startRepair: () => void;
   tutorialStep: number | null;
+  shopTutorialActive?: boolean;
 };
 
 export const ShopPanel = (props: ShopPanelProps) => {
@@ -75,6 +76,7 @@ export const ShopPanel = (props: ShopPanelProps) => {
     activeRepair,
     startRepair,
     tutorialStep,
+    shopTutorialActive = false,
   } = props;
   const [refreshAnimationId, setRefreshAnimationId] = useState(0);
 
@@ -517,7 +519,7 @@ export const ShopPanel = (props: ShopPanelProps) => {
       <div
         className={`no-scrollbar bg-gray-900/80 border-l border-gray-800 p-3.5 flex flex-col gap-2.5 overflow-y-auto overflow-x-hidden transition-all duration-300 ease-in-out ${
           shopPanelVisible ? 'w-[260px] opacity-100 translate-x-0' : 'w-0 opacity-0 translate-x-8 p-0 border-l-0'
-        } ${tutorialStep === 3 || tutorialStep === 4 ? 'shadow-[0_0_20px_rgba(6,182,212,0.4),inset_0_0_20px_rgba(6,182,212,0.15)] border-l-cyan-500/50' : ''}`}
+        } ${tutorialStep === 3 || shopTutorialActive ? 'shadow-[0_0_20px_rgba(6,182,212,0.4),inset_0_0_20px_rgba(6,182,212,0.15)] border-l-cyan-500/50' : ''}`}
       >
         <div className="min-w-[236px] flex flex-col h-full">
           {renderPanelContent(false)}

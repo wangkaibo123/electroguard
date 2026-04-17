@@ -109,6 +109,11 @@ export interface I18nStrings {
     text: string;
     action?: string;
   }[];
+  shopTutorialStep: {
+    title: string;
+    text: string;
+    action?: string;
+  };
 
   // Sidebar tips
   gameTips: Record<string, string>;
@@ -232,6 +237,11 @@ const en: I18nStrings = {
     { title: 'Pick One of Three', text: 'After each wave, choose 1 of 3 upgrades. This first reward is a Generator in the middle slot; choose it so the next defenses have more power.', action: 'Pick the Generator' },
     { title: 'Wire Ports', text: 'Drag from the Generator output port to a turret input port to link power across distance.', action: 'Drag from output to input' },
   ],
+  shopTutorialStep: {
+    title: 'Shop Unlocked',
+    text: 'The shop is now available during rest phases. Spend gold here to buy machines, packs, repairs, or refresh the offers before starting the next wave.',
+    action: 'Review the shop',
+  },
 
   gameTips: {
     tipMoveTurret: 'Move turrets closer to where enemies appear for better coverage.',
@@ -482,6 +492,11 @@ const zh: I18nStrings = {
     { title: '三选一奖励', text: '每波结束后会出现 3 个升级选项，只能选择 1 个。本次中间位置固定为发电机，请选择它，为后续防线提供更多电力。', action: '选择发电机' },
     { title: '端口连线', text: '从发电机输出口拖到炮塔输入口，就可以远距离传输电力。', action: '从输出口拖到输入口' },
   ],
+  shopTutorialStep: {
+    title: '商店解锁',
+    text: '休整阶段可以使用商店。花费金币购买机器、卡包、维修服务，或刷新商品，然后再开启下一波。',
+    action: '查看商店',
+  },
 
   gameTips: {
     tipMoveTurret: '可以移动炮塔到有敌人的位置射击，覆盖更多区域。',

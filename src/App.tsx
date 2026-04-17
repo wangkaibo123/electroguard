@@ -90,6 +90,7 @@ const GENERATOR_DIRECT_PLUG_TUTORIAL_STEP = 2;
 const NEXT_WAVE_TUTORIAL_STEP = 3;
 const POST_WAVE_PICK_STEP = 100;
 const POST_WAVE_WIRE_STEP = 101;
+const SHOP_TUTORIAL_STEP = 102;
 const POST_WAVE_TUTORIAL_MIN_WAVE = 1;
 const POST_WAVE_PICK_CARD_INDEX = 1;
 const CORE_TOWER_TYPES = new Set<TowerType>(['core']);
@@ -176,8 +177,6 @@ export default function App() {
     status: gameState.status,
     pickUiPhase: gameState.pickUiPhase,
   });
-  const shopPanelHiddenForWave = false;
-  const shopPanelVisible = sidebarOpen && !shopPanelHiddenForWave;
   const canStartNextWave =
     gameState.gameMode !== 'custom' &&
     gameState.status === 'playing' &&
@@ -274,7 +273,14 @@ export default function App() {
   const [tutorialStep, setTutorialStep] = useState<number | null>(null);
   const [autoDeployTutorialPending, setAutoDeployTutorialPending] = useState(false);
   const [firstWavePickTutorialDone, setFirstWavePickTutorialDone] = useState(false);
+  const [wireTutorialDone, setWireTutorialDone] = useState(false);
   const [wireTutorialPendingAfterDrop, setWireTutorialPendingAfterDrop] = useState(false);
+  const [shopTutorialUnlocked, setShopTutorialUnlocked] = useState(false);
+  const shopPanelHiddenForWave =
+    autoDeployTutorialPending &&
+    gameState.gameMode !== 'custom' &&
+    !shopTutorialUnlocked;
+  const shopPanelVisible = sidebarOpen && !shopPanelHiddenForWave;
   const [directPlugProgress, setDirectPlugProgress] = useState({
     coreToTurret: false,
     generatorToTurret: false,
@@ -283,7 +289,9 @@ export default function App() {
     startGame();
     setAutoDeployTutorialPending(true);
     setFirstWavePickTutorialDone(false);
+    setWireTutorialDone(false);
     setWireTutorialPendingAfterDrop(false);
+    setShopTutorialUnlocked(false);
     setDirectPlugProgress({ coreToTurret: false, generatorToTurret: false });
     setTutorialStep(0);
   };
@@ -291,7 +299,9 @@ export default function App() {
     setTutorialStep(null);
     setAutoDeployTutorialPending(false);
     setFirstWavePickTutorialDone(false);
+    setWireTutorialDone(false);
     setWireTutorialPendingAfterDrop(false);
+    setShopTutorialUnlocked(false);
     setDirectPlugProgress({ coreToTurret: false, generatorToTurret: false });
     try { localStorage.setItem('electroguard_tutorial_done', '1'); } catch {}
   };
@@ -301,7 +311,9 @@ export default function App() {
       if (localStorage.getItem('electroguard_tutorial_done') !== '1') {
         setAutoDeployTutorialPending(true);
         setFirstWavePickTutorialDone(false);
+        setWireTutorialDone(false);
         setWireTutorialPendingAfterDrop(false);
+        setShopTutorialUnlocked(false);
         setDirectPlugProgress({ coreToTurret: false, generatorToTurret: false });
         setTutorialStep(0);
       }
@@ -358,7 +370,8 @@ export default function App() {
       tutorialStep === POST_WAVE_WIRE_STEP &&
       hasWireBetween(gameState, GENERATOR_TOWER_TYPES, TURRET_TOWER_TYPES, true)
     ) {
-      dismissTutorial();
+      setWireTutorialDone(true);
+      setTutorialStep(null);
     }
     else if (
       tutorialStep === null &&
@@ -382,6 +395,18 @@ export default function App() {
         setTutorialStep(POST_WAVE_PICK_STEP);
       }
     }
+    else if (
+      tutorialStep === null &&
+      autoDeployTutorialPending &&
+      wireTutorialDone &&
+      !shopTutorialUnlocked &&
+      canStartNextWave &&
+      gameState.wave >= 2
+    ) {
+      setShopTutorialUnlocked(true);
+      setSidebarOpen(true);
+      setTutorialStep(SHOP_TUTORIAL_STEP);
+    }
   }, [
     tutorialStep,
     gameState,
@@ -389,7 +414,10 @@ export default function App() {
     directPlugProgress,
     isTowerDragging,
     firstWavePickTutorialDone,
+    wireTutorialDone,
     wireTutorialPendingAfterDrop,
+    shopTutorialUnlocked,
+    canStartNextWave,
     forceTutorialGeneratorPick,
   ]);
 
@@ -447,24 +475,41 @@ export default function App() {
       setWireTutorialPendingAfterDrop(true);
     }
   };
-  const blockMachineDragDuringWireTutorial = (clientX: number, clientY: number, portHitRadius: number) => {
-    if (tutorialStep !== POST_WAVE_WIRE_STEP || gameState.status !== 'playing') return false;
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return false;
-
-    const cam = cameraRef.current;
-    const wx = (clientX - rect.left) / cam.zoom + cam.x;
-    const wy = (clientY - rect.top) / cam.zoom + cam.y;
-    const nearPort = gameState.towers.some(tower =>
+  const isNearAnyPortAt = (wx: number, wy: number, portHitRadius: number) =>
+    gameState.towers.some(tower =>
       !tower.isRuined &&
       tower.ports.some(port => {
         const pos = getPortPos(tower, port);
         return Math.hypot(pos.x - wx, pos.y - wy) < portHitRadius;
       }),
     );
-    if (nearPort) return false;
+  const getCanvasWorldPoint = (clientX: number, clientY: number) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return null;
 
-    if (findTowerAtWorldPoint(gameState, wx, wy)) {
+    const cam = cameraRef.current;
+    return {
+      wx: (clientX - rect.left) / cam.zoom + cam.x,
+      wy: (clientY - rect.top) / cam.zoom + cam.y,
+    };
+  };
+  const wireDragLockedByTutorial =
+    autoDeployTutorialPending &&
+    !wireTutorialDone &&
+    tutorialStep !== POST_WAVE_WIRE_STEP;
+  const blockWireDragBeforeWireTutorial = (clientX: number, clientY: number, portHitRadius: number) => {
+    if (!wireDragLockedByTutorial || gameState.status !== 'playing') return false;
+    const point = getCanvasWorldPoint(clientX, clientY);
+    if (!point) return false;
+    return isNearAnyPortAt(point.wx, point.wy, portHitRadius);
+  };
+  const blockMachineDragDuringWireTutorial = (clientX: number, clientY: number, portHitRadius: number) => {
+    if (tutorialStep !== POST_WAVE_WIRE_STEP || gameState.status !== 'playing') return false;
+    const point = getCanvasWorldPoint(clientX, clientY);
+    if (!point) return false;
+    if (isNearAnyPortAt(point.wx, point.wy, portHitRadius)) return false;
+
+    if (findTowerAtWorldPoint(gameState, point.wx, point.wy)) {
       showTutorialToast(i.wireTutorialDragPortOnly);
       return true;
     }
@@ -473,6 +518,11 @@ export default function App() {
   };
 
   const handleTutorialCanvasMouseDown = (event: ReactMouseEvent<HTMLCanvasElement>) => {
+    if (event.button === 0 && blockWireDragBeforeWireTutorial(event.clientX, event.clientY, 15)) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     if (event.button === 0 && blockMachineDragDuringWireTutorial(event.clientX, event.clientY, 15)) {
       event.preventDefault();
       event.stopPropagation();
@@ -483,6 +533,11 @@ export default function App() {
 
   const handleTutorialCanvasTouchStart = (event: ReactTouchEvent<HTMLCanvasElement>) => {
     const touch = event.touches[0];
+    if (touch && blockWireDragBeforeWireTutorial(touch.clientX, touch.clientY, 20)) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     if (touch && blockMachineDragDuringWireTutorial(touch.clientX, touch.clientY, 20)) {
       event.preventDefault();
       event.stopPropagation();
@@ -741,12 +796,15 @@ export default function App() {
               const isPostWaveTutorialStep =
                 autoDeployTutorialPending &&
                 (tutorialStep === POST_WAVE_PICK_STEP || tutorialStep === POST_WAVE_WIRE_STEP);
+              const isShopTutorialStep = tutorialStep === SHOP_TUTORIAL_STEP;
               const isPostWavePickStep = isPostWaveTutorialStep && tutorialStep === POST_WAVE_PICK_STEP;
               const isPostWaveWireStep = isPostWaveTutorialStep && tutorialStep === POST_WAVE_WIRE_STEP;
               const postWaveStepIndex =
                 tutorialStep === POST_WAVE_WIRE_STEP ? 1 : 0;
               const step = isPostWaveTutorialStep
                 ? i.postWaveTutorialSteps[postWaveStepIndex]
+                : isShopTutorialStep
+                  ? i.shopTutorialStep
                 : i.tutorialSteps[tutorialStep];
               const isDirectPlugStep =
                 !isPostWaveTutorialStep &&
@@ -761,6 +819,8 @@ export default function App() {
                   setTutorialStep(POST_WAVE_WIRE_STEP);
                 } else if (isPostWaveWireStep) {
                   setTutorialStep(null);
+                } else if (isShopTutorialStep) {
+                  dismissTutorial();
                 } else if (isFinal && autoDeployTutorialPending) {
                   setTutorialStep(null);
                 } else {
@@ -772,6 +832,7 @@ export default function App() {
                 0: 'spotlight',
                 [TURRET_DIRECT_PLUG_TUTORIAL_STEP]: 'worldPort',
                 [GENERATOR_DIRECT_PLUG_TUTORIAL_STEP]: 'worldPort',
+                [SHOP_TUTORIAL_STEP]: 'bigArrowRight',
               };
               const ht = hlType[tutorialStep] ?? '';
 
@@ -780,6 +841,8 @@ export default function App() {
                 posClass = 'items-start justify-center pt-20 sm:pt-24';
               } else if (isNextWaveTutorialStep) {
                 posClass = 'items-end justify-center pb-28 sm:pb-32';
+              } else if (isShopTutorialStep) {
+                posClass = 'items-start justify-start pl-6 pt-20 sm:pl-10 sm:pt-24';
               } else if (isInteractive) {
                 posClass = isDirectPlugStep
                   ? 'items-end justify-start pb-4 pl-6'
@@ -939,9 +1002,13 @@ export default function App() {
                 : null;
               const displayStepNumber = isPostWaveTutorialStep
                 ? postWaveStepIndex + 1
+                : isShopTutorialStep
+                  ? 1
                 : tutorialStep + 1;
               const displayStepTotal = isPostWaveTutorialStep
                 ? i.postWaveTutorialSteps.length
+                : isShopTutorialStep
+                  ? 1
                 : i.tutorialSteps.length;
 
               return (
@@ -1134,7 +1201,7 @@ export default function App() {
                         onClick={advanceTutorial}
                         className="w-full px-4 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-lg transition-colors text-sm"
                       >
-                        {isFinal || isPostWaveWireStep ? i.tutorialDone : i.tutorialNext}
+                        {isFinal || isPostWaveWireStep || isShopTutorialStep ? i.tutorialDone : i.tutorialNext}
                       </button>
                     )}
 
@@ -1187,6 +1254,7 @@ export default function App() {
             activeRepair={activeRepair}
             startRepair={startRepair}
             tutorialStep={tutorialStep}
+            shopTutorialActive={tutorialStep === SHOP_TUTORIAL_STEP}
           />
         )}
 
