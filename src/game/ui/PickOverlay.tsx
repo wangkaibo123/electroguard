@@ -1,7 +1,7 @@
 import type { CSSProperties, Dispatch, SetStateAction } from 'react';
 import { Cable, Eye, EyeOff } from 'lucide-react';
 import { GLOBAL_CONFIG } from '../config';
-import type { GameState, TowerType } from '../types';
+import type { CodexEntryType, GameState } from '../types';
 import type { I18nStrings } from '../i18n';
 import { BaseUpgradeIcon, CommandCardIcon, TowerIcon } from './icons';
 import { getPickColor, getTowerPickStats } from './pickStats';
@@ -12,7 +12,7 @@ type PickOverlayProps = {
   hidden: boolean;
   setHidden: Dispatch<SetStateAction<boolean>>;
   onPick: (id: string, origin?: { x: number; y: number }) => void;
-  setCodexTower: (tower: TowerType) => void;
+  setCodexTower: (entry: CodexEntryType) => void;
   highlightPickIndex?: number | null;
   disabledPickIds?: string[];
   battleViewToggleLocked?: boolean;
@@ -86,7 +86,11 @@ export const PickOverlay = ({
         <div className="pick-options flex flex-col sm:flex-row gap-3 sm:gap-4 w-full sm:w-auto items-center">
           {gameState.pickOptions.map((opt, index) => {
             const color = getPickColor(opt);
-            const codexType = opt.kind === 'tower' ? opt.towerType : null;
+            const codexEntry: CodexEntryType | null = opt.kind === 'wire'
+              ? 'wire'
+              : opt.kind === 'tower' && opt.towerType
+                ? opt.towerType
+                : null;
             const highlighted = highlightPickIndex === index;
             const disabled = disabledPickIds.includes(opt.id);
             return (
@@ -107,7 +111,7 @@ export const PickOverlay = ({
                 {opt.kind === 'tower' && opt.towerType && (() => {
                   const stats = getTowerPickStats(opt.towerType);
                   return (
-                    <div className="row-start-1 col-start-1 w-full rounded-lg px-3 py-1.5 grid grid-cols-2 gap-x-2 gap-y-0.5 text-[10px] font-mono border" style={{ borderColor: color + '44', backgroundColor: color + '11', color }}>
+                    <div className="hidden sm:grid row-start-1 col-start-1 w-full rounded-lg px-3 py-1.5 grid-cols-2 gap-x-2 gap-y-0.5 text-[10px] font-mono border" style={{ borderColor: color + '44', backgroundColor: color + '11', color }}>
                       <span title={i.statHp}>{i.statHp} {stats.hp}</span>
                       <span title={i.statRange}>{i.statRange} {stats.range != null ? stats.range : '-'}</span>
                       <span title={i.statAtk}>{i.statAtk} {stats.atk != null ? stats.atk : '-'}</span>
@@ -126,7 +130,7 @@ export const PickOverlay = ({
                     });
                   }}
                   className={`pick-option-button group min-w-0 w-full p-4 sm:p-5 rounded-xl border-2 border-gray-700 bg-gray-900/95 hover:bg-gray-800/95 transition-all flex flex-row sm:flex-col items-center text-center gap-3 hover:scale-105 hover:shadow-lg active:scale-95 disabled:hover:scale-100 disabled:hover:bg-gray-900/95 disabled:cursor-not-allowed ${
-                    codexType ? 'row-start-2 col-start-1 sm:row-auto sm:col-auto' : 'col-span-2 sm:col-span-1'
+                    codexEntry ? 'row-start-1 col-start-1 sm:row-auto sm:col-auto' : 'col-span-2 sm:col-span-1'
                   }`}
                   style={{ '--pick-color': color } as CSSProperties}
                   onMouseEnter={e => {
@@ -151,12 +155,12 @@ export const PickOverlay = ({
                     <div className="text-[11px] text-gray-400 leading-snug">{opt.description}</div>
                   </div>
                 </button>
-                {codexType && (
+                {codexEntry && (
                   <button
                     type="button"
                     title={i.codexButton}
-                    onClick={() => setCodexTower(codexType)}
-                    className="pick-codex-button row-start-2 col-start-2 sm:row-auto sm:col-auto self-stretch sm:self-auto min-w-12 sm:min-w-0 w-12 sm:w-full px-2 sm:px-3 py-2 rounded-lg border text-center text-xs font-bold leading-snug transition-all border-amber-700/50 bg-amber-950/35 text-amber-100 hover:bg-amber-900/45 hover:border-amber-500/60 [writing-mode:vertical-rl] sm:[writing-mode:horizontal-tb] tracking-[0.08em] sm:tracking-normal"
+                    onClick={() => setCodexTower(codexEntry)}
+                    className="pick-codex-button row-start-1 col-start-2 sm:row-auto sm:col-auto self-stretch sm:self-auto min-w-12 sm:min-w-0 w-12 sm:w-full px-2 sm:px-3 py-2 rounded-lg border text-center text-xs font-bold leading-snug transition-all border-amber-700/50 bg-amber-950/35 text-amber-100 hover:bg-amber-900/45 hover:border-amber-500/60 [writing-mode:vertical-rl] sm:[writing-mode:horizontal-tb] tracking-[0.08em] sm:tracking-normal"
                   >
                     {i.codexButton}
                   </button>

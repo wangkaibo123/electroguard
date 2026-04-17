@@ -341,6 +341,8 @@ const en: I18nStrings = {
       'Role: short-term energy reservoir.\n\nStores up to 4 power and releases it quickly to nearby consumers, smoothing spikes when many turrets fire at once.\n\nTips: place between your main power path and hungry turrets (Gatling, Sniper, Tesla); wire battery input from generators/core and output toward the front line.',
     bus:
       'Role: wiring hub — simplifies messy layouts.\n\nAccepts up to 3 input wires and can drive up to 3 outputs, merging and redistributing pulses.\n\nTips: use at junctions where many cables would cross; not a power source by itself—still needs energy from Core/Generators upstream.',
+    wire:
+      'Role: power connection between machine ports.\n\nWires carry power pulses from the Core, Generators, Batteries, or Bus outputs into machines that need energy. Each wire consumes one wire from your inventory when created.\n\nTips: drag from an output port to an input port, keep routes short when possible, and protect exposed wires from Saboteurs because damaged lines can cut power to the front.',
   },
 
   controlsGuide: [
@@ -598,6 +600,8 @@ const zh: I18nStrings = {
       '定位：缓冲池，平滑用电尖峰。\n\n最多存 4 格电并快速放出，适合多炮塔同时开火的瞬间。\n\n用法建议：放在主供电路径与耗电大户（加特林、狙击塔、电磁炮等）之间；输入接发电机/核心，输出通往前线。',
     bus:
       '定位：汇流与分线，整理复杂布线。\n\n最多合并 3 条输入线，并分出最多 3 条输出，用于十字路口式走线。\n\n用法建议：线缆容易交叉纠缠时用插线板收束；它本身不产生能量，上游仍需核心或发电机供能。',
+    wire:
+      '定位：连接设备端口，传递电力脉冲。\n\n线缆把核心、发电机、电池或插线板输出的能量送进需要供电的设备。每创建 1 条线缆都会消耗库存中的 1 条线缆。\n\n用法建议：从输出端口拖到输入端口，尽量让路线短而清晰；暴露在前线的线缆容易被破坏者盯上，关键供电线路最好留有备用路径。',
   },
 
   controlsGuide: [

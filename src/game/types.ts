@@ -2,6 +2,7 @@ import { GLOBAL_CONFIG, TOWER_CONFIG, WEAPON_CONFIG } from './config';
 
 export type Position = { x: number; y: number };
 export type TowerType = 'core' | 'blaster' | 'gatling' | 'sniper' | 'tesla' | 'generator' | 'shield' | 'battery' | 'bus' | 'missile' | 'big_generator' | 'repair_drone';
+export type CodexEntryType = TowerType | 'wire';
 export type CommandCardType = 'add_input' | 'add_output' | 'self_power' | 'range_boost';
 export type BaseUpgradeType = 'core_power_boost' | 'core_turret_unlock' | 'core_shield_unlock';
 export type GameMode = 'normal' | 'custom';

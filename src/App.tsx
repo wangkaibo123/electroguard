@@ -1,14 +1,14 @@
 import { useState, useEffect, useRef, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode, type TouchEvent as ReactTouchEvent } from 'react';
 import { Activity, BookOpen, Cable, Coins, Globe, Keyboard, LogOut, Pause, Play, RotateCcw, Wrench, X } from 'lucide-react';
 import { useGameLoop } from './game/useGameLoop';
-import type { GameState, TowerType } from './game/types';
+import type { CodexEntryType, GameState, TowerType } from './game/types';
 import { t, getLocale, setLocale, Locale } from './game/i18n';
 import { GLOBAL_CONFIG, TIPS_CONFIG } from './game/config';
 import { findWirePath, getPortCell, getPortPos, isPortAccessible } from './game/engine';
 import { findTowerAtWorldPoint } from './game/gameActions';
 import { PickOverlay } from './game/ui/PickOverlay';
 import { ShopPanel } from './game/ui/ShopPanel';
-import { TowerCodexModal } from './game/ui/TowerCodexModal';
+import { CodexModal } from './game/ui/CodexModal';
 
 const KeyCap = ({ children, className = '' }: { children: ReactNode; className?: string }) => (
   <span className={`inline-flex h-6 min-w-8 items-center justify-center rounded-md border border-gray-600/70 bg-gray-900/90 px-2 text-[10px] font-black uppercase text-gray-200 shadow-[inset_0_-2px_0_rgba(255,255,255,0.06)] ${className}`}>
@@ -170,7 +170,7 @@ export default function App() {
   } = useGameLoop();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [codexTower, setCodexTower] = useState<TowerType | null>(null);
+  const [codexTower, setCodexTower] = useState<CodexEntryType | null>(null);
   const [locale, _setLocale] = useState<Locale>(getLocale());
   const [monsterSubTab, setMonsterSubTab] = useState<'type' | 'static'>('type');
   const previousPickStateRef = useRef({
@@ -1272,7 +1272,7 @@ export default function App() {
 
       {/* Machine codex modal */}
       {codexTower && (
-        <TowerCodexModal tower={codexTower} labels={i} onClose={() => setCodexTower(null)} />
+        <CodexModal entry={codexTower} labels={i} onClose={() => setCodexTower(null)} />
       )}
     </div>
   );

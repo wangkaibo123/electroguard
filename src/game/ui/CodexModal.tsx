@@ -1,19 +1,26 @@
-import { X } from 'lucide-react';
+import { Cable, X } from 'lucide-react';
 import { getLocale } from '../i18n';
-import { TOWER_STATS, TowerType } from '../types';
+import { TOWER_STATS, CodexEntryType, TowerType } from '../types';
 import { TowerIcon } from './icons';
 
-type TowerCodexModalProps = {
-  tower: TowerType;
+type CodexModalProps = {
+  entry: CodexEntryType;
   labels: {
+    wires: string;
     towerName: Partial<Record<TowerType, string>>;
     towerDesc: Partial<Record<TowerType, string>>;
-    towerCodex: Partial<Record<TowerType, string>>;
+    towerCodex: Partial<Record<CodexEntryType, string>>;
   };
   onClose: () => void;
 };
 
-export const TowerCodexModal = ({ tower, labels, onClose }: TowerCodexModalProps) => (
+export const CodexModal = ({ entry, labels, onClose }: CodexModalProps) => {
+  const title = entry === 'wire' ? labels.wires : labels.towerName[entry] ?? entry;
+  const body = labels.towerCodex[entry] ?? (
+    entry === 'wire' ? labels.wires : labels.towerDesc[entry] ?? TOWER_STATS[entry].description
+  );
+
+  return (
   <div
     className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 bg-black/55 backdrop-blur-sm"
     onClick={onClose}
@@ -29,10 +36,10 @@ export const TowerCodexModal = ({ tower, labels, onClose }: TowerCodexModalProps
       <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-3 border-b border-gray-800">
         <div className="flex items-center gap-3 min-w-0">
           <div className="text-gray-300 shrink-0 p-2 rounded-lg bg-gray-800/80 border border-gray-700">
-            <TowerIcon type={tower} size={26} />
+            {entry === 'wire' ? <Cable size={26} /> : <TowerIcon type={entry} size={26} />}
           </div>
           <h2 id="codex-title" className="text-lg font-bold text-white leading-tight truncate">
-            {labels.towerName[tower] ?? tower}
+            {title}
           </h2>
         </div>
         <button
@@ -46,9 +53,10 @@ export const TowerCodexModal = ({ tower, labels, onClose }: TowerCodexModalProps
       </div>
       <div className="px-5 py-4 max-h-[min(70vh,28rem)] overflow-y-auto">
         <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-line">
-          {labels.towerCodex[tower] ?? labels.towerDesc[tower] ?? TOWER_STATS[tower].description}
+          {body}
         </p>
       </div>
     </div>
   </div>
-);
+  );
+};
