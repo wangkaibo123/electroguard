@@ -126,7 +126,7 @@ export const WEAPON_CONFIG = {
     /** 子弹最大飞行距离（px），超出后消失 */
     bulletRange: 290,
     /** 每次供电脉冲增加的热量（0~1） */
-    heatPerPulse: 0.22,
+    heatPerPulse: 0.16,
     /** 每秒按当前热量百分比散热（0~1） */
     heatDecayPct: 0.6,
     /** 冷却时的最小散射角（rad，约 6°） */
