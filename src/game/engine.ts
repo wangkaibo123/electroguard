@@ -682,7 +682,7 @@ export const createInitialState = (): GameState => {
     pickUiPhase: 'standard' satisfies PickUiPhase,
     needsPick: true,
     towers: [core], wires: [], pulses: [], enemies: [], projectiles: [], chainLightnings: [], particles: [], hitEffects: [], shieldBreakEffects: [], repairDrones: [], incomingDrops: [],
-    waveTimer: 0, enemiesToSpawn: 0, spawnTimer: 0, score: 0, towerMap,
+    waveTimer: 0, enemiesToSpawn: 0, themeEnemiesToSpawn: [], spawnTimer: 0, score: 0, towerMap,
   };
 };
 
@@ -902,6 +902,10 @@ const pushEnemy = (state: GameState, type: EnemyType, _wave: number) => {
 
 export const spawnEnemy = (state: GameState, wave: number) => {
   pushEnemy(state, pickEnemyType(wave), wave);
+};
+
+export const spawnEnemyOfType = (state: GameState, type: EnemyType, wave: number) => {
+  pushEnemy(state, type, wave);
 };
 
 export const spawnBoss = (state: GameState, wave: number) => {

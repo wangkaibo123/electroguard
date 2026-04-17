@@ -197,6 +197,7 @@ export default function App() {
     gameState.status === 'playing' &&
     !gameState.needsPick &&
     gameState.enemiesToSpawn === 0 &&
+    gameState.themeEnemiesToSpawn.length === 0 &&
     gameState.enemies.length === 0 &&
     !gameState.pendingBossBonusPick;
   const [nextWavePromptActive, setNextWavePromptActive] = useState(false);

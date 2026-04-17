@@ -253,6 +253,7 @@ export interface GameState {
   incomingDrops: IncomingDrop[];
   waveTimer: number;
   enemiesToSpawn: number;
+  themeEnemiesToSpawn: EnemyType[];
   spawnTimer: number;
   score: number;
   towerMap: Map<string, Tower>;

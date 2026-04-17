@@ -225,6 +225,31 @@ export const ENEMY_SCALING = {
   spawnLinear: 1.5,
   /** 每波刷怪数公式的平方根系数 */
   spawnSqrt: 0,
+  /** 第 15 波后，普通刷怪额外增长的起点。 */
+  lateStartWave: 15,
+  /** 第 15 波后普通刷怪额外增长的线性系数。 */
+  lateLinear: 0.55,
+  /** 第 15 波后普通刷怪额外增长的平方根系数。 */
+  lateSqrt: 1.5,
+} as const;
+
+export const THEME_WAVE_CONFIG = {
+  /** 第 7 波开始，每隔 5 波追加一组同类型主题怪。 */
+  startWave: 7,
+  interval: 5,
+  enemySequence: ['scout', 'grunt', 'tank', 'saboteur'] as const satisfies readonly EnemyType[],
+  /** 主题怪数量公式：floor((countBase + themeIndex×countLinear + sqrt(wave)×countSqrt) × typeCountWeight[type]) */
+  countBase: 3,
+  countLinear: 0.45,
+  countSqrt: 1.2,
+  /** 血厚或功能性强的怪数量更少，轻型怪更多。 */
+  typeCountWeight: {
+    scout: 1.35,
+    grunt: 1,
+    tank: 0.55,
+    saboteur: 0.85,
+    overlord: 0,
+  } as const satisfies Record<EnemyType, number>,
 } as const;
 
 // ── 5. 护盾与充能参数 ───────────────────────────────────────────────────────

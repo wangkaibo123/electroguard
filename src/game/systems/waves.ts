@@ -1,12 +1,40 @@
 import { GameState } from '../types';
-import { generatePickOptions, spawnBoss, spawnEnemy } from '../engine';
-import { ENEMY_SCALING, GLOBAL_CONFIG } from '../config';
+import { generatePickOptions, spawnBoss, spawnEnemy, spawnEnemyOfType } from '../engine';
+import { ENEMY_SCALING, GLOBAL_CONFIG, THEME_WAVE_CONFIG } from '../config';
 
 const {
   bossWaveInterval: BOSS_WAVE_INTERVAL,
   spawnInterval: SPAWN_INTERVAL,
   waveClearScoreMul: WAVE_CLEAR_SCORE_MUL,
 } = GLOBAL_CONFIG;
+
+const getBaseSpawnCount = (wave: number) => {
+  const baseCount = Math.floor(
+    ENEMY_SCALING.spawnBase +
+      wave * ENEMY_SCALING.spawnLinear +
+      Math.sqrt(wave) * ENEMY_SCALING.spawnSqrt,
+  );
+  const lateWave = Math.max(0, wave - ENEMY_SCALING.lateStartWave);
+  const lateBonus = Math.floor(
+    lateWave * ENEMY_SCALING.lateLinear +
+      Math.sqrt(lateWave) * ENEMY_SCALING.lateSqrt,
+  );
+  return baseCount + lateBonus;
+};
+
+const getThemeSpawnQueue = (wave: number): GameState['themeEnemiesToSpawn'] => {
+  const { startWave, interval, enemySequence, countBase, countLinear, countSqrt, typeCountWeight } = THEME_WAVE_CONFIG;
+  if (wave < startWave || (wave - startWave) % interval !== 0) return [];
+
+  const themeIndex = Math.floor((wave - startWave) / interval);
+  const enemyType = enemySequence[themeIndex % enemySequence.length];
+  const count = Math.max(1, Math.floor(
+    (countBase + themeIndex * countLinear + Math.sqrt(wave) * countSqrt) *
+      typeCountWeight[enemyType],
+  ));
+
+  return Array.from({ length: count }, () => enemyType);
+};
 
 const expandMapAfterBoss = (state: GameState) => {
   const nextWidth = Math.min(GLOBAL_CONFIG.gridWidth, state.mapWidth + GLOBAL_CONFIG.mapExpandStep);
@@ -82,15 +110,12 @@ const expandMapAfterBoss = (state: GameState) => {
 export const startNextWave = (state: GameState) => {
   if (state.gameMode === 'custom') return false;
   if (state.status !== 'playing') return false;
-  if (state.enemies.length > 0 || state.enemiesToSpawn > 0) return false;
+  if (state.enemies.length > 0 || state.enemiesToSpawn > 0 || state.themeEnemiesToSpawn.length > 0) return false;
   if (state.needsPick || state.pendingBossBonusPick) return false;
 
   state.wave++;
-  state.enemiesToSpawn = Math.floor(
-    ENEMY_SCALING.spawnBase +
-      state.wave * ENEMY_SCALING.spawnLinear +
-      Math.sqrt(state.wave) * ENEMY_SCALING.spawnSqrt,
-  );
+  state.enemiesToSpawn = getBaseSpawnCount(state.wave);
+  state.themeEnemiesToSpawn = getThemeSpawnQueue(state.wave);
   state.waveTimer = 0;
   state.spawnTimer = 0;
   state.needsPick = true;
@@ -103,7 +128,7 @@ export const updateWaveState = (state: GameState, dt: number) => {
 
   if (state.gameMode === 'custom') return changed;
 
-  if (state.enemies.length === 0 && state.enemiesToSpawn === 0) {
+  if (state.enemies.length === 0 && state.enemiesToSpawn === 0 && state.themeEnemiesToSpawn.length === 0) {
     if (state.needsPick) {
       if (state.wave > 0) {
         state.score += state.wave * WAVE_CLEAR_SCORE_MUL;
@@ -118,11 +143,16 @@ export const updateWaveState = (state: GameState, dt: number) => {
     }
   }
 
-  if (state.enemiesToSpawn > 0) {
+  if (state.enemiesToSpawn > 0 || state.themeEnemiesToSpawn.length > 0) {
     state.spawnTimer += dt;
     if (state.spawnTimer > SPAWN_INTERVAL) {
-      spawnEnemy(state, state.wave);
-      state.enemiesToSpawn--;
+      if (state.enemiesToSpawn > 0) {
+        spawnEnemy(state, state.wave);
+        state.enemiesToSpawn--;
+      } else {
+        const themeEnemyType = state.themeEnemiesToSpawn.shift();
+        if (themeEnemyType) spawnEnemyOfType(state, themeEnemyType, state.wave);
+      }
       state.spawnTimer = 0;
       changed = true;
     }
