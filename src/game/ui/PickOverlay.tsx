@@ -15,6 +15,7 @@ type PickOverlayProps = {
   setCodexTower: (tower: TowerType) => void;
   highlightPickIndex?: number | null;
   disabledPickIds?: string[];
+  battleViewToggleLocked?: boolean;
 };
 
 export const PickOverlay = ({
@@ -26,13 +27,18 @@ export const PickOverlay = ({
   setCodexTower,
   highlightPickIndex = null,
   disabledPickIds = [],
+  battleViewToggleLocked = false,
 }: PickOverlayProps) => (
   <div className={`absolute inset-0 ${hidden ? 'pointer-events-none' : ''}`}>
     <div className="absolute left-1/2 bottom-14 -translate-x-1/2 z-20 pointer-events-auto">
       <button
         type="button"
-        onClick={() => setHidden(v => !v)}
-        className="flex items-center gap-2.5 px-5 py-3.5 rounded-xl border border-gray-700 bg-gray-950/88 backdrop-blur-sm text-gray-100 hover:bg-gray-900 transition-colors text-sm font-bold shadow-[0_8px_28px_rgba(0,0,0,0.35)]"
+        disabled={battleViewToggleLocked}
+        onClick={() => {
+          if (battleViewToggleLocked) return;
+          setHidden(v => !v);
+        }}
+        className="flex items-center gap-2.5 px-5 py-3.5 rounded-xl border border-gray-700 bg-gray-950/88 backdrop-blur-sm text-gray-100 hover:bg-gray-900 transition-colors text-sm font-bold shadow-[0_8px_28px_rgba(0,0,0,0.35)] disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-gray-950/88"
         title={hidden ? i.showPanel : i.hidePanel}
       >
         {hidden ? <Eye size={18} /> : <EyeOff size={18} />}

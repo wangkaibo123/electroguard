@@ -4,7 +4,7 @@ import { useGameLoop } from './game/useGameLoop';
 import type { GameState, TowerType } from './game/types';
 import { t, getLocale, setLocale, Locale } from './game/i18n';
 import { GLOBAL_CONFIG, TIPS_CONFIG } from './game/config';
-import { getPortPos } from './game/engine';
+import { findWirePath, getPortCell, getPortPos, isPortAccessible } from './game/engine';
 import { PickOverlay } from './game/ui/PickOverlay';
 import { ShopPanel } from './game/ui/ShopPanel';
 import { TowerCodexModal } from './game/ui/TowerCodexModal';
@@ -403,6 +403,10 @@ export default function App() {
           .filter(option => option.id !== tutorialForcedGeneratorOption.id)
           .map(option => option.id)
       : [];
+  const battleViewToggleLocked =
+    autoDeployTutorialPending &&
+    !firstWavePickTutorialDone &&
+    tutorialStep === POST_WAVE_PICK_STEP;
 
   const handleTutorialPick = (optionId: string, origin?: { x: number; y: number }) => {
     const option = gameState.pickOptions.find(pickOption => pickOption.id === optionId);
@@ -623,6 +627,7 @@ export default function App() {
                 setCodexTower={setCodexTower}
                 highlightPickIndex={tutorialHighlightedPickIndex}
                 disabledPickIds={tutorialDisabledPickIds}
+                battleViewToggleLocked={battleViewToggleLocked}
               />
             )}
 
@@ -738,24 +743,56 @@ export default function App() {
                 (tower.x + tower.width / 2) * CS,
                 (tower.y + tower.height / 2) * CS,
               );
-              const nearestTowerPort = (
+              const portIsUsed = (portId: string) =>
+                gameState.wires.some(wire => wire.startPortId === portId || wire.endPortId === portId);
+              const getConnectablePorts = (
                 tower: GameState['towers'][number],
-                targetWorld: { x: number; y: number },
                 portType: 'input' | 'output',
+              ) => tower.ports.filter(port =>
+                port.portType === portType &&
+                !portIsUsed(port.id) &&
+                isPortAccessible(gameState, tower, port),
+              );
+              const nearestConnectablePortPair = (
+                source: GameState['towers'][number],
+                target: GameState['towers'][number],
+                sourcePortType: 'input' | 'output',
+                targetPortType: 'input' | 'output',
+                requireWirePath = false,
               ) => {
-                const ports = tower.ports.filter(port => port.portType === portType);
-                const nearest = ports.reduce((best, port) => {
-                  const pos = getPortPos(tower, port);
-                  const distance = Math.hypot(pos.x - targetWorld.x, pos.y - targetWorld.y);
-                  return !best || distance < best.distance ? { pos, distance } : best;
-                }, null as { pos: { x: number; y: number }; distance: number } | null);
+                const sourcePorts = getConnectablePorts(source, sourcePortType);
+                const targetPorts = getConnectablePorts(target, targetPortType);
+                let best: {
+                  sourcePos: { x: number; y: number };
+                  targetPos: { x: number; y: number };
+                  distance: number;
+                } | null = null;
 
-                return nearest?.pos ?? {
-                  x: (tower.x + tower.width / 2) * CS,
-                  y: (tower.y + tower.height / 2) * CS,
-                };
+                for (const sourcePort of sourcePorts) {
+                  const sourcePos = getPortPos(source, sourcePort);
+                  for (const targetPort of targetPorts) {
+                    if (sourcePort.portType === targetPort.portType) continue;
+                    if (requireWirePath && !findWirePath(getPortCell(source, sourcePort), getPortCell(target, targetPort), gameState)) continue;
+                    const targetPos = getPortPos(target, targetPort);
+                    const distance = Math.hypot(sourcePos.x - targetPos.x, sourcePos.y - targetPos.y);
+                    if (!best || distance < best.distance) {
+                      best = { sourcePos, targetPos, distance };
+                    }
+                  }
+                }
+
+                return best;
               };
-              const directPlugCue = isDirectPlugStep && core && turret
+              const directPlugCueCompleted =
+                tutorialStep === TURRET_DIRECT_PLUG_TUTORIAL_STEP
+                  ? hasDirectPlugBetween(gameState, CORE_TOWER_TYPES, TURRET_TOWER_TYPES)
+                  : tutorialStep === GENERATOR_DIRECT_PLUG_TUTORIAL_STEP
+                    ? hasDirectPlugBetween(gameState, GENERATOR_TOWER_TYPES, TURRET_TOWER_TYPES)
+                    : false;
+              const wireDragCueCompleted =
+                isPostWaveWireStep &&
+                hasWireBetween(gameState, GENERATOR_TOWER_TYPES, TURRET_TOWER_TYPES, true);
+              const directPlugCue = isDirectPlugStep && !directPlugCueCompleted && core && turret
                 ? (() => {
                     if (tutorialStep === GENERATOR_DIRECT_PLUG_TUTORIAL_STEP && !generator) return null;
                     const source = tutorialStep === GENERATOR_DIRECT_PLUG_TUTORIAL_STEP ? generator! : turret;
@@ -766,12 +803,10 @@ export default function App() {
                     const sourcePortType = source.type === 'core' || source.type === 'generator' || source.type === 'big_generator'
                       ? 'output'
                       : 'input';
-                    const sourceCenterWorld = {
-                      x: (source.x + source.width / 2) * CS,
-                      y: (source.y + source.height / 2) * CS,
-                    };
-                    const targetPortWorld = nearestTowerPort(target, sourceCenterWorld, targetPortType);
-                    const sourcePortWorld = nearestTowerPort(source, targetPortWorld, sourcePortType);
+                    const portPair = nearestConnectablePortPair(source, target, sourcePortType, targetPortType);
+                    if (!portPair) return null;
+                    const sourcePortWorld = portPair.sourcePos;
+                    const targetPortWorld = portPair.targetPos;
                     const start = toScreen(sourcePortWorld.x, sourcePortWorld.y);
                     const end = toScreen(targetPortWorld.x, targetPortWorld.y);
                     const minX = Math.min(start.x, end.x);
@@ -798,7 +833,7 @@ export default function App() {
                     };
                   })()
                 : null;
-              const wireDragCue = isPostWaveWireStep && turret
+              const wireDragCue = isPostWaveWireStep && !wireDragCueCompleted && turret
                 ? (() => {
                     const generators = gameState.towers.filter(tw => GENERATOR_TOWER_TYPES.has(tw.type));
                     const source = generators.find(candidate =>
@@ -810,12 +845,10 @@ export default function App() {
                     ) ?? generator;
                     if (!source) return null;
 
-                    const targetCenterWorld = {
-                      x: (turret.x + turret.width / 2) * CS,
-                      y: (turret.y + turret.height / 2) * CS,
-                    };
-                    const sourcePortWorld = nearestTowerPort(source, targetCenterWorld, 'output');
-                    const targetPortWorld = nearestTowerPort(turret, sourcePortWorld, 'input');
+                    const portPair = nearestConnectablePortPair(source, turret, 'output', 'input', true);
+                    if (!portPair) return null;
+                    const sourcePortWorld = portPair.sourcePos;
+                    const targetPortWorld = portPair.targetPos;
                     const start = toScreen(sourcePortWorld.x, sourcePortWorld.y);
                     const end = toScreen(targetPortWorld.x, targetPortWorld.y);
                     const minX = Math.min(start.x, end.x);
