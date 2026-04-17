@@ -1,20 +1,14 @@
 import {
   GameState,
-  HitEffect,
   ShieldBreakEffect,
   Tower,
-  TOWER_STATS,
   getTowerRange,
 } from './types';
 import {
   createExplosion,
   dispatchPulse,
   genId,
-  generateBossBonusPickOptions,
-  generatePickOptions,
   rebuildTowerMap,
-  spawnBoss,
-  spawnEnemy,
   spawnEnemyAt,
   updatePowerGrid,
 } from './engine';
@@ -23,15 +17,18 @@ import {
   ENEMY_AI_CONFIG,
   BASE_UPGRADE_CONFIG,
   COMMAND_CARD_CONFIG,
-  ENEMY_SCALING,
   GLOBAL_CONFIG,
-  SCORE_CONFIG,
   SHIELD_CONFIG,
-  SHOP_CONFIG,
   WEAPON_CONFIG,
 } from './config';
-import { addTowerToState, createTowerAt } from './towerFactory';
-import { canPlaceTowerAt } from './placement';
+import { applyDamageToEnemy, findNearestEnemy } from './systems/combatUtils';
+import { updateIncomingDrops } from './systems/incomingDrops';
+import { updateProjectiles } from './systems/projectiles';
+import { updateRepairDrones } from './systems/repairDrones';
+import { updateTransientEffects } from './systems/transientEffects';
+import { startNextWave, updateWaveState } from './systems/waves';
+
+export { startNextWave } from './systems/waves';
 
 const TWO_PI = Math.PI * 2;
 const {
@@ -106,82 +103,10 @@ const CORE_TURRET_RANGE = BASE_UPGRADE_CONFIG.core_turret_unlock.coreTurretRange
 const CORE_TURRET_DAMAGE = BASE_UPGRADE_CONFIG.core_turret_unlock.coreTurretDamage ?? 30;
 const CORE_TURRET_COOLDOWN = BASE_UPGRADE_CONFIG.core_turret_unlock.coreTurretCooldown ?? 1200;
 const MISSILE_SILO_COUNT = 4;
-const MISSILE_RETARGET_RANGE = GLOBAL_CONFIG.cellSize * 10;
 const MISSILE_MAX_SPEED = MISSILE_SPEED * 2;
 const MISSILE_INITIAL_SPEED = MISSILE_MAX_SPEED * 0.19;
 const MISSILE_ACCELERATION = 260;
 const MISSILE_ACCELERATION_GROWTH = 720;
-
-const expandMapAfterBoss = (state: GameState) => {
-  const nextWidth = Math.min(GLOBAL_CONFIG.gridWidth, state.mapWidth + GLOBAL_CONFIG.mapExpandStep);
-  const nextHeight = Math.min(GLOBAL_CONFIG.gridHeight, state.mapHeight + GLOBAL_CONFIG.mapExpandStep);
-  const shiftX = Math.floor((nextWidth - state.mapWidth) / 2);
-  const shiftY = Math.floor((nextHeight - state.mapHeight) / 2);
-  if (shiftX <= 0 && shiftY <= 0) return false;
-
-  const pixelShiftX = shiftX * GLOBAL_CONFIG.cellSize;
-  const pixelShiftY = shiftY * GLOBAL_CONFIG.cellSize;
-
-  state.mapWidth = nextWidth;
-  state.mapHeight = nextHeight;
-
-  for (const tower of state.towers) {
-    tower.x += shiftX;
-    tower.y += shiftY;
-  }
-  for (const wire of state.wires) {
-    wire.path = wire.path.map(point => ({ x: point.x + shiftX, y: point.y + shiftY }));
-  }
-  for (const drop of state.incomingDrops) {
-    drop.targetGridX += shiftX;
-    drop.targetGridY += shiftY;
-    drop.startX += pixelShiftX;
-    drop.startY += pixelShiftY;
-    drop.targetX += pixelShiftX;
-    drop.targetY += pixelShiftY;
-  }
-  for (const pulse of state.pulses) {
-    pulse.path = pulse.path.map(point => ({ x: point.x + pixelShiftX, y: point.y + pixelShiftY }));
-  }
-  for (const enemy of state.enemies) {
-    enemy.x += pixelShiftX;
-    enemy.y += pixelShiftY;
-  }
-  for (const projectile of state.projectiles) {
-    projectile.x += pixelShiftX;
-    projectile.y += pixelShiftY;
-  }
-  for (const drone of state.repairDrones) {
-    drone.x += pixelShiftX;
-    drone.y += pixelShiftY;
-    drone.homeX += pixelShiftX;
-    drone.homeY += pixelShiftY;
-    drone.targetX += pixelShiftX;
-    drone.targetY += pixelShiftY;
-  }
-  for (const lightning of state.chainLightnings) {
-    lightning.segments = lightning.segments.map(segment => ({
-      x1: segment.x1 + pixelShiftX,
-      y1: segment.y1 + pixelShiftY,
-      x2: segment.x2 + pixelShiftX,
-      y2: segment.y2 + pixelShiftY,
-    }));
-  }
-  for (const particle of state.particles) {
-    particle.x += pixelShiftX;
-    particle.y += pixelShiftY;
-  }
-  for (const effect of state.hitEffects) {
-    effect.x += pixelShiftX;
-    effect.y += pixelShiftY;
-  }
-  for (const effect of state.shieldBreakEffects) {
-    effect.x += pixelShiftX;
-    effect.y += pixelShiftY;
-  }
-
-  return true;
-};
 
 const normalizeAngleDiff = (angle: number) => {
   while (angle > Math.PI) angle -= TWO_PI;
@@ -207,57 +132,6 @@ const getMissileSiloWorldPosition = (tower: Tower, index: number) => {
     x: centerX + offset.x * cos - offset.y * sin,
     y: centerY + offset.x * sin + offset.y * cos,
   };
-};
-
-const applyDamageToEnemy = (
-  state: GameState,
-  enemy: GameState['enemies'][number],
-  damage: number,
-  color: string,
-  bigExplosion = false,
-): boolean => {
-  let remainingDamage = damage;
-  if (enemy.shieldAbsorb > 0) {
-    const absorbed = Math.min(enemy.shieldAbsorb, remainingDamage);
-    enemy.shieldAbsorb -= absorbed;
-    remainingDamage -= absorbed;
-  }
-
-  enemy.hp -= remainingDamage;
-  createExplosion(state, enemy.x, enemy.y, color, bigExplosion ? 10 : 3);
-
-  if (enemy.hp > 0) return false;
-
-  state.enemies = state.enemies.filter((item) => item.id !== enemy.id);
-  state.score += SCORE_CONFIG[enemy.enemyType] ?? SCORE_CONFIG.default;
-  state.gold += enemy.goldReward ?? SHOP_CONFIG.goldPerEnemyKill;
-  createExplosion(state, enemy.x, enemy.y, enemy.color, bigExplosion ? 15 : 10);
-  return true;
-};
-
-const findNearestEnemy = (
-  enemies: GameState['enemies'],
-  x: number,
-  y: number,
-  range: number,
-  excludeIds?: Set<string> | string[],
-) => {
-  let best: GameState['enemies'][number] | null = null;
-  let bestDistance = range;
-
-  for (const enemy of enemies) {
-    if (excludeIds && (excludeIds instanceof Set ? excludeIds.has(enemy.id) : excludeIds.includes(enemy.id))) {
-      continue;
-    }
-
-    const distance = Math.hypot(enemy.x - x, enemy.y - y);
-    if (distance < bestDistance) {
-      bestDistance = distance;
-      best = enemy;
-    }
-  }
-
-  return best;
 };
 
 const GATLING_SHOT_INTERVAL = 1000 / GATLING_SHOTS_PER_SECOND;
@@ -339,52 +213,6 @@ const launchRepairDrone = (
     energy: REPAIR_DRONE_REPAIR_COST,
     repairTimer: 0,
   });
-};
-
-const updateIncomingDrops = (state: GameState, dt: number) => {
-  let changed = false;
-
-  for (let index = state.incomingDrops.length - 1; index >= 0; index--) {
-    const drop = state.incomingDrops[index];
-    drop.life += dt;
-
-    if (drop.life < drop.duration) {
-      changed = true;
-      continue;
-    }
-
-    let towerPlaced = false;
-    if (canPlaceTowerAt(state, drop.towerType, drop.targetGridX, drop.targetGridY, drop.id)) {
-      addTowerToState(state, createTowerAt(drop.towerType, drop.targetGridX, drop.targetGridY));
-      towerPlaced = true;
-    }
-
-    if (towerPlaced) {
-      const impactColor = TOWER_STATS[drop.towerType].color;
-      createExplosion(state, drop.targetX, drop.targetY, impactColor, 18);
-      state.hitEffects.push({
-        x: drop.targetX,
-        y: drop.targetY,
-        life: 0,
-        maxLife: 0.35,
-        color: impactColor,
-        radius: 24,
-      });
-    }
-
-    state.incomingDrops.splice(index, 1);
-    changed = true;
-  }
-
-  if (state.pendingBossBonusPick && state.incomingDrops.length === 0) {
-    state.pendingBossBonusPick = false;
-    state.pickOptions = generateBossBonusPickOptions();
-    state.pickUiPhase = 'boss_bonus';
-    state.status = 'pick';
-    changed = true;
-  }
-
-  return changed;
 };
 
 const updatePowerSystems = (state: GameState, dt: number, now: number) => {
@@ -801,58 +629,6 @@ const updateCombatTowers = (state: GameState, dt: number, now: number) => {
   return changed;
 };
 
-export const startNextWave = (state: GameState) => {
-  if (state.gameMode === 'custom') return false;
-  if (state.status !== 'playing') return false;
-  if (state.enemies.length > 0 || state.enemiesToSpawn > 0) return false;
-  if (state.needsPick || state.pendingBossBonusPick) return false;
-
-  state.wave++;
-  state.enemiesToSpawn = Math.floor(
-    ENEMY_SCALING.spawnBase +
-      state.wave * ENEMY_SCALING.spawnLinear +
-      Math.sqrt(state.wave) * ENEMY_SCALING.spawnSqrt,
-  );
-  state.waveTimer = 0;
-  state.spawnTimer = 0;
-  state.needsPick = true;
-  if (state.wave % BOSS_WAVE_INTERVAL === 0) spawnBoss(state, state.wave);
-  return true;
-};
-
-const updateWaveState = (state: GameState, dt: number) => {
-  let changed = false;
-
-  if (state.gameMode === 'custom') return changed;
-
-  if (state.enemies.length === 0 && state.enemiesToSpawn === 0) {
-    if (state.needsPick) {
-      if (state.wave > 0) {
-        state.score += state.wave * WAVE_CLEAR_SCORE_MUL;
-      }
-      const isBossWave = state.wave > 0 && state.wave % BOSS_WAVE_INTERVAL === 0;
-      if (isBossWave) changed = expandMapAfterBoss(state) || changed;
-      state.bossBonusPickQueued = isBossWave;
-      state.pickUiPhase = 'standard';
-      state.pickOptions = generatePickOptions();
-      state.status = 'pick';
-      changed = true;
-    }
-  }
-
-  if (state.enemiesToSpawn > 0) {
-    state.spawnTimer += dt;
-    if (state.spawnTimer > SPAWN_INTERVAL) {
-      spawnEnemy(state, state.wave);
-      state.enemiesToSpawn--;
-      state.spawnTimer = 0;
-      changed = true;
-    }
-  }
-
-  return changed;
-};
-
 const createShieldBreakFragments = (): ShieldBreakEffect['fragments'] => {
   const fragments: ShieldBreakEffect['fragments'] = [];
   for (let index = 0; index < 16; index++) {
@@ -1057,363 +833,6 @@ const updateBossEffects = (state: GameState, now: number) => {
       });
       changed = true;
     }
-  }
-
-  return changed;
-};
-
-const findEnemyById = (state: GameState, id: string) => state.enemies.find((enemy) => enemy.id === id);
-
-const applySplashDamage = (
-  state: GameState,
-  x: number,
-  y: number,
-  damage: number,
-  radius: number,
-  color: string,
-  primaryId?: string,
-) => {
-  const enemies = [...state.enemies];
-  for (const enemy of enemies) {
-    const distance = Math.hypot(enemy.x - x, enemy.y - y);
-    if (distance > radius) continue;
-    const falloff = enemy.id === primaryId ? 1 : Math.max(0.35, 1 - distance / radius);
-    applyDamageToEnemy(state, enemy, damage * falloff, color, true);
-  }
-  state.hitEffects.push({ x, y, life: 0, maxLife: 0.35, color, radius });
-};
-
-const moveToward = (
-  currentX: number,
-  currentY: number,
-  targetX: number,
-  targetY: number,
-  distance: number,
-) => {
-  const dx = targetX - currentX;
-  const dy = targetY - currentY;
-  const length = Math.hypot(dx, dy);
-  if (length <= distance || length <= 0.001) {
-    return { x: targetX, y: targetY, reached: true };
-  }
-
-  const t = distance / length;
-  return { x: currentX + dx * t, y: currentY + dy * t, reached: false };
-};
-
-const updateRepairDrones = (state: GameState, dt: number, now: number) => {
-  let changed = false;
-
-  for (let index = state.repairDrones.length - 1; index >= 0; index--) {
-    const drone = state.repairDrones[index];
-    const sourceTower = state.towerMap.get(drone.sourceTowerId);
-    if (sourceTower && !sourceTower.isRuined) {
-      drone.homeX = (sourceTower.x + sourceTower.width / 2) * GLOBAL_CONFIG.cellSize;
-      drone.homeY = (sourceTower.y + sourceTower.height / 2) * GLOBAL_CONFIG.cellSize;
-    }
-
-    const target = state.towerMap.get(drone.targetId);
-    if ((drone.phase === 'outbound' || drone.phase === 'repairing') && target && !target.isRuined) {
-      drone.targetX = (target.x + target.width / 2) * GLOBAL_CONFIG.cellSize;
-      drone.targetY = (target.y + target.height / 2) * GLOBAL_CONFIG.cellSize;
-    } else if (drone.phase !== 'returning') {
-      drone.phase = 'returning';
-      changed = true;
-    }
-
-    if (drone.phase === 'repairing') {
-      if (!target || target.isRuined || target.hp >= target.maxHp || drone.energy <= 0) {
-        drone.phase = 'returning';
-        changed = true;
-      } else {
-        const hoverAngle = now / 500 + drone.id.length;
-        const hoverRadius = Math.max(18, Math.min(target.width, target.height) * GLOBAL_CONFIG.cellSize * 0.42);
-        const hoverX = drone.targetX + Math.cos(hoverAngle) * hoverRadius;
-        const hoverY = drone.targetY + Math.sin(hoverAngle) * hoverRadius * 0.55;
-        const moved = moveToward(drone.x, drone.y, hoverX, hoverY, drone.speed * dt);
-        drone.x = moved.x;
-        drone.y = moved.y;
-
-        drone.repairTimer += dt * 1000;
-        while (drone.repairTimer >= REPAIR_DRONE_REPAIR_COOLDOWN && drone.energy > 0 && target.hp < target.maxHp) {
-          drone.repairTimer -= REPAIR_DRONE_REPAIR_COOLDOWN;
-          drone.energy--;
-          target.hp = Math.min(target.maxHp, target.hp + drone.amount);
-          target.lastDamagedAt = now;
-          state.hitEffects.push({
-            x: drone.targetX,
-            y: drone.targetY,
-            life: 0,
-            maxLife: 0.32,
-            color: '#2dd4bf',
-            radius: 16,
-          });
-          for (let i = 0; i < 8; i++) {
-            const angle = (i / 8) * TWO_PI;
-            state.particles.push({
-              x: drone.x,
-              y: drone.y,
-              vx: Math.cos(angle) * 35,
-              vy: Math.sin(angle) * 35,
-              life: 0,
-              maxLife: 0.35,
-              color: '#5eead4',
-              size: 2,
-            });
-          }
-        }
-
-        if (drone.energy <= 0 || target.hp >= target.maxHp) {
-          drone.phase = 'returning';
-        }
-
-        changed = true;
-        continue;
-      }
-    }
-
-    const destinationX = drone.phase === 'outbound' ? drone.targetX : drone.homeX;
-    const destinationY = drone.phase === 'outbound' ? drone.targetY : drone.homeY;
-    const moved = moveToward(drone.x, drone.y, destinationX, destinationY, drone.speed * dt);
-    drone.x = moved.x;
-    drone.y = moved.y;
-
-    if (moved.reached) {
-      if (drone.phase === 'outbound') {
-        drone.phase = target && !target.isRuined && target.hp < target.maxHp ? 'repairing' : 'returning';
-      } else {
-        if (sourceTower && !sourceTower.isRuined && sourceTower.type === 'repair_drone') {
-          sourceTower.storedPower = Math.min(sourceTower.maxPower, drone.energy);
-        }
-        state.repairDrones.splice(index, 1);
-      }
-    }
-
-    changed = true;
-  }
-
-  return changed;
-};
-
-const updateProjectiles = (state: GameState, dt: number) => {
-  let changed = false;
-
-  for (let index = state.projectiles.length - 1; index >= 0; index--) {
-    const projectile = state.projectiles[index];
-
-    if (projectile.arcHeight !== undefined) {
-      let target = findEnemyById(state, projectile.targetId);
-      if (!target) {
-        target = findNearestEnemy(state.enemies, projectile.x, projectile.y, MISSILE_RETARGET_RANGE);
-        if (target) {
-          projectile.targetId = target.id;
-        } else {
-          applySplashDamage(
-            state,
-            projectile.x,
-            projectile.y,
-            projectile.damage,
-            projectile.splashRadius ?? 0,
-            projectile.color ?? '#fbbf24',
-          );
-          state.projectiles.splice(index, 1);
-          changed = true;
-          continue;
-        }
-      }
-
-      if (projectile.acceleration && projectile.maxSpeed) {
-        if (projectile.accelerationGrowth) {
-          projectile.acceleration += projectile.accelerationGrowth * dt;
-        }
-        projectile.speed = Math.min(projectile.maxSpeed, projectile.speed + projectile.acceleration * dt);
-      }
-      const step = projectile.speed * dt;
-      if (target) {
-        const desired = Math.atan2(target.y - projectile.y, target.x - projectile.x);
-        projectile.angle = desired;
-      }
-
-      const angle = projectile.angle ?? 0;
-      projectile.x += Math.cos(angle) * step;
-      projectile.y += Math.sin(angle) * step;
-      projectile.traveled = (projectile.traveled ?? 0) + step;
-
-      if (target && Math.hypot(target.x - projectile.x, target.y - projectile.y) < target.radius + 5) {
-        applySplashDamage(
-          state,
-          target.x,
-          target.y,
-          projectile.damage,
-          projectile.splashRadius ?? 0,
-          projectile.color ?? '#fbbf24',
-          target.id,
-        );
-        state.projectiles.splice(index, 1);
-        changed = true;
-        continue;
-      }
-
-      if (projectile.maxRange && (projectile.traveled ?? 0) > projectile.maxRange) {
-        if (projectile.splashRadius && target) {
-          applySplashDamage(
-            state,
-            projectile.x,
-            projectile.y,
-            projectile.damage * 0.65,
-            projectile.splashRadius,
-            projectile.color ?? '#fbbf24',
-            target.id,
-          );
-        }
-        state.projectiles.splice(index, 1);
-        changed = true;
-        continue;
-      }
-
-      changed = true;
-      continue;
-    }
-
-    if (projectile.angle !== undefined) {
-      const step = projectile.speed * dt;
-      projectile.x += Math.cos(projectile.angle) * step;
-      projectile.y += Math.sin(projectile.angle) * step;
-      projectile.traveled = (projectile.traveled ?? 0) + step;
-
-      if (projectile.maxRange && projectile.traveled > projectile.maxRange) {
-        state.projectiles.splice(index, 1);
-        changed = true;
-        continue;
-      }
-
-      let hit = false;
-      for (const enemy of state.enemies) {
-        if (projectile.piercedIds?.includes(enemy.id)) continue;
-        if (Math.hypot(enemy.x - projectile.x, enemy.y - projectile.y) >= enemy.radius + 4) continue;
-
-        applyDamageToEnemy(state, enemy, projectile.damage, projectile.color ?? '#fbbf24');
-        if (!projectile.piercing) {
-          state.projectiles.splice(index, 1);
-          hit = true;
-        } else {
-          projectile.piercedIds = projectile.piercedIds ?? [];
-          projectile.piercedIds.push(enemy.id);
-        }
-        changed = true;
-        break;
-      }
-
-      if (!hit) changed = true;
-      continue;
-    }
-
-    let targetX = 0;
-    let targetY = 0;
-    let targetFound = false;
-    const target = findEnemyById(state, projectile.targetId);
-    if (!target) {
-      if (!projectile.piercing) {
-        state.projectiles.splice(index, 1);
-        changed = true;
-        continue;
-      }
-
-      const nextEnemy = findNearestEnemy(state.enemies, projectile.x, projectile.y, 300, projectile.piercedIds);
-      if (!nextEnemy) {
-        state.projectiles.splice(index, 1);
-        changed = true;
-        continue;
-      }
-
-      projectile.targetId = nextEnemy.id;
-      targetX = nextEnemy.x;
-      targetY = nextEnemy.y;
-      targetFound = true;
-    } else {
-      targetX = target.x;
-      targetY = target.y;
-      targetFound = true;
-
-      const distance = Math.hypot(targetX - projectile.x, targetY - projectile.y);
-      if (distance < target.radius + 4) {
-        if (projectile.splashRadius) {
-          applySplashDamage(
-            state,
-            target.x,
-            target.y,
-            projectile.damage,
-            projectile.splashRadius,
-            projectile.color ?? '#fbbf24',
-            target.id,
-          );
-        } else {
-          applyDamageToEnemy(state, target, projectile.damage, projectile.color ?? '#fbbf24', true);
-        }
-        if (projectile.piercing) {
-          projectile.piercedIds = projectile.piercedIds ?? [];
-          projectile.piercedIds.push(target.id);
-          const nextEnemy = findNearestEnemy(state.enemies, projectile.x, projectile.y, 300, projectile.piercedIds);
-          if (nextEnemy) {
-            projectile.targetId = nextEnemy.id;
-          } else {
-            state.projectiles.splice(index, 1);
-          }
-        } else {
-          state.projectiles.splice(index, 1);
-        }
-        changed = true;
-        continue;
-      }
-    }
-
-    if (!targetFound) continue;
-
-    const angle = Math.atan2(targetY - projectile.y, targetX - projectile.x);
-    projectile.x += Math.cos(angle) * projectile.speed * dt;
-    projectile.y += Math.sin(angle) * projectile.speed * dt;
-    changed = true;
-  }
-
-  return changed;
-};
-
-const updateTransientEffects = (state: GameState, dt: number) => {
-  let changed = false;
-
-  for (let index = state.chainLightnings.length - 1; index >= 0; index--) {
-    state.chainLightnings[index].life += dt;
-    if (state.chainLightnings[index].life >= state.chainLightnings[index].maxLife) {
-      state.chainLightnings.splice(index, 1);
-    }
-    changed = true;
-  }
-
-  for (let index = state.particles.length - 1; index >= 0; index--) {
-    const particle = state.particles[index];
-    particle.life += dt;
-    if (particle.life >= particle.maxLife) {
-      state.particles.splice(index, 1);
-    } else {
-      particle.x += particle.vx * dt;
-      particle.y += particle.vy * dt;
-    }
-    changed = true;
-  }
-
-  for (let index = state.hitEffects.length - 1; index >= 0; index--) {
-    const effect: HitEffect = state.hitEffects[index];
-    effect.life += dt;
-    if (effect.life >= effect.maxLife) state.hitEffects.splice(index, 1);
-    changed = true;
-  }
-
-  for (let index = state.shieldBreakEffects.length - 1; index >= 0; index--) {
-    const effect = state.shieldBreakEffects[index];
-    effect.life += dt;
-    for (const fragment of effect.fragments) fragment.dist += fragment.speed * dt;
-    if (effect.life >= effect.maxLife) state.shieldBreakEffects.splice(index, 1);
-    changed = true;
   }
 
   return changed;
