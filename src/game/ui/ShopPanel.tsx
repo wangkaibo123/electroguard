@@ -377,7 +377,7 @@ export const ShopPanel = (props: ShopPanelProps) => {
                   <span className="text-sm font-bold leading-tight">{item.label}</span>
                   <span className="text-xs text-gray-400 leading-tight line-clamp-2">{item.description}</span>
                 </div>
-                <div className={`flex items-center gap-1 ${item.colorClass} text-xs font-bold shrink-0`}>
+                <div className="flex items-center gap-1 text-yellow-400 text-xs font-bold shrink-0">
                   <Coins size={12} />{item.price}
                 </div>
               </button>
