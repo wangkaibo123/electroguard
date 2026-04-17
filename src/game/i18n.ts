@@ -221,17 +221,15 @@ const en: I18nStrings = {
   tutorialNext: 'Next',
   tutorialDone: 'Start Playing!',
   tutorialSteps: [
-    { title: 'Welcome, Commander!', text: 'Welcome to ElectroGuard! Let me guide you through building your defense network.' },
-    { title: 'Choose an Upgrade', text: 'Before each wave, pick one upgrade from three options. Chosen towers are deployed automatically near the Core, while wires are added to your stock. Choose one now!', action: 'Select one of the cards below' },
-    { title: 'Your Core', text: 'The glowing structure in the center is your Core. It generates power and has a protective shield. If enemies destroy it, the game is over!' },
-    { title: 'Auto Deployment', text: 'When you pick a tower card, it is placed automatically onto a random open tile near the Core. You can still drag and rotate placed machines afterward.' },
-    { title: 'Direct Plugging', text: 'Machines can plug directly together when their ports touch. First drag the turret until one of its ports touches a Core port. After that, move things around if needed and plug the Generator into the turret the same way.', action: 'Direct plug Core -> turret, then Generator -> turret' },
-    { title: 'Power System', text: 'Energy pulses travel from the Core through wires. Connected towers glow when powered. Use Generators to extend your network!' },
-    { title: 'Ready for Battle!', text: 'Enemies attack from the edges. Powered turrets fire automatically. Click towers to rotate them, press Q for quick rotation. After each wave, pick a new upgrade. Good luck!' },
+    { title: 'Your Core', text: 'The Core makes power. Do not let it fall.' },
+    { title: 'Auto Deploy', text: 'New machines land near the Core.' },
+    { title: 'Direct Plug', text: 'Touch ports to power machines. Move the turret to the Core, then the generator to the turret.', action: 'Touch ports: Core -> turret, Generator -> turret' },
+    { title: 'Power', text: 'Powered turrets glow and fire.' },
+    { title: 'Fight', text: 'Rotate turrets. Survive the wave.' },
   ],
   postWaveTutorialSteps: [
-    { title: 'Auto Deployment', text: 'When you pick a tower card, it is placed automatically onto a random open tile near the Core. You can still drag and rotate placed machines afterward.' },
-    { title: 'Connect with Wires', text: 'Towers need power! Drag from a port (small circle) on the Core to a port on your tower to create a wire.', action: 'Drag between ports to create a wire' },
+    { title: 'Auto Deploy', text: 'New machines land near the Core.' },
+    { title: 'Wire Ports', text: 'Later, ports can be linked across distance. Start from the Core output and end on a tower input.', action: 'Drag from output to input' },
   ],
 
   gameTips: {
@@ -473,17 +471,15 @@ const zh: I18nStrings = {
   tutorialNext: '下一步',
   tutorialDone: '开始游戏！',
   tutorialSteps: [
-    { title: '欢迎，指挥官！', text: '欢迎来到 ElectroGuard！让我来引导你了解防御网络的基本构建方法。' },
-    { title: '选择升级', text: '每波战斗前，你可以从三个选项中选择一项升级。选中的防御塔会自动部署到核心附近，线缆则会加入库存。现在选择一项吧！', action: '选择下方的一张卡片' },
-    { title: '你的核心', text: '中央发光的建筑就是你的核心。它能生成电力并拥有防护盾。如果核心被敌人摧毁，游戏就结束了！' },
-    { title: '自动部署', text: '当你选择防御塔卡片时，它会自动放到核心附近的一块随机空地上。放置后的设备仍然可以拖动和旋转。' },
-    { title: '直插连接', text: '两个设备的端口贴在一起时，可以不用拉线，直接插成一条短连接。先把炮台拖到基地端口旁完成直插；完成后可以重新调整位置，再把发电机拖到炮台端口旁完成直插。', action: '先直插 基地 -> 炮台，再直插 发电机 -> 炮台' },
-    { title: '电力系统', text: '能量脉冲从核心通过线缆传输。已连接的设备会发光表示通电，才能正常运作。使用发电机来扩展电网！' },
-    { title: '准备战斗！', text: '敌人会从边缘进攻。通电的炮塔会自动开火。点击设备可以旋转，按 Q 键快速旋转。每波结束后选择新升级。祝你好运！' },
+    { title: '你的核心', text: '核心产出电力，别让它被摧毁。' },
+    { title: '自动部署', text: '新设备会落在核心附近。' },
+    { title: '直插连接', text: '端口贴住即可通电。先把炮台贴到核心，再把发电机贴到炮台。', action: '端口相贴：核心 -> 炮台，发电机 -> 炮台' },
+    { title: '电力', text: '通电的炮塔会发光并自动开火。' },
+    { title: '开战', text: '旋转炮塔，守住这一波。' },
   ],
   postWaveTutorialSteps: [
-    { title: '自动部署', text: '当你选择炮台卡牌时，它会自动放到核心附近的一块随机空地上。放置后的设备仍然可以拖动和旋转。' },
-    { title: '连接线缆', text: '设备需要电力！点击核心或发电机的电力输出口（黄色三角形），创建线缆连接到炮塔的输入口（绿色方块）。', action: '在端口之间拖拽以创建线缆' },
+    { title: '自动部署', text: '新设备会落在核心附近。' },
+    { title: '端口连线', text: '之后可以远距离连接端口。从输出口开始，接到输入口。', action: '从输出口拖到输入口' },
   ],
 
   gameTips: {

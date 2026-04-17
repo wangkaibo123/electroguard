@@ -58,8 +58,33 @@ const ControlKeyIcon = ({ code }: { code: string }) => {
   return <KeyCap>{code}</KeyCap>;
 };
 
-const AUTO_DEPLOY_TUTORIAL_STEP = 3;
-const WIRE_TUTORIAL_STEP = 4;
+const TutorialHandCue = ({ className = '' }: { className?: string }) => (
+  <span
+    aria-hidden="true"
+    className={`tutorial-hand-cue inline-flex h-9 w-9 items-center justify-center rounded-full border border-cyan-300/40 bg-gray-950/90 shadow-[0_0_18px_rgba(34,211,238,0.35)] ${className}`}
+  >
+    <svg viewBox="0 0 48 48" className="h-7 w-7" fill="none">
+      <path
+        d="M18.5 23.5V14.4a3.1 3.1 0 0 1 6.2 0v7.2-10.1a3.1 3.1 0 0 1 6.2 0v10.1-7.8a3 3 0 0 1 6 0v11.8-4.9a2.8 2.8 0 0 1 5.6 0v10.5c0 7-4.8 11.3-12.6 11.3h-5.4c-4.6 0-7.8-1.8-10.3-5.7l-4.2-6.7a3.2 3.2 0 0 1 5.4-3.5l2.9 4.1V23.5Z"
+        fill="#e0f2fe"
+        stroke="#22d3ee"
+        strokeWidth="2.4"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+      <path
+        d="M18.5 22.5v8.2M24.7 21.7v9M30.9 21.7v9M36.9 25.4v6.4"
+        stroke="#0f172a"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        opacity="0.42"
+      />
+    </svg>
+  </span>
+);
+
+const AUTO_DEPLOY_TUTORIAL_STEP = 1;
+const WIRE_TUTORIAL_STEP = 2;
 const CORE_TOWER_TYPES = new Set<TowerType>(['core']);
 const TURRET_TOWER_TYPES = new Set<TowerType>(['blaster', 'gatling', 'sniper', 'tesla', 'missile']);
 const GENERATOR_TOWER_TYPES = new Set<TowerType>(['generator', 'big_generator']);
@@ -251,10 +276,9 @@ export default function App() {
       if (tutorialStep !== null) dismissTutorial();
       return;
     }
-    if (tutorialStep === 1 && gameState.status === 'playing') setTutorialStep(2);
-    else if (
+    if (
       tutorialStep === WIRE_TUTORIAL_STEP &&
-      !(autoDeployTutorialPending && gameState.status === 'pick' && gameState.wave === 1)
+      !(autoDeployTutorialPending && gameState.status === 'pick' && gameState.wave >= 2)
     ) {
       const nextDirectPlugProgress = {
         coreToTurret:
@@ -273,14 +297,14 @@ export default function App() {
       }
 
       if (nextDirectPlugProgress.coreToTurret && nextDirectPlugProgress.generatorToTurret) {
-        setTutorialStep(5);
+        setTutorialStep(WIRE_TUTORIAL_STEP + 1);
       }
     }
     else if (
       tutorialStep === null &&
       autoDeployTutorialPending &&
       gameState.status === 'pick' &&
-      gameState.wave === 1
+      gameState.wave >= 2
     ) {
       setTutorialStep(AUTO_DEPLOY_TUTORIAL_STEP);
     }
@@ -532,7 +556,7 @@ export default function App() {
               const isPostWaveTutorialStep =
                 autoDeployTutorialPending &&
                 gameState.status === 'pick' &&
-                gameState.wave === 1 &&
+                gameState.wave >= 2 &&
                 (tutorialStep === AUTO_DEPLOY_TUTORIAL_STEP || tutorialStep === WIRE_TUTORIAL_STEP);
               const isPostWaveAutoDeployStep = isPostWaveTutorialStep && tutorialStep === AUTO_DEPLOY_TUTORIAL_STEP;
               const isPostWaveWireStep = isPostWaveTutorialStep && tutorialStep === WIRE_TUTORIAL_STEP;
@@ -540,7 +564,7 @@ export default function App() {
                 ? i.postWaveTutorialSteps[tutorialStep - AUTO_DEPLOY_TUTORIAL_STEP]
                 : i.tutorialSteps[tutorialStep];
               const isDirectPlugStep = tutorialStep === WIRE_TUTORIAL_STEP && !isPostWaveWireStep;
-              const isInteractive = tutorialStep === 1 || isDirectPlugStep;
+              const isInteractive = isDirectPlugStep;
               const isFinal = tutorialStep === i.tutorialSteps.length - 1;
               const directPlugDoneCount =
                 (directPlugProgress.coreToTurret ? 1 : 0) +
@@ -553,8 +577,6 @@ export default function App() {
                   setTutorialStep(WIRE_TUTORIAL_STEP);
                 } else if (isPostWaveWireStep) {
                   dismissTutorial();
-                } else if (tutorialStep === 2 && autoDeployTutorialPending) {
-                  setTutorialStep(WIRE_TUTORIAL_STEP);
                 } else if (isFinal && autoDeployTutorialPending) {
                   setTutorialStep(null);
                 } else {
@@ -563,19 +585,16 @@ export default function App() {
               };
 
               const hlType: Record<number, string> = {
-                1: 'arrowDown',
-                2: 'spotlight',
+                0: 'spotlight',
                 [WIRE_TUTORIAL_STEP]: 'worldPort',
               };
               const ht = hlType[tutorialStep] ?? '';
 
               let posClass: string;
               if (isInteractive) {
-                posClass = tutorialStep === 1
-                  ? 'items-start justify-center pt-4'
-                  : tutorialStep === WIRE_TUTORIAL_STEP
-                    ? 'items-end justify-start pb-4 pl-6'
-                    : 'items-end justify-center pb-4';
+                posClass = tutorialStep === WIRE_TUTORIAL_STEP
+                  ? 'items-end justify-start pb-4 pl-6'
+                  : 'items-end justify-center pb-4';
               } else {
                 posClass = ht === 'spotlight'
                   ? 'items-end justify-center pb-8'
@@ -587,6 +606,64 @@ export default function App() {
               const cam = cameraRef.current;
               const CS = GLOBAL_CONFIG.cellSize;
               const core = gameState.towers.find(tw => tw.type === 'core');
+              const turret = gameState.towers.find(tw => TURRET_TOWER_TYPES.has(tw.type));
+              const generator = gameState.towers.find(tw => GENERATOR_TOWER_TYPES.has(tw.type));
+              const toScreen = (wx: number, wy: number) => ({
+                x: (wx - cam.x) * cam.zoom,
+                y: (wy - cam.y) * cam.zoom,
+              });
+              const towerCenter = (tower: GameState['towers'][number]) => toScreen(
+                (tower.x + tower.width / 2) * CS,
+                (tower.y + tower.height / 2) * CS,
+              );
+              const nearestPortHint = (
+                source: GameState['towers'][number],
+                target: GameState['towers'][number],
+              ) => {
+                const sourceCx = source.x + source.width / 2;
+                const targetCx = target.x + target.width / 2;
+                const sourceCy = source.y + source.height / 2;
+                const targetTop = target.y + target.height * 0.24;
+                const targetBottom = target.y + target.height * 0.76;
+                const targetY = Math.min(targetBottom, Math.max(targetTop, sourceCy));
+                const targetX = sourceCx < targetCx ? target.x : target.x + target.width;
+                return toScreen(targetX * CS, targetY * CS);
+              };
+              const directPlugCue = isDirectPlugStep && core && turret
+                ? (() => {
+                    const source = directPlugProgress.coreToTurret && generator ? generator : turret;
+                    const target = directPlugProgress.coreToTurret && generator ? turret : core;
+                    const start = towerCenter(source);
+                    const end = nearestPortHint(source, target);
+                    const minX = Math.min(start.x, end.x);
+                    const minY = Math.min(start.y, end.y);
+                    const width = Math.max(24, Math.abs(start.x - end.x));
+                    const height = Math.max(24, Math.abs(start.y - end.y));
+                    const pad = 44;
+                    return {
+                      start,
+                      end,
+                      pathBox: {
+                        left: minX - pad,
+                        top: minY - pad,
+                        width: width + pad * 2,
+                        height: height + pad * 2,
+                      },
+                      line: {
+                        x1: start.x - minX + pad,
+                        y1: start.y - minY + pad,
+                        x2: end.x - minX + pad,
+                        y2: end.y - minY + pad,
+                      },
+                    };
+                  })()
+                : null;
+              const displayStepNumber = isPostWaveTutorialStep
+                ? tutorialStep - AUTO_DEPLOY_TUTORIAL_STEP + 1
+                : tutorialStep + 1;
+              const displayStepTotal = isPostWaveTutorialStep
+                ? i.postWaveTutorialSteps.length
+                : i.tutorialSteps.length;
 
               return (
                 <div className={`absolute inset-0 z-50 flex ${posClass} ${isInteractive ? 'pointer-events-none' : ''}`}>
@@ -650,40 +727,75 @@ export default function App() {
                     );
                   })()}
 
-                  {/* World-position port indicator (step 5: connect wire) */}
-                  {ht === 'worldPort' && core && (() => {
-                    const wx = (core.x + core.width) * CS;
-                    const wy = (core.y + core.height * 0.5) * CS;
-                    const sx = (wx - cam.x) * cam.zoom;
-                    const sy = (wy - cam.y) * cam.zoom;
+                  {/* World-position direct-plug cue */}
+                  {ht === 'worldPort' && directPlugCue && (() => {
+                    const { start, end, pathBox, line } = directPlugCue;
                     return (
                       <>
+                        <svg
+                          className="tutorial-drag-path absolute pointer-events-none overflow-visible"
+                          style={{
+                            left: `${pathBox.left}px`,
+                            top: `${pathBox.top}px`,
+                            width: `${pathBox.width}px`,
+                            height: `${pathBox.height}px`,
+                          }}
+                          viewBox={`0 0 ${pathBox.width} ${pathBox.height}`}
+                        >
+                          <line
+                            x1={line.x1}
+                            y1={line.y1}
+                            x2={line.x2}
+                            y2={line.y2}
+                            stroke="rgba(8, 47, 73, 0.86)"
+                            strokeWidth="10"
+                            strokeLinecap="round"
+                          />
+                          <line
+                            x1={line.x1}
+                            y1={line.y1}
+                            x2={line.x2}
+                            y2={line.y2}
+                            stroke="rgba(34, 211, 238, 0.9)"
+                            strokeWidth="3"
+                            strokeLinecap="round"
+                            strokeDasharray="12 10"
+                          />
+                          <circle r="5" fill="#67e8f9">
+                            <animateMotion dur="1.35s" repeatCount="indefinite" path={`M ${line.x1} ${line.y1} L ${line.x2} ${line.y2}`} />
+                          </circle>
+                        </svg>
                         <div
-                          className="absolute pointer-events-none rounded-full border-2 border-cyan-400/30"
-                          style={{ left: `${sx}px`, top: `${sy}px`, width: '50px', height: '50px', transform: 'translate(-50%, -50%)' }}
+                          className="absolute pointer-events-none rounded-lg border-2 border-cyan-300/35 bg-cyan-300/5"
+                          style={{ left: `${start.x}px`, top: `${start.y}px`, width: '76px', height: '76px', transform: 'translate(-50%, -50%)' }}
                         />
                         <div
-                          className="absolute pointer-events-none rounded-full border-2 border-cyan-400/50 animate-[pulse_1.5s_ease-in-out_infinite]"
-                          style={{ left: `${sx}px`, top: `${sy}px`, width: '80px', height: '80px', transform: 'translate(-50%, -50%)' }}
-                        />
-                        <div
-                          className="absolute pointer-events-none rounded-full border border-cyan-400/20 animate-[pulse_2s_ease-in-out_infinite]"
-                          style={{ left: `${sx}px`, top: `${sy}px`, width: '110px', height: '110px', transform: 'translate(-50%, -50%)' }}
+                          className="absolute pointer-events-none rounded-lg border-2 border-cyan-300/50 animate-[pulse_1.5s_ease-in-out_infinite]"
+                          style={{ left: `${start.x}px`, top: `${start.y}px`, width: '98px', height: '98px', transform: 'translate(-50%, -50%)' }}
                         />
                         <div
                           className="absolute pointer-events-none"
-                          style={{ left: `${sx}px`, top: `${sy}px`, transform: 'translate(-50%, -50%)' }}
+                          style={{ left: `${start.x + 34}px`, top: `${start.y + 34}px`, transform: 'translate(-50%, -50%)' }}
                         >
-                          <div className="w-3 h-3 bg-cyan-400/80 rounded-full animate-pulse" />
+                          <TutorialHandCue />
                         </div>
                         <div
-                          className="absolute pointer-events-none animate-bounce"
-                          style={{ left: `${sx}px`, top: `${sy - 90}px`, transform: 'translateX(-50%)' }}
+                          className="absolute pointer-events-none rounded-full border-2 border-cyan-400/30"
+                          style={{ left: `${end.x}px`, top: `${end.y}px`, width: '50px', height: '50px', transform: 'translate(-50%, -50%)' }}
+                        />
+                        <div
+                          className="absolute pointer-events-none rounded-full border-2 border-cyan-400/50 animate-[pulse_1.5s_ease-in-out_infinite]"
+                          style={{ left: `${end.x}px`, top: `${end.y}px`, width: '80px', height: '80px', transform: 'translate(-50%, -50%)' }}
+                        />
+                        <div
+                          className="absolute pointer-events-none rounded-full border border-cyan-400/20 animate-[pulse_2s_ease-in-out_infinite]"
+                          style={{ left: `${end.x}px`, top: `${end.y}px`, width: '110px', height: '110px', transform: 'translate(-50%, -50%)' }}
+                        />
+                        <div
+                          className="absolute pointer-events-none"
+                          style={{ left: `${end.x}px`, top: `${end.y}px`, transform: 'translate(-50%, -50%)' }}
                         >
-                          <div className="flex flex-col items-center">
-                            <div className="w-[4px] h-12 bg-gradient-to-b from-cyan-400/5 to-cyan-400 rounded-full" />
-                            <div className="w-0 h-0 border-l-[10px] border-r-[10px] border-t-[14px] border-l-transparent border-r-transparent border-t-cyan-400" />
-                          </div>
+                          <div className="w-3 h-3 bg-cyan-400/80 rounded-full animate-pulse" />
                         </div>
                       </>
                     );
@@ -692,17 +804,18 @@ export default function App() {
                   {/* Tutorial card */}
                   <div className="relative pointer-events-auto bg-gray-900/95 border border-cyan-500/40 rounded-xl p-4 sm:p-5 shadow-[0_0_25px_rgba(6,182,212,0.2)] max-w-md w-full mx-2 sm:mx-4 backdrop-blur-sm">
                     <div className="flex items-center justify-between mb-3">
-                      <span className="text-cyan-400/70 text-xs font-mono">{tutorialStep + 1} / {i.tutorialSteps.length}</span>
+                      <span className="text-cyan-400/70 text-xs font-mono">{displayStepNumber} / {displayStepTotal}</span>
                       <button onClick={dismissTutorial} className="text-gray-500 hover:text-gray-300 text-xs transition-colors">{i.tutorialSkip}</button>
                     </div>
                     <h3 className="text-lg font-bold text-white mb-2">{step.title}</h3>
                     <p className="text-gray-300 text-sm leading-relaxed mb-4">{step.text}</p>
                     {actionText && (
                       <div className="text-cyan-300/80 text-xs font-medium animate-pulse mb-3 flex items-center gap-1.5">
-                        <span>▸</span> {actionText}
+                        <TutorialHandCue className="h-7 w-7" />
+                        <span>{actionText}</span>
                       </div>
                     )}
-                    {/* Tutorial Step 5 Images */}
+                    {/* Wire tutorial images */}
                     {isPostWaveWireStep && (
                       <div className="flex flex-col gap-2 mb-4">
                         <img 

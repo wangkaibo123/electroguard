@@ -63,3 +63,32 @@
 .next-wave-breathe {
   animation: nextWaveBreathe 1.6s ease-in-out infinite;
 }
+
+@keyframes tutorialHandPress {
+  0%, 100% {
+    transform: translateY(0) rotate(-8deg) scale(1);
+    filter: brightness(1);
+  }
+  46% {
+    transform: translateY(5px) rotate(-8deg) scale(0.92);
+    filter: brightness(1.2);
+  }
+  62% {
+    transform: translateY(2px) rotate(-8deg) scale(0.98);
+  }
+}
+
+.tutorial-hand-cue {
+  animation: tutorialHandPress 1.05s ease-in-out infinite;
+  transform-origin: 60% 78%;
+  will-change: transform, filter;
+}
+
+.tutorial-drag-path line:last-of-type {
+  animation: tutorialPathDash 1.35s linear infinite;
+}
+
+@keyframes tutorialPathDash {
+  from { stroke-dashoffset: 22; }
+  to { stroke-dashoffset: 0; }
+}
