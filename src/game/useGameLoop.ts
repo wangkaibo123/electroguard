@@ -11,7 +11,7 @@ import {
   canDirectLinkPorts, isPortAccessible,
   generateTowerOnlyPickOptions, generateInfraOnlyPickOptions, rebuildTowerMap,
   generateAdvancedPickOptions, generateCommandCardPickOptions, generateBaseUpgradePickOptions, generateShopOffers,
-  syncDirectPortLinks,
+  generateTutorialGeneratorPickOptions, syncDirectPortLinks,
 } from './engine';
 import { renderGame } from './renderer';
 import { COMMAND_CARD_CONFIG, GLOBAL_CONFIG, SHOP_CONFIG, SHOP_ITEM_CONFIG, getTowerSellPrice } from './config';
@@ -286,6 +286,24 @@ export const useGameLoop = () => {
         state.shopRefreshCost = SHOP_CONFIG.initialRefreshCost;
       }
     }
+    sync();
+  };
+
+  const forceTutorialGeneratorPick = () => {
+    const state = stateRef.current;
+    if (
+      state.gameMode !== 'normal' ||
+      state.status !== 'pick' ||
+      state.pickUiPhase !== 'standard' ||
+      state.wave !== 2
+    ) {
+      return;
+    }
+
+    const middle = state.pickOptions[1];
+    if (middle?.kind === 'tower' && middle.towerType === 'generator') return;
+
+    state.pickOptions = generateTutorialGeneratorPickOptions(state.pickOptions);
     sync();
   };
 
@@ -1151,6 +1169,7 @@ export const useGameLoop = () => {
 
   return {
     canvasRef, cameraRef, gameState, startGame, startCustomGame, togglePause, returnToMenu, handlePick,
+    forceTutorialGeneratorPick,
     openCustomPick, buyShopPack, refreshShopOffers, sellTower, rotatingTowerId,
     startCommandCardUse, activeCommandCard, startRepair, activeRepair,
     selectedTower, setSelectedTower, placeMonsterMode, setPlaceMonsterMode, skipToNextWave, toastMessage,

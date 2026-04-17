@@ -86,8 +86,11 @@ const TutorialHandCue = ({ className = '' }: { className?: string }) => (
 
 const TURRET_DIRECT_PLUG_TUTORIAL_STEP = 1;
 const GENERATOR_DIRECT_PLUG_TUTORIAL_STEP = 2;
-const POST_WAVE_AUTO_DEPLOY_STEP = 1;
-const POST_WAVE_WIRE_STEP = 2;
+const POST_WAVE_PICK_STEP = 100;
+const POST_WAVE_WIRE_STEP = 101;
+const POST_WAVE_GENERATOR_STEP = 102;
+const POST_WAVE_TUTORIAL_MIN_WAVE = 1;
+const POST_WAVE_PICK_CARD_INDEX = 1;
 const CORE_TOWER_TYPES = new Set<TowerType>(['core']);
 const TURRET_TOWER_TYPES = new Set<TowerType>(['blaster', 'gatling', 'sniper', 'tesla', 'missile']);
 const GENERATOR_TOWER_TYPES = new Set<TowerType>(['generator', 'big_generator']);
@@ -118,6 +121,7 @@ export default function App() {
     togglePause,
     returnToMenu,
     handlePick,
+    forceTutorialGeneratorPick,
     openCustomPick,
     buyShopPack,
     selectedTower,
@@ -244,6 +248,8 @@ export default function App() {
 
   const [tutorialStep, setTutorialStep] = useState<number | null>(null);
   const [autoDeployTutorialPending, setAutoDeployTutorialPending] = useState(false);
+  const [firstWavePickTutorialDone, setFirstWavePickTutorialDone] = useState(false);
+  const [generatorPickTutorialDone, setGeneratorPickTutorialDone] = useState(false);
   const [directPlugProgress, setDirectPlugProgress] = useState({
     coreToTurret: false,
     generatorToTurret: false,
@@ -251,12 +257,16 @@ export default function App() {
   const startTutorial = () => {
     startGame();
     setAutoDeployTutorialPending(true);
+    setFirstWavePickTutorialDone(false);
+    setGeneratorPickTutorialDone(false);
     setDirectPlugProgress({ coreToTurret: false, generatorToTurret: false });
     setTutorialStep(0);
   };
   const dismissTutorial = () => {
     setTutorialStep(null);
     setAutoDeployTutorialPending(false);
+    setFirstWavePickTutorialDone(false);
+    setGeneratorPickTutorialDone(false);
     setDirectPlugProgress({ coreToTurret: false, generatorToTurret: false });
     try { localStorage.setItem('electroguard_tutorial_done', '1'); } catch {}
   };
@@ -265,6 +275,8 @@ export default function App() {
     try {
       if (localStorage.getItem('electroguard_tutorial_done') !== '1') {
         setAutoDeployTutorialPending(true);
+        setFirstWavePickTutorialDone(false);
+        setGeneratorPickTutorialDone(false);
         setDirectPlugProgress({ coreToTurret: false, generatorToTurret: false });
         setTutorialStep(0);
       }
@@ -276,13 +288,22 @@ export default function App() {
   }, [gameState.status, pickOverlayHidden]);
 
   useEffect(() => {
+    if (
+      pickOverlayHidden &&
+      (tutorialStep === POST_WAVE_PICK_STEP || tutorialStep === POST_WAVE_GENERATOR_STEP)
+    ) {
+      setPickOverlayHidden(false);
+    }
+  }, [pickOverlayHidden, tutorialStep]);
+
+  useEffect(() => {
     if (gameState.status === 'menu' || gameState.status === 'gameover') {
       if (tutorialStep !== null) dismissTutorial();
       return;
     }
     if (
       (tutorialStep === TURRET_DIRECT_PLUG_TUTORIAL_STEP || tutorialStep === GENERATOR_DIRECT_PLUG_TUTORIAL_STEP) &&
-      !(autoDeployTutorialPending && gameState.status === 'pick' && gameState.wave >= 2)
+      !(autoDeployTutorialPending && gameState.status === 'pick' && gameState.wave >= POST_WAVE_TUTORIAL_MIN_WAVE)
     ) {
       const nextDirectPlugProgress = {
         coreToTurret:
@@ -312,11 +333,74 @@ export default function App() {
       tutorialStep === null &&
       autoDeployTutorialPending &&
       gameState.status === 'pick' &&
-      gameState.wave >= 2
+      gameState.pickUiPhase === 'standard' &&
+      gameState.wave >= POST_WAVE_TUTORIAL_MIN_WAVE
     ) {
-      setTutorialStep(POST_WAVE_AUTO_DEPLOY_STEP);
+      if (gameState.wave === 1 && !firstWavePickTutorialDone) {
+        setTutorialStep(POST_WAVE_PICK_STEP);
+      } else if (gameState.wave === 2 && !generatorPickTutorialDone) {
+        forceTutorialGeneratorPick();
+        setTutorialStep(POST_WAVE_GENERATOR_STEP);
+      }
     }
-  }, [tutorialStep, gameState, autoDeployTutorialPending, directPlugProgress, isTowerDragging]);
+  }, [
+    tutorialStep,
+    gameState,
+    autoDeployTutorialPending,
+    directPlugProgress,
+    isTowerDragging,
+    firstWavePickTutorialDone,
+    generatorPickTutorialDone,
+    forceTutorialGeneratorPick,
+  ]);
+
+  const tutorialHighlightedPickIndex =
+    autoDeployTutorialPending &&
+    gameState.status === 'pick' &&
+    gameState.pickUiPhase === 'standard' &&
+    (tutorialStep === POST_WAVE_PICK_STEP || tutorialStep === POST_WAVE_GENERATOR_STEP)
+      ? POST_WAVE_PICK_CARD_INDEX
+      : null;
+
+  const tutorialForcedGeneratorOption =
+    tutorialStep === POST_WAVE_GENERATOR_STEP
+      ? gameState.pickOptions[POST_WAVE_PICK_CARD_INDEX]
+      : null;
+
+  const tutorialDisabledPickIds =
+    tutorialForcedGeneratorOption
+      ? gameState.pickOptions
+          .filter(option => option.id !== tutorialForcedGeneratorOption.id)
+          .map(option => option.id)
+      : [];
+
+  const handleTutorialPick = (optionId: string, origin?: { x: number; y: number }) => {
+    const option = gameState.pickOptions.find(pickOption => pickOption.id === optionId);
+    if (!option) return;
+
+    if (tutorialStep === POST_WAVE_GENERATOR_STEP) {
+      const forced = gameState.pickOptions[POST_WAVE_PICK_CARD_INDEX];
+      if (
+        option.id !== forced?.id ||
+        option.kind !== 'tower' ||
+        option.towerType !== 'generator'
+      ) {
+        return;
+      }
+    }
+
+    const wasFirstWavePickTutorial = tutorialStep === POST_WAVE_PICK_STEP && gameState.wave === 1;
+    const wasGeneratorPickTutorial = tutorialStep === POST_WAVE_GENERATOR_STEP && gameState.wave === 2;
+    handlePick(optionId, origin);
+
+    if (wasFirstWavePickTutorial) {
+      setFirstWavePickTutorialDone(true);
+      setTutorialStep(POST_WAVE_WIRE_STEP);
+    } else if (wasGeneratorPickTutorial) {
+      setGeneratorPickTutorialDone(true);
+      dismissTutorial();
+    }
+  };
 
   return (
     <div className="h-screen bg-gray-950 text-gray-100 font-sans flex flex-col overflow-hidden">
@@ -508,8 +592,10 @@ export default function App() {
                 labels={i}
                 hidden={pickOverlayHidden}
                 setHidden={setPickOverlayHidden}
-                onPick={handlePick}
+                onPick={handleTutorialPick}
                 setCodexTower={setCodexTower}
+                highlightPickIndex={tutorialHighlightedPickIndex}
+                disabledPickIds={tutorialDisabledPickIds}
               />
             )}
 
@@ -560,28 +646,32 @@ export default function App() {
             )}
 
             {/* Tutorial Overlay */}
-            {tutorialStep !== null && tutorialStep < i.tutorialSteps.length && (() => {
+            {tutorialStep !== null && (tutorialStep < i.tutorialSteps.length || tutorialStep >= POST_WAVE_PICK_STEP) && (() => {
               const isPostWaveTutorialStep =
                 autoDeployTutorialPending &&
-                gameState.status === 'pick' &&
-                gameState.wave >= 2 &&
-                (tutorialStep === POST_WAVE_AUTO_DEPLOY_STEP || tutorialStep === POST_WAVE_WIRE_STEP);
-              const isPostWaveAutoDeployStep = isPostWaveTutorialStep && tutorialStep === POST_WAVE_AUTO_DEPLOY_STEP;
+                (tutorialStep === POST_WAVE_PICK_STEP || tutorialStep === POST_WAVE_WIRE_STEP || tutorialStep === POST_WAVE_GENERATOR_STEP);
+              const isPostWavePickStep = isPostWaveTutorialStep && tutorialStep === POST_WAVE_PICK_STEP;
               const isPostWaveWireStep = isPostWaveTutorialStep && tutorialStep === POST_WAVE_WIRE_STEP;
+              const isPostWaveGeneratorStep = isPostWaveTutorialStep && tutorialStep === POST_WAVE_GENERATOR_STEP;
+              const postWaveStepIndex =
+                tutorialStep === POST_WAVE_WIRE_STEP ? 1 :
+                tutorialStep === POST_WAVE_GENERATOR_STEP ? 2 :
+                0;
               const step = isPostWaveTutorialStep
-                ? i.postWaveTutorialSteps[tutorialStep - POST_WAVE_AUTO_DEPLOY_STEP]
+                ? i.postWaveTutorialSteps[postWaveStepIndex]
                 : i.tutorialSteps[tutorialStep];
               const isDirectPlugStep =
                 !isPostWaveTutorialStep &&
                 (tutorialStep === TURRET_DIRECT_PLUG_TUTORIAL_STEP || tutorialStep === GENERATOR_DIRECT_PLUG_TUTORIAL_STEP);
-              const isInteractive = isDirectPlugStep;
+              const isPickChoiceTutorialStep = isPostWavePickStep || isPostWaveGeneratorStep;
+              const isInteractive = isDirectPlugStep || isPickChoiceTutorialStep;
               const isFinal = tutorialStep === i.tutorialSteps.length - 1;
               const actionText = step.action;
               const advanceTutorial = () => {
-                if (isPostWaveAutoDeployStep) {
+                if (isPostWavePickStep) {
                   setTutorialStep(POST_WAVE_WIRE_STEP);
                 } else if (isPostWaveWireStep) {
-                  dismissTutorial();
+                  setTutorialStep(null);
                 } else if (isFinal && autoDeployTutorialPending) {
                   setTutorialStep(null);
                 } else {
@@ -597,7 +687,9 @@ export default function App() {
               const ht = hlType[tutorialStep] ?? '';
 
               let posClass: string;
-              if (isInteractive) {
+              if (isPickChoiceTutorialStep) {
+                posClass = 'items-start justify-center pt-20 sm:pt-24';
+              } else if (isInteractive) {
                 posClass = isDirectPlugStep
                   ? 'items-end justify-start pb-4 pl-6'
                   : 'items-end justify-center pb-4';
@@ -683,7 +775,7 @@ export default function App() {
                   })()
                 : null;
               const displayStepNumber = isPostWaveTutorialStep
-                ? tutorialStep - POST_WAVE_AUTO_DEPLOY_STEP + 1
+                ? postWaveStepIndex + 1
                 : tutorialStep + 1;
               const displayStepTotal = isPostWaveTutorialStep
                 ? i.postWaveTutorialSteps.length

@@ -430,14 +430,37 @@ export const generatePickOptions = (): PickOption[] => {
   }
 
   return picked.map(o => {
-    const k = pickKey(o.kind, o.towerType, o.count);
-    return {
-      kind: o.kind, towerType: o.towerType, count: o.count,
-      id: genId(),
-      label: loc.pickLabel[k] ?? k,
-      description: loc.pickDesc[k] ?? '',
-    };
+    return createPickOption(o.kind, o.towerType, o.count, loc);
   });
+};
+
+export const createPickOption = (
+  kind: PickOption['kind'],
+  towerType: TowerType | undefined,
+  count: number,
+  loc = t(),
+): PickOption => {
+  const k = pickKey(kind, towerType, count);
+  return {
+    kind,
+    towerType,
+    count,
+    id: genId(),
+    label: loc.pickLabel[k] ?? k,
+    description: loc.pickDesc[k] ?? '',
+  };
+};
+
+export const generateTutorialGeneratorPickOptions = (baseOptions: PickOption[] = generatePickOptions()): PickOption[] => {
+  const loc = t();
+  const generatorOption = createPickOption('tower', 'generator', 1, loc);
+  const fillers = baseOptions.filter(option => option.towerType !== 'generator');
+
+  while (fillers.length < 2) {
+    fillers.push(createPickOption('wire', undefined, 3, loc));
+  }
+
+  return [fillers[0], generatorOption, fillers[1]];
 };
 
 const TURRET_TYPES = new Set<string>(['blaster', 'gatling', 'sniper', 'tesla']);

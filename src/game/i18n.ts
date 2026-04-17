@@ -227,8 +227,9 @@ const en: I18nStrings = {
     { title: 'Power', text: 'Powered turrets glow and fire.' },
   ],
   postWaveTutorialSteps: [
-    { title: 'Auto Deploy', text: 'New machines land near the Core.' },
+    { title: 'Pick One of Three', text: 'After each wave, choose 1 of 3 upgrades. Machines auto-deploy near the Core; wires and command cards go into inventory.', action: 'Pick any reward card' },
     { title: 'Wire Ports', text: 'Later, ports can be linked across distance. Start from the Core output and end on a tower input.', action: 'Drag from output to input' },
+    { title: 'Add Power', text: 'This wave offers a Generator in the middle slot. Choose it so the next defenses have more power to draw from.', action: 'Pick the Generator' },
   ],
 
   gameTips: {
@@ -476,8 +477,9 @@ const zh: I18nStrings = {
     { title: '电力', text: '通电的炮塔会发光并自动开火。' },
   ],
   postWaveTutorialSteps: [
-    { title: '自动部署', text: '新设备会落在核心附近。' },
+    { title: '三选一奖励', text: '每波结束后会出现 3 个升级选项，只能选择 1 个。设备会自动部署到核心附近，线缆和指令卡会进入库存。', action: '选择任意奖励卡' },
     { title: '端口连线', text: '之后可以远距离连接端口。从输出口开始，接到输入口。', action: '从输出口拖到输入口' },
+    { title: '补充电力', text: '这一波中间位置会出现发电机。请选择它，为后续防线提供更多电力。', action: '选择发电机' },
   ],
 
   gameTips: {

@@ -13,6 +13,8 @@ type PickOverlayProps = {
   setHidden: Dispatch<SetStateAction<boolean>>;
   onPick: (id: string, origin?: { x: number; y: number }) => void;
   setCodexTower: (tower: TowerType) => void;
+  highlightPickIndex?: number | null;
+  disabledPickIds?: string[];
 };
 
 export const PickOverlay = ({
@@ -22,6 +24,8 @@ export const PickOverlay = ({
   setHidden,
   onPick,
   setCodexTower,
+  highlightPickIndex = null,
+  disabledPickIds = [],
 }: PickOverlayProps) => (
   <div className={`absolute inset-0 ${hidden ? 'pointer-events-none' : ''}`}>
     <div className="absolute left-1/2 bottom-14 -translate-x-1/2 z-20 pointer-events-auto">
@@ -70,11 +74,26 @@ export const PickOverlay = ({
         )}
 
         <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full sm:w-auto items-center">
-          {gameState.pickOptions.map(opt => {
+          {gameState.pickOptions.map((opt, index) => {
             const color = getPickColor(opt);
             const codexType = opt.kind === 'tower' ? opt.towerType : null;
+            const highlighted = highlightPickIndex === index;
+            const disabled = disabledPickIds.includes(opt.id);
             return (
-              <div key={opt.id} className="w-full max-w-[200px] sm:w-44 flex flex-col gap-2">
+              <div
+                key={opt.id}
+                className={`relative w-full max-w-[200px] sm:w-44 flex flex-col gap-2 rounded-2xl transition-all ${
+                  highlighted ? 'ring-2 ring-cyan-300/90 ring-offset-4 ring-offset-gray-950 shadow-[0_0_28px_rgba(34,211,238,0.5)]' : ''
+                } ${disabled ? 'opacity-45 grayscale' : ''}`}
+              >
+                {highlighted && (
+                  <div className="absolute left-1/2 -top-12 z-10 -translate-x-1/2 animate-bounce pointer-events-none">
+                    <div className="flex flex-col items-center">
+                      <div className="w-px h-7 bg-gradient-to-b from-cyan-200 to-cyan-400" />
+                      <div className="w-0 h-0 border-l-[9px] border-r-[9px] border-t-[12px] border-l-transparent border-r-transparent border-t-cyan-300" />
+                    </div>
+                  </div>
+                )}
                 {opt.kind === 'tower' && opt.towerType && (() => {
                   const stats = getTowerPickStats(opt.towerType);
                   return (
@@ -87,16 +106,20 @@ export const PickOverlay = ({
                   );
                 })()}
                 <button
+                  disabled={disabled}
                   onClick={e => {
+                    if (disabled) return;
                     const rect = e.currentTarget.getBoundingClientRect();
                     onPick(opt.id, {
                       x: rect.left + rect.width / 2,
                       y: rect.top + rect.height / 2,
                     });
                   }}
-                  className="group w-full p-4 sm:p-5 rounded-xl border-2 border-gray-700 bg-gray-900/95 hover:bg-gray-800/95 transition-all flex flex-row sm:flex-col items-center text-center gap-3 hover:scale-105 hover:shadow-lg active:scale-95"
+                  className="group w-full p-4 sm:p-5 rounded-xl border-2 border-gray-700 bg-gray-900/95 hover:bg-gray-800/95 transition-all flex flex-row sm:flex-col items-center text-center gap-3 hover:scale-105 hover:shadow-lg active:scale-95 disabled:hover:scale-100 disabled:hover:bg-gray-900/95 disabled:cursor-not-allowed"
                   style={{ '--pick-color': color } as CSSProperties}
-                  onMouseEnter={e => (e.currentTarget.style.borderColor = color)}
+                  onMouseEnter={e => {
+                    if (!disabled) e.currentTarget.style.borderColor = color;
+                  }}
                   onMouseLeave={e => (e.currentTarget.style.borderColor = '')}
                 >
                   <div
