@@ -690,8 +690,7 @@ export function drawTowerDetails(
   } else if (t.type === 'generator' || t.type === 'big_generator') {
     const outputting = hasGeneratorOutputTarget(state, t);
     drawEnergyEffect(ctx, cx, cy, now, t.powered, tColor, outputting ? generatorPowerProgress : 0, outputting);
-    const r = t.type === 'generator' ? GENERATOR_POWER_OUTPUT_RADIUS : Math.min(tw, th) / 2 - inset - 4;
-    drawPowerOutputIndicator(ctx, cx, cy, r, getPowerOutputAmount(t), now, tColor);
+    drawPowerOutputIndicator(ctx, cx, cy, GENERATOR_POWER_OUTPUT_RADIUS, getPowerOutputAmount(t), now, tColor);
   } else if (t.type === 'repair_drone') {
     ctx.strokeStyle = tColor;
     ctx.lineWidth = 1.5;
@@ -785,4 +784,3 @@ export function drawTowerDetails(
     ctx.beginPath(); ctx.arc(cx, cy, 3, 0, TWO_PI); ctx.fill();
   }
 }
-

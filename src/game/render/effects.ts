@@ -5,6 +5,9 @@ import {
   WIRE_LINE_WIDTH, portOutward, posOnPath,
 } from './constants';
 
+const GENERATOR_LAUNCH_EFFECT_RADIUS =
+  Math.min(TOWER_STATS.generator.width, TOWER_STATS.generator.height) * CELL_SIZE * 0.48;
+
 // ── Wires ─────────────────────────────────────────────────────────────────
 export const drawWires = (ctx: CanvasRenderingContext2D, state: GameState) => {
   ctx.lineWidth = WIRE_LINE_WIDTH;
@@ -82,7 +85,7 @@ export const drawPulses = (
       if (source) {
         const cx = (source.x + source.width / 2) * CELL_SIZE;
         const cy = (source.y + source.height / 2) * CELL_SIZE;
-        const sourceRadius = Math.min(source.width, source.height) * CELL_SIZE * 0.48;
+        const sourceRadius = GENERATOR_LAUNCH_EFFECT_RADIUS;
         const t = 1 - p.launchDelay / p.launchDuration;
         const expandEnd = 0.38;
         const expanding = t < expandEnd;
