@@ -232,18 +232,18 @@ const en: I18nStrings = {
   tutorialDone: 'Start Playing!',
   wireTutorialDragPortOnly: 'Drag a machine port to connect the cable',
   tutorialSteps: [
-    { title: 'Your Core', text: 'The Core makes power. Do not let it fall.' },
-    { title: 'Plug Turret', text: 'Move the turret until its port touches a Core port.', action: 'Plug turret into Core' },
-    { title: 'Plug Generator', text: 'Move the generator until its port touches the turret.', action: 'Plug generator into turret' },
-    { title: 'Start the Wave', text: 'Powered turrets glow and fire. Click Start Next Wave to test this defense.', action: 'Click Start Next Wave' },
+    { title: 'This Is Your Core', text: 'Do not let it be destroyed!' },
+    { title: 'Plug the Turret Into Power', text: 'Move the turret so it connects to the base and receives power.', action: 'Connect the turret to base power' },
+    { title: 'Connect the Generator', text: 'Connect this generator to the turret too, so it can supply power.', action: 'Connect the generator to the turret' },
+    { title: 'Start the Fight!', text: 'Powered turrets fire automatically. Click Start Next Wave to test this defense.', action: 'Click Start Next Wave' },
   ],
   postWaveTutorialSteps: [
-    { title: 'Pick One of Three', text: 'After each wave, choose 1 of 3 upgrades. This first reward is a Generator in the middle slot; choose it so the next defenses have more power.', action: 'Pick the Generator' },
-    { title: 'Wire Ports', text: 'Drag from the Generator output port to a turret input port to link power across distance.', action: 'Drag from output to input' },
+    { title: 'Choose a Reward', text: 'After each wave, you can choose one reward. Pick the Generator this time to provide more power for later defenses.', action: 'Pick the Generator' },
+    { title: 'New Feature: Wiring', text: 'Tap the generator output port to place a cable, then drag it to a turret input port to transmit power over distance.', action: 'Drag a cable from output to input' },
   ],
   shopTutorialStep: {
-    title: 'Shop Unlocked',
-    text: 'The shop is now available during rest phases. Spend gold here to buy machines, packs, repairs, or refresh the offers before starting the next wave.',
+    title: 'New Feature: Shop',
+    text: 'Spend gold here to buy machines, packs, and repair services. Click the battlefield or the button to hide this page.',
     action: 'Review the shop',
   },
 
@@ -326,23 +326,23 @@ const en: I18nStrings = {
   codexButton: 'Codex',
   towerCodex: {
     blaster:
-      'Role: steady single-target damage.\n\nEach shot costs 2 power. Power pulses travel along wires from the Core or Generators; the turret must be connected and receiving energy to fire.\n\nTips: place with a clear line of sight to spawn lanes; click the placed turret to rotate the barrel toward threats. Good as a backbone turret when power is stable.',
+      'Role: steady single-target damage with strong cost efficiency.\n\nEach shot costs 2 power.\n\nTips: a reliable turret.',
     gatling:
-      'Role: sustained DPS with capped fire rate.\n\nEach incoming power becomes 4 bullets. The turret fires those bullets at up to 10 shots per second while heat still affects spread and overload risk.\n\nTips: best against waves and clusters; pair with reliable wiring so it keeps a healthy ammo queue during fights.',
+      'Role: the more energy it receives, the faster it fires.\n\nEach incoming power becomes 4 bullets, fired continuously at up to 10 shots per second. It temporarily stops firing when overheated.\n\nTips: good against dense waves. Keep wiring reliable; 5 generators powering it can reach maximum fire rate, and additional current input may cause overheating.',
     sniper:
-      'Role: burst damage on a line.\n\nEach shot costs 4 power and pierces all enemies along its firing line, with a longer cooldown between shots.\n\nTips: align the turret so enemies walk in a straight line through the beam; excellent for choke points. Rotate after placement to maximize pierce value.',
+      'Role: piercing damage in a straight line.\n\nEach shot costs 4 power and has a long cooldown, but one shot can pierce every enemy along its path.\n\nTips: use its long range to guard as much area as possible.',
     tesla:
-      'Role: area control via chained lightning.\n\nLightning jumps between nearby enemies, strong against tight groups. Higher max power storage than basic turrets—plan wiring accordingly.\n\nTips: pull enemies into clusters before arcs connect; less ideal for very spread-out paths unless you have multiple teslas.',
+      'Role: chained lightning that counters clustered enemies.\n\nLightning jumps between nearby enemies and is especially effective against grouped targets. It has a higher power storage limit.\n\nTips: it can store 10 power, so use the downtime between waves to fully charge it.',
     generator:
-      'Role: extends your power network.\n\nLike the Core, it dispatches energy pulses on an interval. Use it when turrets are far from the Core or when one line cannot supply enough devices.\n\nTips: place between the Core and forward defenses; connect inputs from the network and outputs toward front-line turrets.',
+      'Role: basic power supply unit.\n\nPeriodically dispatches energy pulses into the network.\n\nTips: connect it to turrets by direct plugging or by cables.',
     shield:
-      'Role: bubble shield that absorbs damage for buildings inside.\n\nThe shield recharges using power. If broken, it needs enough stored power (e.g. 3 units) to reboot—keep it wired.\n\nTips: center the bubble on the Core or a cluster of key turrets; do not leave it unwired or it will fall quickly under focus fire.',
+      'Role: projects an area shield that absorbs damage for buildings inside.\n\nThe shield consumes power to recharge. After being broken, it needs to accumulate 3 power before it can reboot.\n\nTips: cover key turret clusters.',
     battery:
-      'Role: short-term energy reservoir.\n\nStores up to 4 power and releases it quickly to nearby consumers, smoothing spikes when many turrets fire at once.\n\nTips: place between your main power path and hungry turrets (Gatling, Sniper, Tesla); wire battery input from generators/core and output toward the front line.',
+      'Role: energy storage device.\n\nStores up to 4 power and can quickly release it when turrets need supply.\n\nTips: charge it fully during rest phases, then let it quickly power turrets during battle.',
     bus:
-      'Role: wiring hub — simplifies messy layouts.\n\nAccepts up to 3 input wires and can drive up to 3 outputs, merging and redistributing pulses.\n\nTips: use at junctions where many cables would cross; not a power source by itself—still needs energy from Core/Generators upstream.',
+      'Role: power merging and splitting, useful for organizing wiring.\n\nCombines up to 3 input wires and branches into up to 3 outputs.\n\nTips: it does not generate energy, but it can gather power from multiple generators into one place or distribute it to multiple turrets.',
     wire:
-      'Role: power connection between machine ports.\n\nWires carry power pulses from the Core, Generators, Batteries, or Bus outputs into machines that need energy. Each wire consumes one wire from your inventory when created.\n\nTips: drag from an output port to an input port, keep routes short when possible, and protect exposed wires from Saboteurs because damaged lines can cut power to the front.',
+      'Role: connects machine ports and transmits power pulses.\n\nEach cable you create consumes 1 cable from your inventory.\n\nTips: conduct power to distant turrets, and try not to waste a single power pulse.',
   },
 
   controlsGuide: [
@@ -383,16 +383,16 @@ const en: I18nStrings = {
   pickDesc: {
     'blaster_1': 'Fires a bullet per 2 power',
     'blaster_2': 'Two standard turrets',
-    'gatling_1': '4 bullets per power, max 10 shots/sec',
-    'sniper_1': 'Piercing line shot, long cooldown',
-    'tesla_1': 'Chain lightning between enemies',
+    'gatling_1': 'More input power means faster fire, but beware overheating!',
+    'sniper_1': 'Fires a piercing straight-line shot, long range and long cooldown',
+    'tesla_1': 'Fires chained lightning that bounces between enemies',
     'generator_1': 'Power source for the network',
     'shield_1': 'Projects a protective bubble',
     'battery_1': 'Stores power, discharges rapidly',
     'bus_1': 'Merges 3 inputs into 3 outputs',
     'missile_1': 'Four silos, 4 power per arcing missile',
     'big_generator_1': 'Produces 4 power every 2 seconds',
-    'repair_drone_1': 'Sends repair drones with stored power',
+    'repair_drone_1': 'Sends drones to repair buildings',
     'wire_3': 'Power line connectors',
     'wire_5': 'Large bundle of power lines',
     'add_input_1': 'Add one input port',
@@ -491,18 +491,18 @@ const zh: I18nStrings = {
   tutorialDone: '开始游戏！',
   wireTutorialDragPortOnly: '请拖拽机器接口进行电缆连接',
   tutorialSteps: [
-    { title: '你的核心', text: '核心产出电力，别让它被摧毁。' },
-    { title: '炮台直插', text: '拖动炮台，让端口贴住核心端口。', action: '炮台直插核心' },
-    { title: '发电机直插', text: '拖动发电机，让端口贴住炮台端口。', action: '发电机直插炮台' },
-    { title: '开启波次', text: '通电的炮塔会发光并自动开火。点击【开启下一波】来测试这条防线。', action: '点击开启下一波' },
+    { title: '这是你的核心', text: '别让它被摧毁！' },
+    { title: '炮台插入电源', text: '拖动炮台使其与基地拼接，让炮台获得电力', action: '连接炮台和基地电源' },
+    { title: '连接发电机', text: '将这个发电机也与炮台连接，为其供电。', action: '发电机连接炮台' },
+    { title: '开启战斗！', text: '通电的炮塔会自动开火。点击【开启下一波】来测试这条防线。', action: '点击开启下一波' },
   ],
   postWaveTutorialSteps: [
-    { title: '三选一奖励', text: '每波结束后会出现 3 个升级选项，只能选择 1 个。本次中间位置固定为发电机，请选择它，为后续防线提供更多电力。', action: '选择发电机' },
-    { title: '端口连线', text: '从发电机输出口拖到炮塔输入口，就可以远距离传输电力。', action: '从输出口拖到输入口' },
+    { title: '选择奖励', text: '每波结束后可以选择一次奖励。本次请选择发电机，为后续防线提供更多电力。', action: '选择发电机' },
+    { title: '新功能：连线', text: '点击发电机输出口可以布置线缆，拖到炮台输入口就可以远距离传输电力。', action: '从输出口拉线缆到输入口' },
   ],
   shopTutorialStep: {
-    title: '商店解锁',
-    text: '休整阶段可以使用商店。花费金币购买机器、卡包、维修服务，或刷新商品，然后再开启下一波。',
+    title: '新功能：商店',
+    text: '可以在此花费金币购买机器、卡包、维修服务。点击战场或者按钮可以隐藏此此页面',
     action: '查看商店',
   },
 
@@ -585,23 +585,23 @@ const zh: I18nStrings = {
   codexButton: '图鉴',
   towerCodex: {
     blaster:
-      '定位：加农炮——稳定单体输出，性价比高。\n\n每次开火消耗 2 格电力。能量沿线缆从核心或发电机传来，必须连通电网且正在受电才能射击。\n\n用法建议：放在能俯视刷怪方向的位置；放置后点击旋转炮口。电力稳定时适合作为主力炮塔。',
+      '定位：稳定单体输出，性价比高。\n\n每次开火消耗 2 格电力。\n\n用法建议：稳定的炮塔。',
     gatling:
-      '定位：持续火力，稳定限速输出。\n\n每接收 1 格电就转化为 4 发子弹，并以最多每秒 10 发的速度持续射击。热量仍会影响散布，并在过热时暂时停火。\n\n用法建议：适合应对密集波次；务必保证线缆可靠，让它在交战时保持足够弹药储备。',
+      '定位：输入能源越多射速越快。\n\n每接收 1 格电就转化为 4 发子弹，并以最多每秒 10 发的速度持续射击。过热时会暂时停火。\n\n用法建议：适合应对密集波次；务必保证线缆可靠，5台发电机为其供能时会达到最高射速，再多电流输入会导致过热',
     sniper:
-      '定位：狙击塔——直线高爆发、穿透杀伤。\n\n每发消耗 4 格电，冷却较长，但一发可穿透路径上所有敌人。\n\n用法建议：把敌人走位收成一条线时收益最大，适合隘口；放置后旋转找好穿透角度。',
+      '定位：直线穿透杀伤。\n\n每发消耗 4 格电，冷却较长，但一发可穿透路径上所有敌人。\n\n用法建议：利用长射程尽可能守卫更大的范围',
     tesla:
-      '定位：电磁炮——连锁闪电，克制聚堆敌人。\n\n电弧在临近敌人之间跳跃，对成群目标特别有效。储电上限较高，布线时预留容量。\n\n用法建议：引诱或迫使敌人聚拢；若路线过于分散，可多座配合覆盖。',
+      '定位：连锁闪电，克制聚堆敌人。\n\n电弧在临近敌人之间跳跃，对成群目标特别有效。储电上限较高。\n\n用法建议：其可以存储10格电量，利用波次间隙为其充好电。',
     generator:
-      '定位：扩展电网，远程供电。\n\n与核心类似，按周期向网络派发能量脉冲。当前方炮塔离核心太远或单线负载不足时使用。\n\n用法建议：放在核心与前线之间作“中继”；输入接上游，输出指向下游炮塔。',
+      '定位：基础供能单元。\n\n按周期向网络派发能量脉冲。\n\n用法建议：通过直插或接线的方式连接炮塔。',
     shield:
-      '定位：护盾塔——展开范围护罩，吸收伤害保护圈内建筑。\n\n护罩会消耗电力充能；被击破后需要积累一定电力（例如 3 格）才能重启，请保持连接。\n\n用法建议：罩住核心或关键炮塔群；不要长时间断电否则极易被集火打穿。',
+      '定位：展开范围护罩，吸收伤害保护圈内建筑。\n\n护罩会消耗电力充能；被击破后需要积累 3 格电力才能重启\n\n用法建议：罩住关键炮塔群',
     battery:
-      '定位：缓冲池，平滑用电尖峰。\n\n最多存 4 格电并快速放出，适合多炮塔同时开火的瞬间。\n\n用法建议：放在主供电路径与耗电大户（加特林、狙击塔、电磁炮等）之间；输入接发电机/核心，输出通往前线。',
+      '定位：储能设备。\n\n最多存 4 格电，炮台需要供电时可以快速放出。\n\n用法建议：休整阶段充满电，战斗时快速给炮塔供能',
     bus:
-      '定位：汇流与分线，整理复杂布线。\n\n最多合并 3 条输入线，并分出最多 3 条输出，用于十字路口式走线。\n\n用法建议：线缆容易交叉纠缠时用插线板收束；它本身不产生能量，上游仍需核心或发电机供能。',
+      '定位：汇流与分线，整理布线。\n\n最多合并 3 条输入线，并分出最多 3 条输出。\n\n用法建议：其本身不产生能量，但可以将多个发电机的电量汇于一处或者分散给多个炮塔。',
     wire:
-      '定位：连接设备端口，传递电力脉冲。\n\n线缆把核心、发电机、电池或插线板输出的能量送进需要供电的设备。每创建 1 条线缆都会消耗库存中的 1 条线缆。\n\n用法建议：从输出端口拖到输入端口，尽量让路线短而清晰；暴露在前线的线缆容易被破坏者盯上，关键供电线路最好留有备用路径。',
+      '定位：连接设备端口，传递电力脉冲。\n\n每创建 1 条线缆都会消耗库存中的 1 条线缆。\n\n用法建议：将电力传导给远处的炮台，尽量不要浪费任何一个电力脉冲',
   },
 
   controlsGuide: [
@@ -642,16 +642,16 @@ const zh: I18nStrings = {
   pickDesc: {
     'blaster_1': '每2格电发射一发子弹',
     'blaster_2': '两座标准炮塔',
-    'gatling_1': '1电4发，最多每秒10发',
-    'sniper_1': '穿透直线射击，长冷却',
-    'tesla_1': '闪电在敌人间弹射',
+    'gatling_1': '输入电力越多射速越快，但小心过热！',
+    'sniper_1': '发射穿透直线射击，射程远冷却长',
+    'tesla_1': '发射连锁闪电在敌人间弹射',
     'generator_1': '为网络提供能量',
     'shield_1': '投射防护罩',
     'battery_1': '存储能量，快速放电',
     'bus_1': '合并3条输入为3条输出',
     'missile_1': '4个发射井，每4格电发射1枚弧线追踪导弹',
     'big_generator_1': '每2秒生产4个电',
-    'repair_drone_1': '派出携电无人机维修建筑',
+    'repair_drone_1': '派出无人机维修建筑',
     'wire_3': '电力线缆连接器',
     'wire_5': '大捆电力线缆',
     'add_input_1': '增加一个机器输入口',

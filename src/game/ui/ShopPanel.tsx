@@ -477,7 +477,9 @@ export const ShopPanel = (props: ShopPanelProps) => {
         {(gameState.status === 'playing' || gameState.status === 'paused') && !shopPanelHiddenForWave && (
           <button
             onClick={() => setSidebarOpen(v => !v)}
-            className={`absolute top-1/2 z-50 flex h-14 w-[25px] -translate-y-1/2 items-center justify-center rounded-l-lg border border-r-0 border-gray-700 bg-gray-800/90 text-gray-300 shadow-lg backdrop-blur-sm transition-[right,transform,background-color] hover:bg-gray-700 active:scale-95 ${
+            className={`absolute top-1/2 flex h-14 w-[25px] -translate-y-1/2 items-center justify-center rounded-l-lg border border-r-0 border-gray-700 bg-gray-800/90 text-gray-300 shadow-lg backdrop-blur-sm transition-[right,transform,background-color] hover:bg-gray-700 active:scale-95 ${
+              tutorialStep === null ? 'z-50' : 'z-30'
+            } ${
               sidebarOpen ? 'right-[260px]' : 'right-0'
             }`}
             title={sidebarOpen ? i.hidePanel : i.showPanel}
