@@ -1,6 +1,7 @@
 import type { CSSProperties, Dispatch, SetStateAction } from 'react';
 import { Cable, Eye, EyeOff } from 'lucide-react';
 import { GLOBAL_CONFIG } from '../config';
+import { WIRE_MAX_HP } from '../types';
 import type { CodexEntryType, GameState } from '../types';
 import type { I18nStrings } from '../i18n';
 import { BaseUpgradeIcon, CommandCardIcon, TowerIcon } from './icons';
@@ -93,10 +94,11 @@ export const PickOverlay = ({
                 : null;
             const highlighted = highlightPickIndex === index;
             const disabled = disabledPickIds.includes(opt.id);
+            const hasCodexButton = Boolean(codexEntry);
             return (
               <div
                 key={opt.id}
-                className={`pick-option relative w-full max-w-[280px] sm:max-w-none sm:w-44 grid grid-cols-[minmax(0,1fr)_auto] sm:flex sm:flex-col gap-2 rounded-2xl transition-all ${
+                className={`pick-option relative w-full max-w-[280px] sm:max-w-none sm:w-44 sm:h-[240px] grid grid-cols-[minmax(0,1fr)_auto] sm:flex sm:flex-col gap-2 rounded-2xl transition-all ${
                   highlighted ? 'ring-2 ring-cyan-300/90 ring-offset-4 ring-offset-gray-950 shadow-[0_0_28px_rgba(34,211,238,0.5)]' : ''
                 } ${disabled ? 'opacity-45 grayscale' : ''}`}
               >
@@ -108,17 +110,29 @@ export const PickOverlay = ({
                     </div>
                   </div>
                 )}
-                {opt.kind === 'tower' && opt.towerType && (() => {
-                  const stats = getTowerPickStats(opt.towerType);
-                  return (
-                    <div className="hidden sm:grid row-start-1 col-start-1 w-full rounded-lg px-3 py-1.5 grid-cols-2 gap-x-2 gap-y-0.5 text-[10px] font-mono border" style={{ borderColor: color + '44', backgroundColor: color + '11', color }}>
-                      <span title={i.statHp}>{i.statHp} {stats.hp}</span>
-                      <span title={i.statRange}>{i.statRange} {stats.range != null ? stats.range : '-'}</span>
-                      <span title={i.statAtk}>{i.statAtk} {stats.atk != null ? stats.atk : '-'}</span>
-                      <span title={i.statPow}>{i.statPow} {stats.powLabel}</span>
-                    </div>
-                  );
-                })()}
+                <div
+                  className={`hidden sm:grid row-start-1 col-start-1 h-[50px] w-full rounded-lg px-3 py-1.5 grid-cols-2 content-center gap-x-2 gap-y-0.5 text-[10px] font-mono border ${
+                    opt.kind === 'tower' || opt.kind === 'wire' ? '' : 'opacity-0'
+                  }`}
+                  style={{ borderColor: color + '44', backgroundColor: color + '11', color }}
+                  aria-hidden={opt.kind !== 'tower' && opt.kind !== 'wire'}
+                >
+                  {opt.kind === 'tower' && opt.towerType ? (() => {
+                    const stats = getTowerPickStats(opt.towerType);
+                    return (
+                      <>
+                        <span title={i.statHp}>{i.statHp} {stats.hp}</span>
+                        <span title={i.statRange}>{i.statRange} {stats.range != null ? stats.range : '-'}</span>
+                        <span title={i.statAtk}>{i.statAtk} {stats.atk != null ? stats.atk : '-'}</span>
+                        <span title={i.statPow}>{i.statPow} {stats.powLabel}</span>
+                      </>
+                    );
+                  })() : opt.kind === 'wire' ? (
+                    <span className="col-span-2" title={i.statHp}>{i.statHp} {WIRE_MAX_HP}</span>
+                  ) : (
+                    <span className="col-span-2">-</span>
+                  )}
+                </div>
                 <button
                   disabled={disabled}
                   onClick={e => {
@@ -129,7 +143,7 @@ export const PickOverlay = ({
                       y: rect.top + rect.height / 2,
                     });
                   }}
-                  className={`pick-option-button group min-w-0 w-full p-4 sm:p-5 rounded-xl border-2 border-gray-700 bg-gray-900/95 hover:bg-gray-800/95 transition-all flex flex-row sm:flex-col items-center text-center gap-3 hover:scale-105 hover:shadow-lg active:scale-95 disabled:hover:scale-100 disabled:hover:bg-gray-900/95 disabled:cursor-not-allowed ${
+                  className={`pick-option-button group min-w-0 w-full sm:flex-1 p-4 sm:p-5 rounded-xl border-2 border-gray-700 bg-gray-900/95 hover:bg-gray-800/95 transition-all flex flex-row sm:flex-col items-center justify-center text-center gap-3 hover:scale-105 hover:shadow-lg active:scale-95 disabled:hover:scale-100 disabled:hover:bg-gray-900/95 disabled:cursor-not-allowed ${
                     codexEntry ? 'row-start-1 col-start-1 sm:row-auto sm:col-auto' : 'col-span-2 sm:col-span-1'
                   }`}
                   style={{ '--pick-color': color } as CSSProperties}
@@ -155,7 +169,7 @@ export const PickOverlay = ({
                     <div className="text-[11px] text-gray-400 leading-snug">{opt.description}</div>
                   </div>
                 </button>
-                {codexEntry && (
+                {hasCodexButton ? (
                   <button
                     type="button"
                     title={i.codexButton}
@@ -164,6 +178,10 @@ export const PickOverlay = ({
                   >
                     {i.codexButton}
                   </button>
+                ) : (
+                  <div className="hidden sm:block w-full px-3 py-2 text-xs leading-snug opacity-0 pointer-events-none">
+                    {i.codexButton}
+                  </div>
                 )}
               </div>
             );

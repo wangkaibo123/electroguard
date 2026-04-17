@@ -5,6 +5,34 @@ import { applyDamageToEnemy, findNearestEnemy } from './combatUtils';
 const MISSILE_RETARGET_RANGE = GLOBAL_CONFIG.cellSize * 10;
 const findEnemyById = (state: GameState, id: string) => state.enemies.find((enemy) => enemy.id === id);
 
+const distanceToSegment = (
+  px: number,
+  py: number,
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+) => {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const lengthSq = dx * dx + dy * dy;
+  if (lengthSq === 0) return Math.hypot(px - ax, py - ay);
+
+  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lengthSq));
+  const closestX = ax + dx * t;
+  const closestY = ay + dy * t;
+  return Math.hypot(px - closestX, py - closestY);
+};
+
+const projectileSweptEnemyHit = (
+  projectile: GameState['projectiles'][number],
+  enemy: GameState['enemies'][number],
+  fromX: number,
+  fromY: number,
+  toX: number,
+  toY: number,
+) => distanceToSegment(enemy.x, enemy.y, fromX, fromY, toX, toY) < enemy.radius + (projectile.size ?? 4);
+
 const applySplashDamage = (
   state: GameState,
   x: number,
@@ -105,32 +133,34 @@ export const updateProjectiles = (state: GameState, dt: number) => {
     }
 
     if (projectile.angle !== undefined) {
+      const previousX = projectile.x;
+      const previousY = projectile.y;
       const step = projectile.speed * dt;
       projectile.x += Math.cos(projectile.angle) * step;
       projectile.y += Math.sin(projectile.angle) * step;
       projectile.traveled = (projectile.traveled ?? 0) + step;
 
-      if (projectile.maxRange && projectile.traveled > projectile.maxRange) {
-        state.projectiles.splice(index, 1);
-        changed = true;
-        continue;
-      }
-
       let hit = false;
       for (const enemy of state.enemies) {
         if (projectile.piercedIds?.includes(enemy.id)) continue;
-        if (Math.hypot(enemy.x - projectile.x, enemy.y - projectile.y) >= enemy.radius + 4) continue;
+        if (!projectileSweptEnemyHit(projectile, enemy, previousX, previousY, projectile.x, projectile.y)) continue;
 
         applyDamageToEnemy(state, enemy, projectile.damage, projectile.color ?? '#fbbf24');
         if (!projectile.piercing) {
           state.projectiles.splice(index, 1);
           hit = true;
+          break;
         } else {
           projectile.piercedIds = projectile.piercedIds ?? [];
           projectile.piercedIds.push(enemy.id);
         }
         changed = true;
-        break;
+      }
+
+      if (projectile.maxRange && projectile.traveled > projectile.maxRange) {
+        state.projectiles.splice(index, 1);
+        changed = true;
+        continue;
       }
 
       if (!hit) changed = true;
@@ -165,7 +195,8 @@ export const updateProjectiles = (state: GameState, dt: number) => {
       targetFound = true;
 
       const distance = Math.hypot(targetX - projectile.x, targetY - projectile.y);
-      if (distance < target.radius + 4) {
+      const step = projectile.speed * dt;
+      if (distance < target.radius + 4 || distance <= step + target.radius + (projectile.size ?? 4)) {
         if (projectile.splashRadius) {
           applySplashDamage(
             state,
@@ -199,8 +230,15 @@ export const updateProjectiles = (state: GameState, dt: number) => {
     if (!targetFound) continue;
 
     const angle = Math.atan2(targetY - projectile.y, targetX - projectile.x);
-    projectile.x += Math.cos(angle) * projectile.speed * dt;
-    projectile.y += Math.sin(angle) * projectile.speed * dt;
+    const distance = Math.hypot(targetX - projectile.x, targetY - projectile.y);
+    const step = Math.min(projectile.speed * dt, distance);
+    projectile.x += Math.cos(angle) * step;
+    projectile.y += Math.sin(angle) * step;
+    projectile.traveled = (projectile.traveled ?? 0) + step;
+
+    if (projectile.maxRange && projectile.traveled > projectile.maxRange) {
+      state.projectiles.splice(index, 1);
+    }
     changed = true;
   }
 

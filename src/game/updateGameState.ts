@@ -470,7 +470,6 @@ const updateCombatTowers = (state: GameState, dt: number, now: number) => {
         targetId: bestEnemy?.id ?? '',
         speed: BLASTER_BULLET_SPEED,
         damage: BLASTER_DAMAGE,
-        angle: tower.barrelAngle,
         traveled: 0,
         maxRange: BLASTER_RANGE * (tower.rangeMultiplier ?? 1),
         color: '#f87171',

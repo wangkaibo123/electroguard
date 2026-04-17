@@ -771,26 +771,26 @@ export default function App() {
                 </button>
               ) : (
                 <div className="absolute top-2 left-2 select-none">
-                  <div className="w-[260px] bg-gray-950/70 backdrop-blur-sm rounded-lg px-3 py-2.5 border border-gray-700/40 shadow-lg">
-                    <div className="flex items-center justify-between mb-2">
+                  <div className="w-[220px] bg-gray-950/70 backdrop-blur-sm rounded-lg px-2.5 py-2 border border-gray-700/40 shadow-lg">
+                    <div className="flex items-center justify-between mb-1.5">
                       <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider">{locale === 'zh' ? '操作指南' : 'Controls'}</span>
                       <button
                         onClick={() => setControlsHidden(true)}
-                        className="ml-3 rounded p-1.5 text-red-500 transition-colors hover:bg-red-500/10 hover:text-red-400"
+                        className="ml-2 rounded p-1 text-red-500 transition-colors hover:bg-red-500/10 hover:text-red-400"
                         title={i.hidePanel}
                       >
-                        <X size={24} />
+                        <X size={18} />
                       </button>
                     </div>
-                    <ul className="space-y-1.5 pointer-events-none">
+                    <ul className="space-y-1 pointer-events-none">
                       {i.controlsGuide.map((item, idx) => (
-                        <li key={idx} className="grid grid-cols-[78px_1fr] items-center gap-3">
-                          <span className="flex justify-end">
+                        <li key={idx} className="grid grid-cols-[64px_1fr] items-center gap-2">
+                          <span className="flex justify-end origin-right scale-90">
                             {item.keys.map((key) => (
                               <ControlKeyIcon key={key} code={key} />
                             ))}
                           </span>
-                          <span className="text-[12px] leading-snug text-gray-300">{item.action}</span>
+                          <span className="text-[11px] leading-tight text-gray-300">{item.action}</span>
                         </li>
                       ))}
                     </ul>
@@ -1325,23 +1325,23 @@ export default function App() {
                   })()}
 
                   {/* Tutorial card */}
-                  <div className="relative pointer-events-auto bg-gray-900/95 border border-cyan-500/40 rounded-xl p-4 sm:p-5 lg:p-6 shadow-[0_0_25px_rgba(6,182,212,0.2)] max-w-md sm:max-w-lg lg:max-w-xl w-full mx-2 sm:mx-4 backdrop-blur-sm">
-                    <div className="flex items-center justify-between mb-3">
+                  <div className="relative pointer-events-auto bg-gray-900/95 border border-cyan-500/40 rounded-xl p-3 sm:p-4 lg:p-5 shadow-[0_0_25px_rgba(6,182,212,0.2)] max-w-sm sm:max-w-md lg:max-w-lg w-full mx-2 sm:mx-4 backdrop-blur-sm">
+                    <div className="flex items-center justify-between mb-2">
                       <span className="text-cyan-400/70 text-xs font-mono">{displayStepNumber} / {displayStepTotal}</span>
                       <button onClick={dismissTutorial} className="text-gray-500 hover:text-gray-300 text-xs transition-colors">{i.tutorialSkip}</button>
                     </div>
-                    <h3 className="text-lg lg:text-xl font-bold text-white mb-2">{step.title}</h3>
-                    <p className="text-gray-300 text-sm lg:text-base leading-relaxed mb-4">{step.text}</p>
+                    <h3 className="text-base lg:text-lg font-bold text-white mb-1.5">{step.title}</h3>
+                    <p className="text-gray-300 text-xs lg:text-sm leading-relaxed mb-3">{step.text}</p>
                     {actionText && (
-                      <div className="text-cyan-300/80 text-xs font-medium animate-pulse mb-3 flex items-center gap-1.5">
-                        <TutorialHandCue className="h-7 w-7" />
+                      <div className="text-cyan-300/80 text-xs font-medium animate-pulse mb-2.5 flex items-center gap-1.5">
+                        <TutorialHandCue className="h-6 w-6" />
                         <span>{actionText}</span>
                       </div>
                     )}
                     {!isInteractive && (
                       <button
                         onClick={advanceTutorial}
-                        className="w-full px-4 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-lg transition-colors text-sm"
+                        className="w-full px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-lg transition-colors text-sm"
                       >
                         {isFinal || isPostWaveWireStep || isShopMachineControlTutorialStep ? i.tutorialDone : i.tutorialNext}
                       </button>
