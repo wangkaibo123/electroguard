@@ -98,6 +98,7 @@ export interface I18nStrings {
   tutorialSkip: string;
   tutorialNext: string;
   tutorialDone: string;
+  wireTutorialDragPortOnly: string;
   tutorialSteps: {
     title: string;
     text: string;
@@ -220,11 +221,12 @@ const en: I18nStrings = {
   tutorialSkip: 'Skip',
   tutorialNext: 'Next',
   tutorialDone: 'Start Playing!',
+  wireTutorialDragPortOnly: 'Drag a machine port to connect the cable',
   tutorialSteps: [
     { title: 'Your Core', text: 'The Core makes power. Do not let it fall.' },
     { title: 'Plug Turret', text: 'Move the turret until its port touches a Core port.', action: 'Plug turret into Core' },
     { title: 'Plug Generator', text: 'Move the generator until its port touches the turret.', action: 'Plug generator into turret' },
-    { title: 'Power', text: 'Powered turrets glow and fire.' },
+    { title: 'Start the Wave', text: 'Powered turrets glow and fire. Click Start Next Wave to test this defense.', action: 'Click Start Next Wave' },
   ],
   postWaveTutorialSteps: [
     { title: 'Pick One of Three', text: 'After each wave, choose 1 of 3 upgrades. This first reward is a Generator in the middle slot; choose it so the next defenses have more power.', action: 'Pick the Generator' },
@@ -469,11 +471,12 @@ const zh: I18nStrings = {
   tutorialSkip: '跳过',
   tutorialNext: '下一步',
   tutorialDone: '开始游戏！',
+  wireTutorialDragPortOnly: '请拖拽机器接口进行电缆连接',
   tutorialSteps: [
     { title: '你的核心', text: '核心产出电力，别让它被摧毁。' },
     { title: '炮台直插', text: '拖动炮台，让端口贴住核心端口。', action: '炮台直插核心' },
     { title: '发电机直插', text: '拖动发电机，让端口贴住炮台端口。', action: '发电机直插炮台' },
-    { title: '电力', text: '通电的炮塔会发光并自动开火。' },
+    { title: '开启波次', text: '通电的炮塔会发光并自动开火。点击【开启下一波】来测试这条防线。', action: '点击开启下一波' },
   ],
   postWaveTutorialSteps: [
     { title: '三选一奖励', text: '每波结束后会出现 3 个升级选项，只能选择 1 个。本次中间位置固定为发电机，请选择它，为后续防线提供更多电力。', action: '选择发电机' },

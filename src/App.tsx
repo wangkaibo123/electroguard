@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
+import { useState, useEffect, useRef, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode, type TouchEvent as ReactTouchEvent } from 'react';
 import { Activity, BookOpen, Cable, Coins, Globe, Keyboard, LogOut, Pause, Play, RotateCcw, Wrench, X } from 'lucide-react';
 import { useGameLoop } from './game/useGameLoop';
 import type { GameState, TowerType } from './game/types';
 import { t, getLocale, setLocale, Locale } from './game/i18n';
 import { GLOBAL_CONFIG, TIPS_CONFIG } from './game/config';
 import { findWirePath, getPortCell, getPortPos, isPortAccessible } from './game/engine';
+import { findTowerAtWorldPoint } from './game/gameActions';
 import { PickOverlay } from './game/ui/PickOverlay';
 import { ShopPanel } from './game/ui/ShopPanel';
 import { TowerCodexModal } from './game/ui/TowerCodexModal';
@@ -86,6 +87,7 @@ const TutorialHandCue = ({ className = '' }: { className?: string }) => (
 
 const TURRET_DIRECT_PLUG_TUTORIAL_STEP = 1;
 const GENERATOR_DIRECT_PLUG_TUTORIAL_STEP = 2;
+const NEXT_WAVE_TUTORIAL_STEP = 3;
 const POST_WAVE_PICK_STEP = 100;
 const POST_WAVE_WIRE_STEP = 101;
 const POST_WAVE_TUTORIAL_MIN_WAVE = 1;
@@ -254,6 +256,13 @@ export default function App() {
   const [tipHidden, setTipHidden] = useState(false);
   const [controlsHidden, setControlsHidden] = useState(false);
   const [pickOverlayHidden, setPickOverlayHidden] = useState(false);
+  const [tutorialToastMessage, setTutorialToastMessage] = useState<string | null>(null);
+  const tutorialToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showTutorialToast = (message: string, durationMs = 1800) => {
+    if (tutorialToastTimerRef.current) clearTimeout(tutorialToastTimerRef.current);
+    setTutorialToastMessage(message);
+    tutorialToastTimerRef.current = setTimeout(() => setTutorialToastMessage(null), durationMs);
+  };
   const showControlsGuide = !isMobile && (gameState.status === 'playing' || gameState.status === 'paused');
   useEffect(() => {
     const id = setInterval(() => {
@@ -407,6 +416,12 @@ export default function App() {
     autoDeployTutorialPending &&
     !firstWavePickTutorialDone &&
     tutorialStep === POST_WAVE_PICK_STEP;
+  const handleNextWaveClick = () => {
+    if (tutorialStep === NEXT_WAVE_TUTORIAL_STEP && autoDeployTutorialPending) {
+      setTutorialStep(null);
+    }
+    skipToNextWave();
+  };
 
   const handleTutorialPick = (optionId: string, origin?: { x: number; y: number }) => {
     const option = gameState.pickOptions.find(pickOption => pickOption.id === optionId);
@@ -432,6 +447,50 @@ export default function App() {
       setWireTutorialPendingAfterDrop(true);
     }
   };
+  const blockMachineDragDuringWireTutorial = (clientX: number, clientY: number, portHitRadius: number) => {
+    if (tutorialStep !== POST_WAVE_WIRE_STEP || gameState.status !== 'playing') return false;
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return false;
+
+    const cam = cameraRef.current;
+    const wx = (clientX - rect.left) / cam.zoom + cam.x;
+    const wy = (clientY - rect.top) / cam.zoom + cam.y;
+    const nearPort = gameState.towers.some(tower =>
+      !tower.isRuined &&
+      tower.ports.some(port => {
+        const pos = getPortPos(tower, port);
+        return Math.hypot(pos.x - wx, pos.y - wy) < portHitRadius;
+      }),
+    );
+    if (nearPort) return false;
+
+    if (findTowerAtWorldPoint(gameState, wx, wy)) {
+      showTutorialToast(i.wireTutorialDragPortOnly);
+      return true;
+    }
+
+    return false;
+  };
+
+  const handleTutorialCanvasMouseDown = (event: ReactMouseEvent<HTMLCanvasElement>) => {
+    if (event.button === 0 && blockMachineDragDuringWireTutorial(event.clientX, event.clientY, 15)) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+    handleCanvasMouseDown(event);
+  };
+
+  const handleTutorialCanvasTouchStart = (event: ReactTouchEvent<HTMLCanvasElement>) => {
+    const touch = event.touches[0];
+    if (touch && blockMachineDragDuringWireTutorial(touch.clientX, touch.clientY, 20)) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+    handleCanvasTouchStart(event);
+  };
+  const activeToastMessage = toastMessage ?? tutorialToastMessage;
 
   return (
     <div className="h-screen bg-gray-950 text-gray-100 font-sans flex flex-col overflow-hidden">
@@ -520,13 +579,13 @@ export default function App() {
           <div className="relative rounded-xl overflow-hidden shadow-[0_0_30px_rgba(0,0,0,0.6)] bg-gray-900 w-full h-full">
             <canvas
               ref={canvasRef}
-              onMouseDown={handleCanvasMouseDown}
+              onMouseDown={handleTutorialCanvasMouseDown}
               onMouseMove={handleCanvasMouseMove}
               onMouseUp={handleCanvasMouseUp}
               onMouseLeave={handleCanvasMouseLeave}
               onWheel={handleCanvasWheel}
               onContextMenu={handleCanvasContextMenu}
-              onTouchStart={handleCanvasTouchStart}
+              onTouchStart={handleTutorialCanvasTouchStart}
               onTouchMove={handleCanvasTouchMove}
               onTouchEnd={handleCanvasTouchEnd}
               onTouchCancel={handleCanvasTouchEnd}
@@ -574,9 +633,9 @@ export default function App() {
             )}
 
             {/* Toast Notification */}
-            {toastMessage && (
+            {activeToastMessage && (
               <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 bg-gray-900/95 border border-amber-500/60 rounded-lg shadow-[0_0_15px_rgba(245,158,11,0.2)] text-amber-300 text-sm font-bold animate-bounce pointer-events-none">
-                {toastMessage}
+                {activeToastMessage}
               </div>
             )}
 
@@ -692,8 +751,9 @@ export default function App() {
               const isDirectPlugStep =
                 !isPostWaveTutorialStep &&
                 (tutorialStep === TURRET_DIRECT_PLUG_TUTORIAL_STEP || tutorialStep === GENERATOR_DIRECT_PLUG_TUTORIAL_STEP);
+              const isNextWaveTutorialStep = tutorialStep === NEXT_WAVE_TUTORIAL_STEP;
               const isPickChoiceTutorialStep = isPostWavePickStep;
-              const isInteractive = isDirectPlugStep || isPickChoiceTutorialStep || isPostWaveWireStep;
+              const isInteractive = isDirectPlugStep || isPickChoiceTutorialStep || isPostWaveWireStep || isNextWaveTutorialStep;
               const isFinal = tutorialStep === i.tutorialSteps.length - 1;
               const actionText = step.action;
               const advanceTutorial = () => {
@@ -718,6 +778,8 @@ export default function App() {
               let posClass: string;
               if (isPickChoiceTutorialStep) {
                 posClass = 'items-start justify-center pt-20 sm:pt-24';
+              } else if (isNextWaveTutorialStep) {
+                posClass = 'items-end justify-center pb-28 sm:pb-32';
               } else if (isInteractive) {
                 posClass = isDirectPlugStep
                   ? 'items-end justify-start pb-4 pl-6'
@@ -1045,6 +1107,15 @@ export default function App() {
                     );
                   })()}
 
+                  {/* Arrow to Start Next Wave button */}
+                  {isNextWaveTutorialStep && canStartNextWave && (
+                    <div className="absolute bottom-20 left-1/2 -translate-x-1/2 flex flex-col items-center animate-bounce pointer-events-none sm:bottom-24">
+                      <TutorialHandCue className="mb-1" />
+                      <div className="w-[4px] h-10 bg-gradient-to-b from-cyan-300 to-blue-400 rounded-full shadow-[0_0_12px_rgba(34,211,238,0.45)]" />
+                      <div className="w-0 h-0 border-l-[13px] border-r-[13px] border-t-[17px] border-l-transparent border-r-transparent border-t-blue-400" />
+                    </div>
+                  )}
+
                   {/* Tutorial card */}
                   <div className="relative pointer-events-auto bg-gray-900/95 border border-cyan-500/40 rounded-xl p-4 sm:p-5 shadow-[0_0_25px_rgba(6,182,212,0.2)] max-w-md w-full mx-2 sm:mx-4 backdrop-blur-sm">
                     <div className="flex items-center justify-between mb-3">
@@ -1123,7 +1194,7 @@ export default function App() {
         {canStartNextWave && (
           <button
             type="button"
-            onClick={skipToNextWave}
+            onClick={handleNextWaveClick}
             className={`absolute bottom-4 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-lg border border-blue-400/70 bg-blue-600 px-5 py-3 text-sm font-black text-white shadow-[0_10px_30px_rgba(37,99,235,0.35)] transition-colors hover:bg-blue-500 active:scale-95 sm:bottom-6 sm:px-6 sm:text-base ${nextWavePromptActive ? 'next-wave-breathe' : ''}`}
           >
             <Play size={18} />
