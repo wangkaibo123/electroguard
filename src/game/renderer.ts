@@ -81,7 +81,7 @@ export const renderGame = (
   drawWireHpBars(ctx, state);
 
   drawShields(ctx, state, now);
-  drawRangePreview(ctx, state, hoverPos, selectedTower, rotatingTowerId);
+  drawRangePreview(ctx, state, hoverPos, selectedTower, rotatingTowerId, draggedTowerId);
 
   drawPorts(ctx, state);
   drawTowers(ctx, state, now, activeRepair);

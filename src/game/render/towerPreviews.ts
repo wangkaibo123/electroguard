@@ -79,6 +79,7 @@ export const drawRangePreview = (
   hoverPos: { x: number; y: number } | null,
   selectedTower: TowerType | null,
   rotatingTowerId: string | null,
+  draggedTowerId: string | null,
 ) => {
   if (hoverPos && selectedTower && state.status === 'playing') {
     const range = getTowerRange(selectedTower);
@@ -97,6 +98,17 @@ export const drawRangePreview = (
         const rcx = (rt.x + rt.width / 2) * CELL_SIZE;
         const rcy = (rt.y + rt.height / 2) * CELL_SIZE;
         drawRangeCircle(ctx, rcx, rcy, range, 0.2, 0.04);
+      }
+    }
+  }
+  if (draggedTowerId) {
+    const draggedTower = state.towerMap.get(draggedTowerId);
+    if (draggedTower) {
+      const range = getTowerRange(draggedTower);
+      if (range) {
+        const rcx = (draggedTower.x + draggedTower.width / 2) * CELL_SIZE;
+        const rcy = (draggedTower.y + draggedTower.height / 2) * CELL_SIZE;
+        drawRangeCircle(ctx, rcx, rcy, range, 0.24, 0.05);
       }
     }
   }

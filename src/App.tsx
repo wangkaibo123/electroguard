@@ -91,6 +91,7 @@ const NEXT_WAVE_TUTORIAL_STEP = 3;
 const POST_WAVE_PICK_STEP = 100;
 const POST_WAVE_WIRE_STEP = 101;
 const SHOP_TUTORIAL_STEP = 102;
+const SHOP_MACHINE_CONTROL_TUTORIAL_STEP = 103;
 const POST_WAVE_TUTORIAL_MIN_WAVE = 1;
 const POST_WAVE_PICK_CARD_INDEX = 1;
 const CORE_TOWER_TYPES = new Set<TowerType>(['core']);
@@ -156,6 +157,7 @@ export default function App() {
     buyShopPack,
     selectedTower,
     setSelectedTower,
+    rotatingTowerId,
     placeMonsterMode,
     setPlaceMonsterMode,
     selectedMonsterType,
@@ -424,6 +426,12 @@ export default function App() {
       setSidebarOpen(true);
       setTutorialStep(SHOP_TUTORIAL_STEP);
     }
+    else if (
+      tutorialStep === SHOP_MACHINE_CONTROL_TUTORIAL_STEP &&
+      rotatingTowerId
+    ) {
+      dismissTutorial();
+    }
   }, [
     tutorialStep,
     gameState,
@@ -436,6 +444,7 @@ export default function App() {
     shopTutorialUnlocked,
     canStartNextWave,
     forceTutorialGeneratorPick,
+    rotatingTowerId,
   ]);
 
   const tutorialHighlightedPickIndex =
@@ -814,6 +823,8 @@ export default function App() {
                 autoDeployTutorialPending &&
                 (tutorialStep === POST_WAVE_PICK_STEP || tutorialStep === POST_WAVE_WIRE_STEP);
               const isShopTutorialStep = tutorialStep === SHOP_TUTORIAL_STEP;
+              const isShopMachineControlTutorialStep = tutorialStep === SHOP_MACHINE_CONTROL_TUTORIAL_STEP;
+              const isShopPostTutorialStep = isShopTutorialStep || isShopMachineControlTutorialStep;
               const isPostWavePickStep = isPostWaveTutorialStep && tutorialStep === POST_WAVE_PICK_STEP;
               const isPostWaveWireStep = isPostWaveTutorialStep && tutorialStep === POST_WAVE_WIRE_STEP;
               const postWaveStepIndex =
@@ -822,13 +833,20 @@ export default function App() {
                 ? i.postWaveTutorialSteps[postWaveStepIndex]
                 : isShopTutorialStep
                   ? i.shopTutorialStep
+                : isShopMachineControlTutorialStep
+                  ? i.shopMachineControlTutorialStep
                 : i.tutorialSteps[tutorialStep];
               const isDirectPlugStep =
                 !isPostWaveTutorialStep &&
                 (tutorialStep === TURRET_DIRECT_PLUG_TUTORIAL_STEP || tutorialStep === GENERATOR_DIRECT_PLUG_TUTORIAL_STEP);
               const isNextWaveTutorialStep = tutorialStep === NEXT_WAVE_TUTORIAL_STEP;
               const isPickChoiceTutorialStep = isPostWavePickStep;
-              const isInteractive = isDirectPlugStep || isPickChoiceTutorialStep || isPostWaveWireStep || isNextWaveTutorialStep;
+              const isInteractive =
+                isDirectPlugStep ||
+                isPickChoiceTutorialStep ||
+                isPostWaveWireStep ||
+                isNextWaveTutorialStep ||
+                isShopMachineControlTutorialStep;
               const isFinal = tutorialStep === i.tutorialSteps.length - 1;
               const actionText = step.action;
               const advanceTutorial = () => {
@@ -837,6 +855,8 @@ export default function App() {
                 } else if (isPostWaveWireStep) {
                   setTutorialStep(null);
                 } else if (isShopTutorialStep) {
+                  setTutorialStep(SHOP_MACHINE_CONTROL_TUTORIAL_STEP);
+                } else if (isShopMachineControlTutorialStep) {
                   dismissTutorial();
                 } else if (isFinal && autoDeployTutorialPending) {
                   setTutorialStep(null);
@@ -850,6 +870,7 @@ export default function App() {
                 [TURRET_DIRECT_PLUG_TUTORIAL_STEP]: 'worldPort',
                 [GENERATOR_DIRECT_PLUG_TUTORIAL_STEP]: 'worldPort',
                 [SHOP_TUTORIAL_STEP]: 'bigArrowRight',
+                [SHOP_MACHINE_CONTROL_TUTORIAL_STEP]: 'worldMachineTap',
               };
               const ht = hlType[tutorialStep] ?? '';
 
@@ -860,6 +881,8 @@ export default function App() {
                 posClass = 'items-end justify-center pb-28 sm:pb-32';
               } else if (isShopTutorialStep) {
                 posClass = 'items-start justify-start pl-6 pt-20 sm:pl-10 sm:pt-24';
+              } else if (isShopMachineControlTutorialStep) {
+                posClass = 'items-end justify-center pb-8 sm:pb-10';
               } else if (isInteractive) {
                 posClass = isDirectPlugStep
                   ? 'items-end justify-start pb-4 pl-6'
@@ -1021,11 +1044,13 @@ export default function App() {
                 ? postWaveStepIndex + 1
                 : isShopTutorialStep
                   ? 1
+                : isShopMachineControlTutorialStep
+                  ? 2
                 : tutorialStep + 1;
               const displayStepTotal = isPostWaveTutorialStep
                 ? i.postWaveTutorialSteps.length
-                : isShopTutorialStep
-                  ? 1
+                : isShopPostTutorialStep
+                  ? 2
                 : i.tutorialSteps.length;
 
               return (
@@ -1199,6 +1224,20 @@ export default function App() {
                     </div>
                   )}
 
+                  {/* World-position tap cue for machine controls */}
+                  {isShopMachineControlTutorialStep && turret && (() => {
+                    const center = towerCenter(turret);
+                    return (
+                      <div
+                        className="absolute pointer-events-none"
+                        style={{ left: `${center.x}px`, top: `${center.y}px`, transform: 'translate(-50%, -50%)' }}
+                      >
+                        <div className="absolute left-1/2 top-1/2 h-20 w-20 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-cyan-300/50 animate-pulse" />
+                        <TutorialHandCue />
+                      </div>
+                    );
+                  })()}
+
                   {/* Tutorial card */}
                   <div className="relative pointer-events-auto bg-gray-900/95 border border-cyan-500/40 rounded-xl p-4 sm:p-5 shadow-[0_0_25px_rgba(6,182,212,0.2)] max-w-md w-full mx-2 sm:mx-4 backdrop-blur-sm">
                     <div className="flex items-center justify-between mb-3">
@@ -1218,7 +1257,7 @@ export default function App() {
                         onClick={advanceTutorial}
                         className="w-full px-4 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-lg transition-colors text-sm"
                       >
-                        {isFinal || isPostWaveWireStep || isShopTutorialStep ? i.tutorialDone : i.tutorialNext}
+                        {isFinal || isPostWaveWireStep || isShopMachineControlTutorialStep ? i.tutorialDone : i.tutorialNext}
                       </button>
                     )}
 

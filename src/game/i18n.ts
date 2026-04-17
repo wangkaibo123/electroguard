@@ -116,6 +116,11 @@ export interface I18nStrings {
     text: string;
     action?: string;
   };
+  shopMachineControlTutorialStep: {
+    title: string;
+    text: string;
+    action?: string;
+  };
 
   // Sidebar tips
   gameTips: Record<string, string>;
@@ -245,6 +250,11 @@ const en: I18nStrings = {
     title: 'New Feature: Shop',
     text: 'Spend gold here to buy machines, packs, and repair services. Click the battlefield or the button to hide this page.',
     action: 'Review the shop',
+  },
+  shopMachineControlTutorialStep: {
+    title: 'Machine Controls',
+    text: 'Tap a placed machine to open its controls. From there, you can rotate it or sell it for gold.',
+    action: 'Tap a machine',
   },
 
   gameTips: {
@@ -504,6 +514,11 @@ const zh: I18nStrings = {
     title: '新功能：商店',
     text: '可以在此花费金币购买机器、卡包、维修服务。点击战场或者按钮可以隐藏此此页面',
     action: '查看商店',
+  },
+  shopMachineControlTutorialStep: {
+    title: '机器操作',
+    text: '轻点已放置的机器可以唤起操作按钮，在这里可以旋转机器，也可以售卖换回金币。',
+    action: '轻点一台机器',
   },
 
   gameTips: {
