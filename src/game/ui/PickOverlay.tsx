@@ -92,7 +92,7 @@ export const PickOverlay = ({
             return (
               <div
                 key={opt.id}
-                className={`pick-option relative w-full max-w-[200px] sm:w-44 flex flex-col gap-2 rounded-2xl transition-all ${
+                className={`pick-option relative w-full max-w-[280px] sm:max-w-none sm:w-44 grid grid-cols-[minmax(0,1fr)_auto] sm:flex sm:flex-col gap-2 rounded-2xl transition-all ${
                   highlighted ? 'ring-2 ring-cyan-300/90 ring-offset-4 ring-offset-gray-950 shadow-[0_0_28px_rgba(34,211,238,0.5)]' : ''
                 } ${disabled ? 'opacity-45 grayscale' : ''}`}
               >
@@ -107,7 +107,7 @@ export const PickOverlay = ({
                 {opt.kind === 'tower' && opt.towerType && (() => {
                   const stats = getTowerPickStats(opt.towerType);
                   return (
-                    <div className="w-full rounded-lg px-3 py-1.5 grid grid-cols-2 gap-x-2 gap-y-0.5 text-[10px] font-mono border" style={{ borderColor: color + '44', backgroundColor: color + '11', color }}>
+                    <div className="row-start-1 col-start-1 w-full rounded-lg px-3 py-1.5 grid grid-cols-2 gap-x-2 gap-y-0.5 text-[10px] font-mono border" style={{ borderColor: color + '44', backgroundColor: color + '11', color }}>
                       <span title={i.statHp}>{i.statHp} {stats.hp}</span>
                       <span title={i.statRange}>{i.statRange} {stats.range != null ? stats.range : '-'}</span>
                       <span title={i.statAtk}>{i.statAtk} {stats.atk != null ? stats.atk : '-'}</span>
@@ -125,7 +125,9 @@ export const PickOverlay = ({
                       y: rect.top + rect.height / 2,
                     });
                   }}
-                  className="pick-option-button group w-full p-4 sm:p-5 rounded-xl border-2 border-gray-700 bg-gray-900/95 hover:bg-gray-800/95 transition-all flex flex-row sm:flex-col items-center text-center gap-3 hover:scale-105 hover:shadow-lg active:scale-95 disabled:hover:scale-100 disabled:hover:bg-gray-900/95 disabled:cursor-not-allowed"
+                  className={`pick-option-button group min-w-0 w-full p-4 sm:p-5 rounded-xl border-2 border-gray-700 bg-gray-900/95 hover:bg-gray-800/95 transition-all flex flex-row sm:flex-col items-center text-center gap-3 hover:scale-105 hover:shadow-lg active:scale-95 disabled:hover:scale-100 disabled:hover:bg-gray-900/95 disabled:cursor-not-allowed ${
+                    codexType ? 'row-start-2 col-start-1 sm:row-auto sm:col-auto' : 'col-span-2 sm:col-span-1'
+                  }`}
                   style={{ '--pick-color': color } as CSSProperties}
                   onMouseEnter={e => {
                     if (!disabled) e.currentTarget.style.borderColor = color;
@@ -154,7 +156,7 @@ export const PickOverlay = ({
                     type="button"
                     title={i.codexButton}
                     onClick={() => setCodexTower(codexType)}
-                    className="pick-codex-button w-full px-3 py-2 rounded-lg border text-center text-xs font-bold leading-snug transition-all border-amber-700/50 bg-amber-950/35 text-amber-100 hover:bg-amber-900/45 hover:border-amber-500/60"
+                    className="pick-codex-button row-start-2 col-start-2 sm:row-auto sm:col-auto self-stretch sm:self-auto min-w-12 sm:min-w-0 w-12 sm:w-full px-2 sm:px-3 py-2 rounded-lg border text-center text-xs font-bold leading-snug transition-all border-amber-700/50 bg-amber-950/35 text-amber-100 hover:bg-amber-900/45 hover:border-amber-500/60 [writing-mode:vertical-rl] sm:[writing-mode:horizontal-tb] tracking-[0.08em] sm:tracking-normal"
                   >
                     {i.codexButton}
                   </button>
