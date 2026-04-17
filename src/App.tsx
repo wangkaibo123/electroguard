@@ -84,8 +84,10 @@ const TutorialHandCue = ({ className = '' }: { className?: string }) => (
   </span>
 );
 
-const AUTO_DEPLOY_TUTORIAL_STEP = 1;
-const WIRE_TUTORIAL_STEP = 2;
+const TURRET_DIRECT_PLUG_TUTORIAL_STEP = 1;
+const GENERATOR_DIRECT_PLUG_TUTORIAL_STEP = 2;
+const POST_WAVE_AUTO_DEPLOY_STEP = 1;
+const POST_WAVE_WIRE_STEP = 2;
 const CORE_TOWER_TYPES = new Set<TowerType>(['core']);
 const TURRET_TOWER_TYPES = new Set<TowerType>(['blaster', 'gatling', 'sniper', 'tesla', 'missile']);
 const GENERATOR_TOWER_TYPES = new Set<TowerType>(['generator', 'big_generator']);
@@ -141,6 +143,7 @@ export default function App() {
     activeCommandCard,
     activeRepair,
     startRepair,
+    isTowerDragging,
   } = useGameLoop();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -278,7 +281,7 @@ export default function App() {
       return;
     }
     if (
-      tutorialStep === WIRE_TUTORIAL_STEP &&
+      (tutorialStep === TURRET_DIRECT_PLUG_TUTORIAL_STEP || tutorialStep === GENERATOR_DIRECT_PLUG_TUTORIAL_STEP) &&
       !(autoDeployTutorialPending && gameState.status === 'pick' && gameState.wave >= 2)
     ) {
       const nextDirectPlugProgress = {
@@ -297,8 +300,12 @@ export default function App() {
         setDirectPlugProgress(nextDirectPlugProgress);
       }
 
-      if (nextDirectPlugProgress.coreToTurret && nextDirectPlugProgress.generatorToTurret) {
-        setTutorialStep(WIRE_TUTORIAL_STEP + 1);
+      if (isTowerDragging) return;
+
+      if (tutorialStep === TURRET_DIRECT_PLUG_TUTORIAL_STEP && nextDirectPlugProgress.coreToTurret) {
+        setTutorialStep(GENERATOR_DIRECT_PLUG_TUTORIAL_STEP);
+      } else if (tutorialStep === GENERATOR_DIRECT_PLUG_TUTORIAL_STEP && nextDirectPlugProgress.generatorToTurret) {
+        setTutorialStep(GENERATOR_DIRECT_PLUG_TUTORIAL_STEP + 1);
       }
     }
     else if (
@@ -307,9 +314,9 @@ export default function App() {
       gameState.status === 'pick' &&
       gameState.wave >= 2
     ) {
-      setTutorialStep(AUTO_DEPLOY_TUTORIAL_STEP);
+      setTutorialStep(POST_WAVE_AUTO_DEPLOY_STEP);
     }
-  }, [tutorialStep, gameState, autoDeployTutorialPending, directPlugProgress]);
+  }, [tutorialStep, gameState, autoDeployTutorialPending, directPlugProgress, isTowerDragging]);
 
   return (
     <div className="h-screen bg-gray-950 text-gray-100 font-sans flex flex-col overflow-hidden">
@@ -558,24 +565,21 @@ export default function App() {
                 autoDeployTutorialPending &&
                 gameState.status === 'pick' &&
                 gameState.wave >= 2 &&
-                (tutorialStep === AUTO_DEPLOY_TUTORIAL_STEP || tutorialStep === WIRE_TUTORIAL_STEP);
-              const isPostWaveAutoDeployStep = isPostWaveTutorialStep && tutorialStep === AUTO_DEPLOY_TUTORIAL_STEP;
-              const isPostWaveWireStep = isPostWaveTutorialStep && tutorialStep === WIRE_TUTORIAL_STEP;
+                (tutorialStep === POST_WAVE_AUTO_DEPLOY_STEP || tutorialStep === POST_WAVE_WIRE_STEP);
+              const isPostWaveAutoDeployStep = isPostWaveTutorialStep && tutorialStep === POST_WAVE_AUTO_DEPLOY_STEP;
+              const isPostWaveWireStep = isPostWaveTutorialStep && tutorialStep === POST_WAVE_WIRE_STEP;
               const step = isPostWaveTutorialStep
-                ? i.postWaveTutorialSteps[tutorialStep - AUTO_DEPLOY_TUTORIAL_STEP]
+                ? i.postWaveTutorialSteps[tutorialStep - POST_WAVE_AUTO_DEPLOY_STEP]
                 : i.tutorialSteps[tutorialStep];
-              const isDirectPlugStep = tutorialStep === WIRE_TUTORIAL_STEP && !isPostWaveWireStep;
+              const isDirectPlugStep =
+                !isPostWaveTutorialStep &&
+                (tutorialStep === TURRET_DIRECT_PLUG_TUTORIAL_STEP || tutorialStep === GENERATOR_DIRECT_PLUG_TUTORIAL_STEP);
               const isInteractive = isDirectPlugStep;
               const isFinal = tutorialStep === i.tutorialSteps.length - 1;
-              const directPlugDoneCount =
-                (directPlugProgress.coreToTurret ? 1 : 0) +
-                (directPlugProgress.generatorToTurret ? 1 : 0);
-              const actionText = isDirectPlugStep
-                ? `${step.action ?? ''} (${directPlugDoneCount}/2)`
-                : step.action;
+              const actionText = step.action;
               const advanceTutorial = () => {
                 if (isPostWaveAutoDeployStep) {
-                  setTutorialStep(WIRE_TUTORIAL_STEP);
+                  setTutorialStep(POST_WAVE_WIRE_STEP);
                 } else if (isPostWaveWireStep) {
                   dismissTutorial();
                 } else if (isFinal && autoDeployTutorialPending) {
@@ -587,13 +591,14 @@ export default function App() {
 
               const hlType: Record<number, string> = {
                 0: 'spotlight',
-                [WIRE_TUTORIAL_STEP]: 'worldPort',
+                [TURRET_DIRECT_PLUG_TUTORIAL_STEP]: 'worldPort',
+                [GENERATOR_DIRECT_PLUG_TUTORIAL_STEP]: 'worldPort',
               };
               const ht = hlType[tutorialStep] ?? '';
 
               let posClass: string;
               if (isInteractive) {
-                posClass = tutorialStep === WIRE_TUTORIAL_STEP
+                posClass = isDirectPlugStep
                   ? 'items-end justify-start pb-4 pl-6'
                   : 'items-end justify-center pb-4';
               } else {
@@ -636,8 +641,9 @@ export default function App() {
               };
               const directPlugCue = isDirectPlugStep && core && turret
                 ? (() => {
-                    const source = directPlugProgress.coreToTurret && generator ? generator : turret;
-                    const target = directPlugProgress.coreToTurret && generator ? turret : core;
+                    if (tutorialStep === GENERATOR_DIRECT_PLUG_TUTORIAL_STEP && !generator) return null;
+                    const source = tutorialStep === GENERATOR_DIRECT_PLUG_TUTORIAL_STEP ? generator! : turret;
+                    const target = tutorialStep === GENERATOR_DIRECT_PLUG_TUTORIAL_STEP ? turret : core;
                     const targetPortType = target.type === 'core' || target.type === 'generator' || target.type === 'big_generator'
                       ? 'output'
                       : 'input';
@@ -660,6 +666,7 @@ export default function App() {
                     return {
                       start,
                       end,
+                      hand: towerCenter(source),
                       pathBox: {
                         left: minX - pad,
                         top: minY - pad,
@@ -676,7 +683,7 @@ export default function App() {
                   })()
                 : null;
               const displayStepNumber = isPostWaveTutorialStep
-                ? tutorialStep - AUTO_DEPLOY_TUTORIAL_STEP + 1
+                ? tutorialStep - POST_WAVE_AUTO_DEPLOY_STEP + 1
                 : tutorialStep + 1;
               const displayStepTotal = isPostWaveTutorialStep
                 ? i.postWaveTutorialSteps.length
@@ -746,7 +753,7 @@ export default function App() {
 
                   {/* World-position direct-plug cue */}
                   {ht === 'worldPort' && directPlugCue && (() => {
-                    const { start, end, pathBox, line } = directPlugCue;
+                    const { hand, pathBox, line } = directPlugCue;
                     return (
                       <>
                         <svg
@@ -783,36 +790,10 @@ export default function App() {
                           </circle>
                         </svg>
                         <div
-                          className="absolute pointer-events-none rounded-lg border-2 border-cyan-300/35 bg-cyan-300/5"
-                          style={{ left: `${start.x}px`, top: `${start.y}px`, width: '76px', height: '76px', transform: 'translate(-50%, -50%)' }}
-                        />
-                        <div
-                          className="absolute pointer-events-none rounded-lg border-2 border-cyan-300/50 animate-[pulse_1.5s_ease-in-out_infinite]"
-                          style={{ left: `${start.x}px`, top: `${start.y}px`, width: '98px', height: '98px', transform: 'translate(-50%, -50%)' }}
-                        />
-                        <div
                           className="absolute pointer-events-none"
-                          style={{ left: `${start.x + 34}px`, top: `${start.y + 34}px`, transform: 'translate(-50%, -50%)' }}
+                          style={{ left: `${hand.x}px`, top: `${hand.y}px`, transform: 'translate(-50%, -50%)' }}
                         >
                           <TutorialHandCue />
-                        </div>
-                        <div
-                          className="absolute pointer-events-none rounded-full border-2 border-cyan-400/30"
-                          style={{ left: `${end.x}px`, top: `${end.y}px`, width: '50px', height: '50px', transform: 'translate(-50%, -50%)' }}
-                        />
-                        <div
-                          className="absolute pointer-events-none rounded-full border-2 border-cyan-400/50 animate-[pulse_1.5s_ease-in-out_infinite]"
-                          style={{ left: `${end.x}px`, top: `${end.y}px`, width: '80px', height: '80px', transform: 'translate(-50%, -50%)' }}
-                        />
-                        <div
-                          className="absolute pointer-events-none rounded-full border border-cyan-400/20 animate-[pulse_2s_ease-in-out_infinite]"
-                          style={{ left: `${end.x}px`, top: `${end.y}px`, width: '110px', height: '110px', transform: 'translate(-50%, -50%)' }}
-                        />
-                        <div
-                          className="absolute pointer-events-none"
-                          style={{ left: `${end.x}px`, top: `${end.y}px`, transform: 'translate(-50%, -50%)' }}
-                        >
-                          <div className="w-3 h-3 bg-cyan-400/80 rounded-full animate-pulse" />
                         </div>
                       </>
                     );

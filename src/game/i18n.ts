@@ -222,10 +222,9 @@ const en: I18nStrings = {
   tutorialDone: 'Start Playing!',
   tutorialSteps: [
     { title: 'Your Core', text: 'The Core makes power. Do not let it fall.' },
-    { title: 'Auto Deploy', text: 'New machines land near the Core.' },
-    { title: 'Direct Plug', text: 'Touch ports to power machines. Move the turret to the Core, then the generator to the turret.', action: 'Touch ports: Core -> turret, Generator -> turret' },
+    { title: 'Plug Turret', text: 'Move the turret until its port touches a Core port.', action: 'Plug turret into Core' },
+    { title: 'Plug Generator', text: 'Move the generator until its port touches the turret.', action: 'Plug generator into turret' },
     { title: 'Power', text: 'Powered turrets glow and fire.' },
-    { title: 'Fight', text: 'Rotate turrets. Survive the wave.' },
   ],
   postWaveTutorialSteps: [
     { title: 'Auto Deploy', text: 'New machines land near the Core.' },
@@ -472,10 +471,9 @@ const zh: I18nStrings = {
   tutorialDone: '开始游戏！',
   tutorialSteps: [
     { title: '你的核心', text: '核心产出电力，别让它被摧毁。' },
-    { title: '自动部署', text: '新设备会落在核心附近。' },
-    { title: '直插连接', text: '端口贴住即可通电。先把炮台贴到核心，再把发电机贴到炮台。', action: '端口相贴：核心 -> 炮台，发电机 -> 炮台' },
+    { title: '炮台直插', text: '拖动炮台，让端口贴住核心端口。', action: '炮台直插核心' },
+    { title: '发电机直插', text: '拖动发电机，让端口贴住炮台端口。', action: '发电机直插炮台' },
     { title: '电力', text: '通电的炮塔会发光并自动开火。' },
-    { title: '开战', text: '旋转炮塔，守住这一波。' },
   ],
   postWaveTutorialSteps: [
     { title: '自动部署', text: '新设备会落在核心附近。' },

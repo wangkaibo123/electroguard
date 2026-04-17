@@ -115,6 +115,7 @@ export const useGameLoop = () => {
   const dragOrigPosRef = useRef<{ x: number; y: number } | null>(null);
   const dragOrigWiresRef = useRef<Wire[] | null>(null);
   const dragOrigInventoryRef = useRef<number>(0);
+  const [isTowerDragging, setIsTowerDragging] = useState(false);
   const activeCommandCardRef = useRef<CommandCardType | null>(null);
   const activeRepairRef = useRef(false);
   const activeShopCommandPurchaseRef = useRef<{
@@ -170,6 +171,7 @@ export const useGameLoop = () => {
     dragTowerRef.current = null;
     dragOrigPosRef.current = null;
     dragOrigWiresRef.current = null;
+    setIsTowerDragging(false);
   };
 
   const [rotatingTowerId, setRotatingTowerId] = useState<string | null>(null);
@@ -469,6 +471,7 @@ export const useGameLoop = () => {
     dragTowerRef.current = null;
     dragOrigPosRef.current = null;
     dragOrigWiresRef.current = null;
+    setIsTowerDragging(false);
   };
 
   const clearWireDragState = () => {
@@ -733,6 +736,7 @@ export const useGameLoop = () => {
       dragOrigPosRef.current = towerDrag.originalPos;
       dragOrigWiresRef.current = towerDrag.connectedWires;
       dragOrigInventoryRef.current = towerDrag.wireInventory;
+      setIsTowerDragging(true);
       return;
     }
 
@@ -1151,6 +1155,7 @@ export const useGameLoop = () => {
     startCommandCardUse, activeCommandCard, startRepair, activeRepair,
     selectedTower, setSelectedTower, placeMonsterMode, setPlaceMonsterMode, skipToNextWave, toastMessage,
     selectedMonsterType, setSelectedMonsterType, staticMonster, setStaticMonster,
+    isTowerDragging,
     handleCanvasMouseDown, handleCanvasMouseMove, handleCanvasMouseUp, handleCanvasMouseLeave,
     handleCanvasWheel, handleCanvasContextMenu,
     handleCanvasTouchStart, handleCanvasTouchMove, handleCanvasTouchEnd,
