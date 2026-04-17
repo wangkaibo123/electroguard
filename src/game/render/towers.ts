@@ -1,27 +1,34 @@
-import { GameState, Tower, TowerType, CommandCardType, CELL_SIZE, HALF_CELL, TOWER_STATS, getCanvasHeight, getCanvasWidth, getTowerRange } from '../types';
+import { GameState, Tower, CELL_SIZE, HALF_CELL, TOWER_STATS, getTowerRange } from '../types';
 import { getPortPos, isPortAccessible } from '../engine';
 import { getLinearTowerBodyAspectRatio, getLinearTowerBodyRect } from '../linearTowerGeometry';
-import { COMMAND_CARD_CONFIG, GLOBAL_CONFIG, getTowerSellPrice } from '../config';
-import { __iconNode as coinsIconNode } from 'lucide-react/dist/esm/icons/coins.js';
-import { __iconNode as trash2IconNode } from 'lucide-react/dist/esm/icons/trash-2.js';
+import { GLOBAL_CONFIG } from '../config';
 import {
   TWO_PI, BG_DARK, UNPOWERED, PULSE_CLR, HP_BG, HP_FG,
-  PORT_OUT, PORT_OUT_USED, PORT_IN, PORT_IN_USED, KNOB_CLR, POWER_ON,
+  PORT_OUT, PORT_OUT_USED, PORT_IN, PORT_IN_USED, POWER_ON,
   INSET, portOutward,
 } from './constants';
 import {
-  drawPowerArc, drawRangeCircle, drawMuzzleFlash,
+  drawPowerArc, drawMuzzleFlash,
   FLASH_DUR_BLASTER, FLASH_DUR_GATLING, FLASH_DUR_SNIPER, FLASH_DUR_TESLA,
   SNIPER_COOLDOWN_MS,
 } from './helpers';
-import { getTowerCells, getTowerFootprintCells } from '../footprint';
-import { canUseCommandCardOnTower } from '../commandCards';
+import { getTowerCells } from '../footprint';
+import { drawFootprintCells } from './towerDrawingUtils';
 
-const ROTATION_KNOB_BASE_OFFSET = 20;
-export const ROTATION_BUTTON_WIDTH = 58;
-export const ROTATION_BUTTON_HEIGHT = 28;
-export const DELETE_BUTTON_WIDTH = 78;
-export const DELETE_BUTTON_HEIGHT = 28;
+export {
+  DELETE_BUTTON_HEIGHT,
+  DELETE_BUTTON_WIDTH,
+  ROTATION_BUTTON_HEIGHT,
+  ROTATION_BUTTON_WIDTH,
+  drawDeleteButton,
+  drawRotationKnob,
+  getDeleteButtonLayout,
+  getRotationKnobLayout,
+} from './towerControls';
+export { drawOccupiedGround } from './towerGround';
+export { drawCommandCardTargeting, drawRepairTargeting } from './towerTargeting';
+export { drawDraggedTowerFootprint, drawPlacementPreview, drawRangePreview } from './towerPreviews';
+
 const TOWER_BAR_SHOW_MS = 1800;
 const TOWER_BAR_FADE_MS = 700;
 const ENERGY_EFFECT_SIZE = CELL_SIZE * 0.5;
@@ -29,62 +36,6 @@ const POWER_RHYTHM_RING_RADIUS = ENERGY_EFFECT_SIZE * 1.62;
 const GENERATOR_POWER_OUTPUT_RADIUS =
   (Math.min(TOWER_STATS.generator.width, TOWER_STATS.generator.height) * CELL_SIZE) / 2 - INSET - 4;
 const MAX_COMMAND_UPGRADE_MARKS = 3;
-type LucideIconNode = [string, Record<string, string>][];
-
-export const drawOccupiedGround = (ctx: CanvasRenderingContext2D, state: GameState) => {
-  const occupied = new Set<string>();
-  let hasCore = false;
-
-  for (const tower of state.towers) {
-    if (tower.type === 'core') hasCore = true;
-    for (const cell of getTowerCells(tower)) occupied.add(`${cell.x},${cell.y}`);
-  }
-
-  if (!occupied.size) return;
-
-  const hasCell = (x: number, y: number) => occupied.has(`${x},${y}`);
-  const baseInset = 1;
-  const cellSize = CELL_SIZE - baseInset * 2;
-
-  ctx.fillStyle = hasCore ? 'rgba(16,26,42,0.92)' : 'rgba(14,22,36,0.9)';
-  for (const cell of occupied) {
-    const [gx, gy] = cell.split(',').map(Number);
-    const px = gx * CELL_SIZE + baseInset;
-    const py = gy * CELL_SIZE + baseInset;
-    ctx.fillRect(px, py, cellSize, cellSize);
-  }
-
-  ctx.strokeStyle = hasCore ? 'rgba(96,165,250,0.14)' : 'rgba(148,163,184,0.08)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-
-  for (const cell of occupied) {
-    const [gx, gy] = cell.split(',').map(Number);
-    const left = gx * CELL_SIZE + baseInset;
-    const right = (gx + 1) * CELL_SIZE - baseInset;
-    const top = gy * CELL_SIZE + baseInset;
-    const bottom = (gy + 1) * CELL_SIZE - baseInset;
-
-    if (!hasCell(gx, gy - 1)) {
-      ctx.moveTo(left, top);
-      ctx.lineTo(right, top);
-    }
-    if (!hasCell(gx + 1, gy)) {
-      ctx.moveTo(right, top);
-      ctx.lineTo(right, bottom);
-    }
-    if (!hasCell(gx, gy + 1)) {
-      ctx.moveTo(right, bottom);
-      ctx.lineTo(left, bottom);
-    }
-    if (!hasCell(gx - 1, gy)) {
-      ctx.moveTo(left, bottom);
-      ctx.lineTo(left, top);
-    }
-  }
-
-  ctx.stroke();
-};
 
 const drawEnergyEffect = (
   ctx: CanvasRenderingContext2D,
@@ -272,88 +223,6 @@ const drawPowerOutputIndicator = (
     ctx.fill();
   }
   ctx.restore();
-};
-
-const drawFootprintCells = (
-  ctx: CanvasRenderingContext2D,
-  cells: { x: number; y: number }[],
-  inset: number,
-  fill = true,
-  stroke = true,
-) => {
-  for (const cell of cells) {
-    const px = cell.x * CELL_SIZE;
-    const py = cell.y * CELL_SIZE;
-    if (fill) ctx.fillRect(px + inset, py + inset, CELL_SIZE - inset * 2, CELL_SIZE - inset * 2);
-    if (stroke) ctx.strokeRect(px + inset, py + inset, CELL_SIZE - inset * 2, CELL_SIZE - inset * 2);
-  }
-};
-
-const drawLucideIconNode = (
-  ctx: CanvasRenderingContext2D,
-  iconNode: LucideIconNode,
-  cx: number,
-  cy: number,
-  size: number,
-  color: string,
-) => {
-  ctx.save();
-  ctx.translate(cx - size / 2, cy - size / 2);
-  ctx.scale(size / 24, size / 24);
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 2;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  ctx.fillStyle = 'transparent';
-
-  for (const [tag, attrs] of iconNode) {
-    if (tag === 'path' && attrs.d) {
-      ctx.stroke(new Path2D(attrs.d));
-    } else if (tag === 'circle') {
-      ctx.beginPath();
-      ctx.arc(Number(attrs.cx), Number(attrs.cy), Number(attrs.r), 0, TWO_PI);
-      ctx.stroke();
-    } else if (tag === 'line') {
-      ctx.beginPath();
-      ctx.moveTo(Number(attrs.x1), Number(attrs.y1));
-      ctx.lineTo(Number(attrs.x2), Number(attrs.y2));
-      ctx.stroke();
-    }
-  }
-
-  ctx.restore();
-};
-
-export const getRotationKnobLayout = (tower: Tower) => {
-  const tpx = tower.x * CELL_SIZE;
-  const tpy = tower.y * CELL_SIZE;
-  const ttw = tower.width * CELL_SIZE;
-  const tth = tower.height * CELL_SIZE;
-  const tcx = tpx + ttw / 2;
-  const tcy = tpy + tth / 2;
-  const kd = tth / 2 + ROTATION_KNOB_BASE_OFFSET * 2;
-  const kx = tcx;
-  const ky = tcy - kd;
-  const buttonWidth = ROTATION_BUTTON_WIDTH;
-  const buttonHeight = ROTATION_BUTTON_HEIGHT;
-  const buttonX = kx - buttonWidth / 2;
-  const buttonY = ky - buttonHeight / 2;
-
-  return { tpx, tpy, ttw, tth, tcx, tcy, kd, kx, ky, buttonX, buttonY, buttonWidth, buttonHeight };
-};
-
-export const getDeleteButtonLayout = (tower: Tower) => {
-  const tpx = tower.x * CELL_SIZE;
-  const tpy = tower.y * CELL_SIZE;
-  const ttw = tower.width * CELL_SIZE;
-  const tth = tower.height * CELL_SIZE;
-  const tcx = tpx + ttw / 2;
-  const buttonWidth = DELETE_BUTTON_WIDTH;
-  const buttonHeight = DELETE_BUTTON_HEIGHT;
-  const buttonX = tcx - buttonWidth / 2;
-  const buttonY = tpy + tth + 22;
-
-  return { buttonX, buttonY, buttonWidth, buttonHeight };
 };
 
 const getTowerVisualRect = (tower: Tower, px: number, py: number, tw: number, th: number) => {
@@ -731,327 +600,6 @@ export const drawTowers = (ctx: CanvasRenderingContext2D, state: GameState, now:
       }
     }
   }
-};
-
-const drawTowerTargeting = (
-  ctx: CanvasRenderingContext2D,
-  now: number,
-  targets: Tower[],
-  color: string,
-) => {
-  if (!targets.length) return;
-
-  const pulse = 0.5 + 0.5 * Math.sin(now / 210);
-  const bounce = Math.sin(now / 260) * 5;
-
-  ctx.save();
-  const mask = new Path2D();
-  mask.rect(0, 0, getCanvasWidth(state), getCanvasHeight(state));
-  for (const tower of targets) {
-    const px = tower.x * CELL_SIZE;
-    const py = tower.y * CELL_SIZE;
-    const tw = tower.width * CELL_SIZE;
-    const th = tower.height * CELL_SIZE;
-    const pad = 10 + pulse * 3;
-    mask.roundRect(px - pad, py - pad, tw + pad * 2, th + pad * 2, 8);
-  }
-  ctx.fillStyle = 'rgba(2, 6, 23, 0.58)';
-  ctx.fill(mask, 'evenodd');
-  ctx.restore();
-
-  for (const tower of targets) {
-    const px = tower.x * CELL_SIZE;
-    const py = tower.y * CELL_SIZE;
-    const tw = tower.width * CELL_SIZE;
-    const th = tower.height * CELL_SIZE;
-    const cx = px + tw / 2;
-    const bottomY = py + th;
-    const pad = 8;
-    const haloAlpha = 0.18 + pulse * 0.16;
-
-    ctx.save();
-    ctx.shadowColor = color;
-    ctx.shadowBlur = 16 + pulse * 12;
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2.2 + pulse * 0.8;
-    ctx.setLineDash([9, 6]);
-    ctx.lineDashOffset = -now / 55;
-    ctx.strokeRect(px - pad, py - pad, tw + pad * 2, th + pad * 2);
-    ctx.setLineDash([]);
-
-    const halo = ctx.createRadialGradient(cx, py + th / 2, 0, cx, py + th / 2, Math.max(tw, th) * 0.9);
-    halo.addColorStop(0, `${color}${Math.round(haloAlpha * 255).toString(16).padStart(2, '0')}`);
-    halo.addColorStop(1, `${color}00`);
-    ctx.fillStyle = halo;
-    ctx.beginPath();
-    ctx.arc(cx, py + th / 2, Math.max(tw, th) * 0.9, 0, TWO_PI);
-    ctx.fill();
-
-    const arrowTipY = Math.min(getCanvasHeight(state) - 42, bottomY + 30 + bounce);
-    const arrowTailY = arrowTipY + 28;
-    const arrowHeadY = arrowTipY + 12;
-    ctx.lineWidth = 4;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.strokeStyle = 'rgba(2,6,23,0.95)';
-    ctx.beginPath();
-    ctx.moveTo(cx, arrowTailY);
-    ctx.lineTo(cx, arrowTipY);
-    ctx.moveTo(cx - 11, arrowHeadY);
-    ctx.lineTo(cx, arrowTipY);
-    ctx.lineTo(cx + 11, arrowHeadY);
-    ctx.stroke();
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2.4;
-    ctx.beginPath();
-    ctx.moveTo(cx, arrowTailY);
-    ctx.lineTo(cx, arrowTipY);
-    ctx.moveTo(cx - 11, arrowHeadY);
-    ctx.lineTo(cx, arrowTipY);
-    ctx.lineTo(cx + 11, arrowHeadY);
-    ctx.stroke();
-    ctx.restore();
-  }
-};
-
-export const drawCommandCardTargeting = (
-  ctx: CanvasRenderingContext2D,
-  state: GameState,
-  now: number,
-  activeCommandCard: CommandCardType | null,
-) => {
-  if (!activeCommandCard || state.status !== 'playing') return;
-
-  drawTowerTargeting(
-    ctx,
-    now,
-    state.towers.filter(tower => canUseCommandCardOnTower(state, activeCommandCard, tower)),
-    COMMAND_CARD_CONFIG[activeCommandCard].color,
-  );
-};
-
-export const drawRepairTargeting = (
-  ctx: CanvasRenderingContext2D,
-  state: GameState,
-  now: number,
-  activeRepair: boolean,
-) => {
-  if (!activeRepair || state.status !== 'playing') return;
-
-  drawTowerTargeting(
-    ctx,
-    now,
-    state.towers.filter(tower => tower.type !== 'core' && (tower.isRuined || tower.hp < tower.maxHp)),
-    '#22d3ee',
-  );
-};
-
-// ── Placement preview ─────────────────────────────────────────────────────
-export const drawPlacementPreview = (
-  ctx: CanvasRenderingContext2D, state: GameState,
-  hoverPos: { x: number; y: number } | null,
-  selectedTower: TowerType | null,
-  canPlaceFlag: boolean,
-) => {
-  if (!hoverPos || !selectedTower || state.status !== 'playing') return;
-  const stats = TOWER_STATS[selectedTower];
-  const pi = INSET;
-  const prevPx = hoverPos.x * CELL_SIZE;
-  const prevPy = hoverPos.y * CELL_SIZE;
-  const prevTw = stats.width * CELL_SIZE;
-  const prevTh = stats.height * CELL_SIZE;
-  const previewBody = (selectedTower === 'battery' || selectedTower === 'bus')
-    ? getLinearTowerBodyRect(prevPx, prevPy, prevTw, prevTh, prevTw >= prevTh, getLinearTowerBodyAspectRatio(selectedTower))
-    : { x: prevPx, y: prevPy, width: prevTw, height: prevTh };
-  ctx.strokeStyle = canPlaceFlag ? stats.color : '#ef4444';
-  ctx.lineWidth = 2;
-  ctx.globalAlpha = 0.6;
-  if (selectedTower === 'shield') {
-    drawFootprintCells(ctx, getTowerFootprintCells(hoverPos.x, hoverPos.y, stats.width, stats.height, selectedTower), pi, false, true);
-  } else {
-    ctx.strokeRect(previewBody.x + pi, previewBody.y + pi, previewBody.width - pi * 2, previewBody.height - pi * 2);
-  }
-  if (canPlaceFlag) {
-    ctx.fillStyle = stats.color;
-    ctx.globalAlpha = 0.15;
-    if (selectedTower === 'shield') {
-      drawFootprintCells(ctx, getTowerFootprintCells(hoverPos.x, hoverPos.y, stats.width, stats.height, selectedTower), pi, true, false);
-    } else {
-      ctx.fillRect(previewBody.x + pi, previewBody.y + pi, previewBody.width - pi * 2, previewBody.height - pi * 2);
-    }
-  }
-  ctx.globalAlpha = 1;
-};
-
-export const drawDraggedTowerFootprint = (
-  ctx: CanvasRenderingContext2D,
-  state: GameState,
-  draggedTowerId: string | null,
-) => {
-  if (!draggedTowerId || state.status !== 'playing') return;
-  const tower = state.towerMap.get(draggedTowerId);
-  if (!tower) return;
-
-  const px = tower.x * CELL_SIZE;
-  const py = tower.y * CELL_SIZE;
-  const tw = tower.width * CELL_SIZE;
-  const th = tower.height * CELL_SIZE;
-
-  ctx.save();
-  ctx.strokeStyle = '#facc15';
-  ctx.lineWidth = 2;
-  ctx.setLineDash([10, 6]);
-  if (tower.type === 'shield') {
-    drawFootprintCells(ctx, getTowerCells(tower), 0, false, true);
-  } else {
-    ctx.strokeRect(px, py, tw, th);
-  }
-  ctx.setLineDash([4, 8]);
-  ctx.fillStyle = 'rgba(250,204,21,0.08)';
-  if (tower.type === 'shield') {
-    drawFootprintCells(ctx, getTowerCells(tower), 0, true, false);
-  } else {
-    ctx.fillRect(px, py, tw, th);
-  }
-  ctx.restore();
-};
-
-// ── Range preview ─────────────────────────────────────────────────────────
-export const drawRangePreview = (
-  ctx: CanvasRenderingContext2D, state: GameState,
-  hoverPos: { x: number; y: number } | null,
-  selectedTower: TowerType | null,
-  rotatingTowerId: string | null,
-) => {
-  if (hoverPos && selectedTower && state.status === 'playing') {
-    const range = getTowerRange(selectedTower);
-    if (range) {
-      const stats = TOWER_STATS[selectedTower];
-      const rcx = (hoverPos.x + stats.width / 2) * CELL_SIZE;
-      const rcy = (hoverPos.y + stats.height / 2) * CELL_SIZE;
-      drawRangeCircle(ctx, rcx, rcy, range, 0.15, 0.03);
-    }
-  }
-  if (rotatingTowerId) {
-    const rt = state.towerMap.get(rotatingTowerId);
-    if (rt) {
-      const range = getTowerRange(rt);
-      if (range) {
-        const rcx = (rt.x + rt.width / 2) * CELL_SIZE;
-        const rcy = (rt.y + rt.height / 2) * CELL_SIZE;
-        drawRangeCircle(ctx, rcx, rcy, range, 0.2, 0.04);
-      }
-    }
-  }
-};
-
-// ── Rotation knob ─────────────────────────────────────────────────────────
-export const drawRotationKnob = (ctx: CanvasRenderingContext2D, state: GameState, rotatingTowerId: string | null) => {
-  if (!rotatingTowerId) return;
-  const tower = state.towerMap.get(rotatingTowerId);
-  if (!tower || tower.isRuined) return;
-
-  const { tpx, tpy, ttw, tth, tcx, tcy, buttonX, buttonY, buttonWidth, buttonHeight } = getRotationKnobLayout(tower);
-
-  ctx.strokeStyle = KNOB_CLR; ctx.lineWidth = 1.5;
-  ctx.setLineDash([4, 4]);
-  ctx.strokeRect(tpx - 2, tpy - 2, ttw + 4, tth + 4);
-  ctx.setLineDash([]);
-
-  const buttonCx = buttonX + buttonWidth / 2;
-  const buttonCy = buttonY + buttonHeight / 2;
-  const arrowY = buttonY;
-  const arrowR = 19;
-  const arrowStart = Math.PI * 1.12;
-  const arrowEnd = Math.PI * 1.9;
-
-  ctx.strokeStyle = 'rgba(245,158,11,0.72)';
-  ctx.lineWidth = 1.6;
-  ctx.beginPath();
-  ctx.moveTo(buttonCx, buttonY + buttonHeight);
-  ctx.lineTo(tcx, tcy);
-  ctx.stroke();
-
-  ctx.strokeStyle = 'rgba(255,255,255,0.92)';
-  ctx.lineWidth = 3.4;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.arc(buttonCx, arrowY, arrowR, arrowStart, arrowEnd);
-  ctx.stroke();
-  const arrowDir = arrowEnd + Math.PI / 2;
-  const arrowTipOffset = 4;
-  const arrowTipX = buttonCx + arrowR * Math.cos(arrowEnd) + Math.cos(arrowDir) * arrowTipOffset;
-  const arrowTipY = arrowY + arrowR * Math.sin(arrowEnd) + Math.sin(arrowDir) * arrowTipOffset;
-  const arrowBaseX = arrowTipX - Math.cos(arrowDir) * 8;
-  const arrowBaseY = arrowTipY - Math.sin(arrowDir) * 8;
-  const arrowSideX = -Math.sin(arrowDir);
-  const arrowSideY = Math.cos(arrowDir);
-  const arrowHalfW = 4.5;
-  ctx.fillStyle = 'rgba(255,255,255,0.95)';
-  ctx.beginPath();
-  ctx.moveTo(arrowTipX, arrowTipY);
-  ctx.lineTo(arrowBaseX + arrowSideX * arrowHalfW, arrowBaseY + arrowSideY * arrowHalfW);
-  ctx.lineTo(arrowBaseX - arrowSideX * arrowHalfW, arrowBaseY - arrowSideY * arrowHalfW);
-  ctx.closePath();
-  ctx.fill();
-  ctx.lineCap = 'butt';
-
-  ctx.fillStyle = 'rgba(217,119,6,0.92)';
-  ctx.strokeStyle = 'rgba(245,158,11,0.9)';
-  ctx.lineWidth = 1;
-  ctx.shadowColor = 'rgba(0,0,0,0.35)';
-  ctx.shadowBlur = 10;
-  ctx.shadowOffsetY = 3;
-  ctx.beginPath();
-  ctx.roundRect(buttonX, buttonY, buttonWidth, buttonHeight, 8);
-  ctx.fill();
-  ctx.shadowColor = 'transparent';
-  ctx.shadowBlur = 0;
-  ctx.shadowOffsetY = 0;
-  ctx.stroke();
-
-  ctx.font = 'bold 12px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = '#ffffff';
-  ctx.fillText('旋转', buttonCx, buttonCy + 0.5);
-};
-
-export const drawDeleteButton = (ctx: CanvasRenderingContext2D, state: GameState, rotatingTowerId: string | null) => {
-  if (!rotatingTowerId || state.status !== 'playing' || state.gameMode === 'custom') return;
-  const tower = state.towerMap.get(rotatingTowerId);
-  if (!tower || tower.type === 'core') return;
-
-  const { buttonX, buttonY, buttonWidth, buttonHeight } = getDeleteButtonLayout(tower);
-
-  ctx.fillStyle = 'rgba(220,38,38,0.92)';
-  ctx.strokeStyle = 'rgba(248,113,113,0.9)';
-  ctx.lineWidth = 1;
-  ctx.shadowColor = 'rgba(0,0,0,0.35)';
-  ctx.shadowBlur = 10;
-  ctx.shadowOffsetY = 3;
-  ctx.beginPath();
-  ctx.roundRect(buttonX, buttonY, buttonWidth, buttonHeight, 8);
-  ctx.fill();
-  ctx.shadowColor = 'transparent';
-  ctx.shadowBlur = 0;
-  ctx.shadowOffsetY = 0;
-  ctx.stroke();
-
-  ctx.font = 'bold 12px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = '#ffffff';
-  const centerY = buttonY + buttonHeight / 2;
-  const contentCx = buttonX + buttonWidth / 2;
-  const trashX = contentCx - 21;
-  const coinX = contentCx + 22;
-
-  drawLucideIconNode(ctx, trash2IconNode as LucideIconNode, trashX, centerY, 13, '#ffffff');
-
-  ctx.fillText(String(getTowerSellPrice(tower)), contentCx, centerY + 0.5);
-
-  drawLucideIconNode(ctx, coinsIconNode as LucideIconNode, coinX, centerY, 13, 'rgba(250,204,21,0.96)');
 };
 
 const drawCapsuleBarrel = (
