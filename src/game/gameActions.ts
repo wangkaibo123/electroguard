@@ -20,7 +20,7 @@ export const deployStartingLoadout = (state: GameState) => {
   for (const type of starterTowers) {
     const placement = findAutoPlacementNearCore(state, type, 2, 1);
     if (!placement) continue;
-    addTowerToState(state, createTowerAt(type, placement.x, placement.y));
+    addTowerToState(state, createTowerAt(type, placement.x, placement.y, { portCount: 4 }));
   }
 };
 

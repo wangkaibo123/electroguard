@@ -4,6 +4,7 @@ import { useGameLoop } from './game/useGameLoop';
 import type { GameState, TowerType } from './game/types';
 import { t, getLocale, setLocale, Locale } from './game/i18n';
 import { GLOBAL_CONFIG, TIPS_CONFIG } from './game/config';
+import { getPortPos } from './game/engine';
 import { PickOverlay } from './game/ui/PickOverlay';
 import { ShopPanel } from './game/ui/ShopPanel';
 import { TowerCodexModal } from './game/ui/TowerCodexModal';
@@ -616,25 +617,41 @@ export default function App() {
                 (tower.x + tower.width / 2) * CS,
                 (tower.y + tower.height / 2) * CS,
               );
-              const nearestPortHint = (
-                source: GameState['towers'][number],
-                target: GameState['towers'][number],
+              const nearestTowerPort = (
+                tower: GameState['towers'][number],
+                targetWorld: { x: number; y: number },
+                portType: 'input' | 'output',
               ) => {
-                const sourceCx = source.x + source.width / 2;
-                const targetCx = target.x + target.width / 2;
-                const sourceCy = source.y + source.height / 2;
-                const targetTop = target.y + target.height * 0.24;
-                const targetBottom = target.y + target.height * 0.76;
-                const targetY = Math.min(targetBottom, Math.max(targetTop, sourceCy));
-                const targetX = sourceCx < targetCx ? target.x : target.x + target.width;
-                return toScreen(targetX * CS, targetY * CS);
+                const ports = tower.ports.filter(port => port.portType === portType);
+                const nearest = ports.reduce((best, port) => {
+                  const pos = getPortPos(tower, port);
+                  const distance = Math.hypot(pos.x - targetWorld.x, pos.y - targetWorld.y);
+                  return !best || distance < best.distance ? { pos, distance } : best;
+                }, null as { pos: { x: number; y: number }; distance: number } | null);
+
+                return nearest?.pos ?? {
+                  x: (tower.x + tower.width / 2) * CS,
+                  y: (tower.y + tower.height / 2) * CS,
+                };
               };
               const directPlugCue = isDirectPlugStep && core && turret
                 ? (() => {
                     const source = directPlugProgress.coreToTurret && generator ? generator : turret;
                     const target = directPlugProgress.coreToTurret && generator ? turret : core;
-                    const start = towerCenter(source);
-                    const end = nearestPortHint(source, target);
+                    const targetPortType = target.type === 'core' || target.type === 'generator' || target.type === 'big_generator'
+                      ? 'output'
+                      : 'input';
+                    const sourcePortType = source.type === 'core' || source.type === 'generator' || source.type === 'big_generator'
+                      ? 'output'
+                      : 'input';
+                    const sourceCenterWorld = {
+                      x: (source.x + source.width / 2) * CS,
+                      y: (source.y + source.height / 2) * CS,
+                    };
+                    const targetPortWorld = nearestTowerPort(target, sourceCenterWorld, targetPortType);
+                    const sourcePortWorld = nearestTowerPort(source, targetPortWorld, sourcePortType);
+                    const start = toScreen(sourcePortWorld.x, sourcePortWorld.y);
+                    const end = toScreen(targetPortWorld.x, targetPortWorld.y);
                     const minX = Math.min(start.x, end.x);
                     const minY = Math.min(start.y, end.y);
                     const width = Math.max(24, Math.abs(start.x - end.x));

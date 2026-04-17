@@ -11,7 +11,11 @@ import { makeTowerCollider } from './collider';
 const INITIAL_DIAGONAL_BARREL_ANGLE = Math.PI / 4;
 const DIAGONAL_BARREL_TOWER_TYPES = new Set<TowerType>(['blaster', 'gatling', 'sniper']);
 
-const createTowerPorts = (type: TowerType): Port[] => {
+type CreateTowerOptions = {
+  portCount?: number;
+};
+
+const createTowerPorts = (type: TowerType, options: CreateTowerOptions = {}): Port[] => {
   const allSideInputPorts = (): Port[] => [
     { id: genId(), direction: 'top', portType: 'input' },
     { id: genId(), direction: 'right', portType: 'input' },
@@ -37,7 +41,7 @@ const createTowerPorts = (type: TowerType): Port[] => {
   }
 
   if (type === 'generator') {
-    return generatePorts('output');
+    return generatePorts('output', options.portCount);
   }
 
   if (type === 'shield') {
@@ -60,13 +64,13 @@ const createTowerPorts = (type: TowerType): Port[] => {
   }
 
   if (type === 'blaster' || type === 'gatling' || type === 'sniper' || type === 'tesla') {
-    return generatePorts('input', 1 + Math.floor(Math.random() * 4));
+    return generatePorts('input', options.portCount ?? (1 + Math.floor(Math.random() * 4)));
   }
 
   return [];
 };
 
-export const createTowerAt = (type: TowerType, x: number, y: number): Tower => {
+export const createTowerAt = (type: TowerType, x: number, y: number, options: CreateTowerOptions = {}): Tower => {
   const stats = TOWER_STATS[type];
   const barrelAngle = DIAGONAL_BARREL_TOWER_TYPES.has(type) ? INITIAL_DIAGONAL_BARREL_ANGLE : 0;
 
@@ -88,7 +92,7 @@ export const createTowerAt = (type: TowerType, x: number, y: number): Tower => {
     shieldRadius: stats.shieldRadius,
     lastActionTime: type === 'shield' ? performance.now() : 0,
     lastDamagedAt: 0,
-    ports: createTowerPorts(type),
+    ports: createTowerPorts(type, options),
     rotation: 0,
     barrelAngle,
     heat: 0,
