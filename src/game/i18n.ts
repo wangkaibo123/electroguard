@@ -22,6 +22,8 @@ export interface I18nStrings {
   waveCleared: (wave: number) => string;
   systemUpgrade: string;
   pickDescription: string;
+  showPickChoices: string;
+  viewBattle: string;
   /** Extra fixed pick after boss wave (wire / generator / shield) */
   bossBonusPickTitle: string;
   bossBonusPickDescription: string;
@@ -161,6 +163,8 @@ const en: I18nStrings = {
   waveCleared: (w) => `WAVE ${w} CLEARED`,
   systemUpgrade: 'SYSTEM UPGRADE',
   pickDescription: 'Choose one upgrade for your defense network',
+  showPickChoices: 'Show choices',
+  viewBattle: 'View battlefield',
   bossBonusPickTitle: 'BOSS SUPPLY DROP',
   bossBonusPickDescription: 'Boss defeated — choose one: wires, generator, or shield.',
 
@@ -416,6 +420,8 @@ const zh: I18nStrings = {
   waveCleared: (w) => `第 ${w} 波 已清除`,
   systemUpgrade: '系统升级',
   pickDescription: '为你的防御网络选择一项升级',
+  showPickChoices: '显示三选一',
+  viewBattle: '查看战场',
   bossBonusPickTitle: 'Boss 额外补给',
   bossBonusPickDescription: '击败 Boss 后的定向三选一：线缆、发电机、护盾塔各一项，请选其一。',
 
