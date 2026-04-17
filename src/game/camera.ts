@@ -6,13 +6,13 @@ export type ViewportSize = { width: number; height: number };
 export const createInitialCamera = (): Camera => {
   const initialCanvasWidth = GLOBAL_CONFIG.initialGridWidth * CELL_SIZE;
   const initialCanvasHeight = GLOBAL_CONFIG.initialGridHeight * CELL_SIZE;
-  const initialMinZoom = Math.max(VIEWPORT_WIDTH / initialCanvasWidth, VIEWPORT_HEIGHT / initialCanvasHeight);
+  const initialMinZoom = Math.min(VIEWPORT_WIDTH / initialCanvasWidth, VIEWPORT_HEIGHT / initialCanvasHeight);
   const initialViewW = VIEWPORT_WIDTH / initialMinZoom;
   const initialViewH = VIEWPORT_HEIGHT / initialMinZoom;
 
   return {
-    x: Math.max(0, (initialCanvasWidth - initialViewW) / 2),
-    y: Math.max(0, (initialCanvasHeight - initialViewH) / 2),
+    x: (initialCanvasWidth - initialViewW) / 2,
+    y: (initialCanvasHeight - initialViewH) / 2,
     zoom: initialMinZoom,
   };
 };
@@ -20,7 +20,7 @@ export const createInitialCamera = (): Camera => {
 export const getMinZoom = (viewport: ViewportSize, state?: GameState) => {
   const canvasWidth = state ? getCanvasWidth(state) : GLOBAL_CONFIG.initialGridWidth * CELL_SIZE;
   const canvasHeight = state ? getCanvasHeight(state) : GLOBAL_CONFIG.initialGridHeight * CELL_SIZE;
-  return Math.max(viewport.width / canvasWidth, viewport.height / canvasHeight);
+  return Math.min(viewport.width / canvasWidth, viewport.height / canvasHeight);
 };
 
 export const clampCamera = (cam: Camera, viewport: ViewportSize, state?: GameState) => {
@@ -28,10 +28,16 @@ export const clampCamera = (cam: Camera, viewport: ViewportSize, state?: GameSta
   const canvasHeight = state ? getCanvasHeight(state) : GLOBAL_CONFIG.initialGridHeight * CELL_SIZE;
   const viewW = viewport.width / cam.zoom;
   const viewH = viewport.height / cam.zoom;
-  const maxX = Math.max(0, canvasWidth - viewW);
-  const maxY = Math.max(0, canvasHeight - viewH);
-  cam.x = Math.max(0, Math.min(cam.x, maxX));
-  cam.y = Math.max(0, Math.min(cam.y, maxY));
+  if (viewW >= canvasWidth) {
+    cam.x = (canvasWidth - viewW) / 2;
+  } else {
+    cam.x = Math.max(0, Math.min(cam.x, canvasWidth - viewW));
+  }
+  if (viewH >= canvasHeight) {
+    cam.y = (canvasHeight - viewH) / 2;
+  } else {
+    cam.y = Math.max(0, Math.min(cam.y, canvasHeight - viewH));
+  }
 };
 
 export const centerCameraOnCore = (state: GameState, cam: Camera, viewport: ViewportSize) => {
