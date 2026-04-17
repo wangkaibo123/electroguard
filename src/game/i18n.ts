@@ -666,7 +666,19 @@ const zh: I18nStrings = {
 
 const locales: Record<Locale, I18nStrings> = { en, zh };
 
-let currentLocale: Locale = 'zh';
+const detectDefaultLocale = (): Locale => {
+  if (typeof navigator === 'undefined') return 'en';
+
+  const preferredLanguages = navigator.languages?.length
+    ? navigator.languages
+    : [navigator.language];
+
+  return preferredLanguages.some(language => language.toLowerCase().startsWith('zh'))
+    ? 'zh'
+    : 'en';
+};
+
+let currentLocale: Locale = detectDefaultLocale();
 
 export const setLocale = (l: Locale) => { currentLocale = l; };
 export const getLocale = (): Locale => currentLocale;
