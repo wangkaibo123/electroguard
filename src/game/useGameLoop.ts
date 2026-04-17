@@ -700,6 +700,7 @@ export const useGameLoop = () => {
 
     const { wx, wy } = toWorld(sx, sy);
     mouseDownPosRef.current = { x: wx, y: wy };
+    mousePxRef.current = { x: wx, y: wy };
 
     if (activeCommandCardRef.current) {
       commitActiveCommandCardAtWorld(wx, wy);
@@ -981,7 +982,10 @@ export const useGameLoop = () => {
       return;
     }
 
-    finishPrimaryPointer(mousePxRef.current, 20, false);
+    const touch = e.changedTouches[0];
+    const spos = touch ? touchScreenXY(touch) : null;
+    const world = spos ? toWorld(spos.sx, spos.sy) : null;
+    finishPrimaryPointer(world ? { x: world.wx, y: world.wy } : mousePxRef.current, 20, false);
   };
 
   // 鈹€鈹€ Game loop 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
