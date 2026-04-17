@@ -107,7 +107,7 @@ export const WEAPON_CONFIG = {
     /** 索敌射程（px） */
     range: 260,
     /** 单发伤害 */
-    damage: 50,
+    damage: 30,
     /** 每次开火消耗电力 */
     powerCost: 2,
     /** 子弹飞行速度（px/s） */
@@ -143,7 +143,7 @@ export const WEAPON_CONFIG = {
     /** 索敌射程（px） */
     range: 420,
     /** 单发伤害 */
-    damage: 200,
+    damage: 80,
     /** 每次开火消耗电力 */
     powerCost: 4,
     /** 子弹飞行速度（px/s） */
@@ -167,7 +167,7 @@ export const WEAPON_CONFIG = {
   missile: {
     cooldown: 1800,
     range: 720,
-    damage: 120,
+    damage: 60,
     splashRadius: 70,
     powerCost: 2,
     bulletSpeed: 240,
@@ -240,8 +240,8 @@ export const ENEMY_SCALING = {
 } as const;
 
 export const THEME_WAVE_CONFIG = {
-  /** 第 7 波开始，每隔 5 波追加一组同类型主题怪。 */
-  startWave: 7,
+  /** 第 12 波开始，每隔 5 波追加一组同类型主题怪。 */
+  startWave: 12,
   interval: 5,
   enemySequence: ['scout', 'grunt', 'tank', 'saboteur'] as const satisfies readonly EnemyType[],
   /** 主题怪数量公式：floor((countBase + themeIndex×countLinear + sqrt(wave)×countSqrt) × typeCountWeight[type]) */
