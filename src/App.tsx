@@ -392,7 +392,7 @@ export default function App() {
     const focusKey = `${tutorialStep}:${Math.round(target.x)}:${Math.round(target.y)}`;
     if (tutorialCameraFocusKeyRef.current === focusKey) return;
     tutorialCameraFocusKeyRef.current = focusKey;
-    focusCameraOnWorld(target, 700);
+    focusCameraOnWorld(target, 700, { x: 0.5, y: 0.36 });
   }, [tutorialStep, gameState.status, gameState.towers, focusCameraOnWorld]);
 
   useEffect(() => {
@@ -1325,15 +1325,15 @@ export default function App() {
                   })()}
 
                   {/* Tutorial card */}
-                  <div className="relative pointer-events-auto bg-gray-900/95 border border-cyan-500/40 rounded-xl p-3 sm:p-4 lg:p-5 shadow-[0_0_25px_rgba(6,182,212,0.2)] max-w-sm sm:max-w-md lg:max-w-lg w-full mx-2 sm:mx-4 backdrop-blur-sm">
-                    <div className="flex items-center justify-between mb-2">
+                  <div className="relative pointer-events-auto bg-gray-900/95 border border-cyan-500/40 rounded-xl p-3 sm:p-3.5 lg:p-4 shadow-[0_0_22px_rgba(6,182,212,0.18)] max-w-sm sm:max-w-md lg:max-w-md w-full mx-2 sm:mx-4 backdrop-blur-sm">
+                    <div className="flex items-center justify-between mb-1.5">
                       <span className="text-cyan-400/70 text-xs font-mono">{displayStepNumber} / {displayStepTotal}</span>
                       <button onClick={dismissTutorial} className="text-gray-500 hover:text-gray-300 text-xs transition-colors">{i.tutorialSkip}</button>
                     </div>
-                    <h3 className="text-base lg:text-lg font-bold text-white mb-1.5">{step.title}</h3>
-                    <p className="text-gray-300 text-xs lg:text-sm leading-relaxed mb-3">{step.text}</p>
+                    <h3 className="text-base font-bold text-white mb-1">{step.title}</h3>
+                    <p className="text-gray-300 text-xs leading-relaxed mb-2.5">{step.text}</p>
                     {actionText && (
-                      <div className="text-cyan-300/80 text-xs font-medium animate-pulse mb-2.5 flex items-center gap-1.5">
+                      <div className="text-cyan-300/80 text-xs font-medium animate-pulse mb-2 flex items-center gap-1.5">
                         <TutorialHandCue className="h-6 w-6" />
                         <span>{actionText}</span>
                       </div>
@@ -1341,7 +1341,7 @@ export default function App() {
                     {!isInteractive && (
                       <button
                         onClick={advanceTutorial}
-                        className="w-full px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-lg transition-colors text-sm"
+                        className="w-full px-4 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-lg transition-colors text-xs sm:text-sm"
                       >
                         {isFinal || isPostWaveWireStep || isShopMachineControlTutorialStep ? i.tutorialDone : i.tutorialNext}
                       </button>

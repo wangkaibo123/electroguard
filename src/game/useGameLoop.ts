@@ -918,15 +918,19 @@ export const useGameLoop = () => {
     lastPinchDistRef.current = null;
   };
 
-  const focusCameraOnWorld = useCallback((target: { x: number; y: number; zoom?: number }, durationMs = 650) => {
+  const focusCameraOnWorld = useCallback((
+    target: { x: number; y: number; zoom?: number },
+    durationMs = 650,
+    anchor: { x: number; y: number } = { x: 0.5, y: 0.5 },
+  ) => {
     const cam = cameraRef.current;
     const state = stateRef.current;
     const viewport = viewportRef.current;
     const minZoom = getMinZoom(viewport, state);
     const targetZoom = Math.max(minZoom, Math.min(MAX_ZOOM, target.zoom ?? Math.max(minZoom, Math.min(MAX_ZOOM, 1))));
     const next = {
-      x: target.x - (viewport.width / targetZoom) / 2,
-      y: target.y - (viewport.height / targetZoom) / 2,
+      x: target.x - (viewport.width / targetZoom) * anchor.x,
+      y: target.y - (viewport.height / targetZoom) * anchor.y,
       zoom: targetZoom,
     };
     clampCamera(next, viewport, state);
