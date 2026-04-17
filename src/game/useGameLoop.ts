@@ -102,6 +102,18 @@ export const useGameLoop = () => {
   const lastTimeRef = useRef(0);
 
   const cameraRef = useRef(createInitialCamera());
+  const cameraTransitionRef = useRef<{
+    startX: number;
+    startY: number;
+    startZoom: number;
+    targetX: number;
+    targetY: number;
+    targetZoom: number;
+    startTime: number;
+    durationMs: number;
+  } | null>(null);
+  const isCameraTransitioningRef = useRef(false);
+  const [isCameraTransitioning, setIsCameraTransitioning] = useState(false);
   const lastMapSizeRef = useRef({
     width: stateRef.current.mapWidth,
     height: stateRef.current.mapHeight,
@@ -691,6 +703,7 @@ export const useGameLoop = () => {
     sy: number,
     options: { wireHitRadius: number; touchPadding?: number; panWhenNotPlaying: 'pick' | 'always' },
   ) => {
+    if (isCameraTransitioningRef.current) return;
     const state = stateRef.current;
 
     if (state.status !== 'playing') {
@@ -803,6 +816,7 @@ export const useGameLoop = () => {
   };
 
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (isCameraTransitioningRef.current) return;
     const spos = canvasScreenXY(e);
     if (!spos) return;
     const { sx, sy } = spos;
@@ -816,6 +830,7 @@ export const useGameLoop = () => {
   };
 
   const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (isCameraTransitioningRef.current) return;
     const spos = canvasScreenXY(e);
     if (!spos) return;
     const { sx, sy } = spos;
@@ -847,6 +862,7 @@ export const useGameLoop = () => {
   };
 
   const handleCanvasMouseUp = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (isCameraTransitioningRef.current) return;
     const spos = canvasScreenXY(e);
     const world = spos ? toWorld(spos.sx, spos.sy) : null;
     finishPrimaryPointer(world ? { x: world.wx, y: world.wy } : null, 15, true);
@@ -864,6 +880,7 @@ export const useGameLoop = () => {
 
   const handleCanvasWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
     e.preventDefault();
+    if (isCameraTransitioningRef.current) return;
     const spos = canvasScreenXY(e as unknown as React.MouseEvent<HTMLCanvasElement>);
     if (!spos) return;
     const { sx, sy } = spos;
@@ -891,6 +908,51 @@ export const useGameLoop = () => {
   // 鈹€鈹€ Touch support 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
   const lastPinchDistRef = useRef<number | null>(null);
 
+  const clearInteractionStateForCameraMove = () => {
+    hoverRef.current = null;
+    cancelTowerDrag();
+    clearWireDragState();
+    isRotKnobRef.current = false;
+    isPanningRef.current = false;
+    panLastRef.current = null;
+    lastPinchDistRef.current = null;
+  };
+
+  const focusCameraOnWorld = useCallback((target: { x: number; y: number; zoom?: number }, durationMs = 650) => {
+    const cam = cameraRef.current;
+    const state = stateRef.current;
+    const viewport = viewportRef.current;
+    const minZoom = getMinZoom(viewport, state);
+    const targetZoom = Math.max(minZoom, Math.min(MAX_ZOOM, target.zoom ?? Math.max(minZoom, Math.min(MAX_ZOOM, 1))));
+    const next = {
+      x: target.x - (viewport.width / targetZoom) / 2,
+      y: target.y - (viewport.height / targetZoom) / 2,
+      zoom: targetZoom,
+    };
+    clampCamera(next, viewport, state);
+
+    if (
+      Math.hypot(cam.x - next.x, cam.y - next.y) < 1 &&
+      Math.abs(cam.zoom - next.zoom) < 0.005
+    ) {
+      return;
+    }
+
+    clearInteractionStateForCameraMove();
+    cameraTransitionRef.current = {
+      startX: cam.x,
+      startY: cam.y,
+      startZoom: cam.zoom,
+      targetX: next.x,
+      targetY: next.y,
+      targetZoom: next.zoom,
+      startTime: performance.now(),
+      durationMs,
+    };
+    isCameraTransitioningRef.current = true;
+    setIsCameraTransitioning(true);
+  }, []);
+
   const touchScreenXY = (touch: React.Touch) => {
     const r = canvasRef.current?.getBoundingClientRect();
     return r ? { sx: touch.clientX - r.left, sy: touch.clientY - r.top } : null;
@@ -898,6 +960,7 @@ export const useGameLoop = () => {
 
   const handleCanvasTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
     e.preventDefault();
+    if (isCameraTransitioningRef.current) return;
     if (e.touches.length === 2) {
       // Start pinch zoom
       const dx = e.touches[0].clientX - e.touches[1].clientX;
@@ -919,6 +982,7 @@ export const useGameLoop = () => {
 
   const handleCanvasTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
     e.preventDefault();
+    if (isCameraTransitioningRef.current) return;
     // Pinch zoom
     if (e.touches.length === 2 && lastPinchDistRef.current !== null) {
       const dx = e.touches[0].clientX - e.touches[1].clientX;
@@ -976,6 +1040,7 @@ export const useGameLoop = () => {
 
   const handleCanvasTouchEnd = (e: React.TouchEvent<HTMLCanvasElement>) => {
     e.preventDefault();
+    if (isCameraTransitioningRef.current) return;
     // End pinch
     if (lastPinchDistRef.current !== null && e.touches.length < 2) {
       lastPinchDistRef.current = null;
@@ -994,6 +1059,26 @@ export const useGameLoop = () => {
     const dt = (time - lastTimeRef.current) / 1000;
     lastTimeRef.current = time;
     const state = stateRef.current;
+
+    const cameraTransition = cameraTransitionRef.current;
+    if (cameraTransition) {
+      const t = Math.min(1, (time - cameraTransition.startTime) / cameraTransition.durationMs);
+      const eased = 1 - Math.pow(1 - t, 3);
+      const cam = cameraRef.current;
+      cam.x = cameraTransition.startX + (cameraTransition.targetX - cameraTransition.startX) * eased;
+      cam.y = cameraTransition.startY + (cameraTransition.targetY - cameraTransition.startY) * eased;
+      cam.zoom = cameraTransition.startZoom + (cameraTransition.targetZoom - cameraTransition.startZoom) * eased;
+      clampCamera(cam, viewportRef.current, state);
+      if (t >= 1) {
+        cam.x = cameraTransition.targetX;
+        cam.y = cameraTransition.targetY;
+        cam.zoom = cameraTransition.targetZoom;
+        clampCamera(cam, viewportRef.current, state);
+        cameraTransitionRef.current = null;
+        isCameraTransitioningRef.current = false;
+        setIsCameraTransitioning(false);
+      }
+    }
 
     if (state.status === 'playing' && updateGameState(state, dt)) {
       sync();
@@ -1105,6 +1190,7 @@ export const useGameLoop = () => {
   // 鈹€鈹€ Keyboard shortcuts 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      if (isCameraTransitioningRef.current) return;
       const state = stateRef.current;
       if (state.status !== 'playing') return;
 
@@ -1174,6 +1260,7 @@ export const useGameLoop = () => {
   return {
     canvasRef, cameraRef, gameState, startGame, startCustomGame, togglePause, returnToMenu, handlePick,
     forceTutorialGeneratorPick,
+    focusCameraOnWorld, isCameraTransitioning,
     openCustomPick, buyShopPack, refreshShopOffers, sellTower, rotatingTowerId,
     startCommandCardUse, activeCommandCard, startRepair, activeRepair,
     selectedTower, setSelectedTower, placeMonsterMode, setPlaceMonsterMode, skipToNextWave, toastMessage,

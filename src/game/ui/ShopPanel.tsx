@@ -48,6 +48,7 @@ type ShopPanelProps = {
   startRepair: () => void;
   tutorialStep: number | null;
   shopTutorialActive?: boolean;
+  interactionLocked?: boolean;
 };
 
 export const ShopPanel = (props: ShopPanelProps) => {
@@ -77,6 +78,7 @@ export const ShopPanel = (props: ShopPanelProps) => {
     startRepair,
     tutorialStep,
     shopTutorialActive = false,
+    interactionLocked = false,
   } = props;
   const [refreshAnimationId, setRefreshAnimationId] = useState(0);
 
@@ -91,10 +93,11 @@ export const ShopPanel = (props: ShopPanelProps) => {
       <div key={type} className="flex w-full items-stretch min-w-0">
         <button
           onClick={() => {
+            if (interactionLocked) return;
             setPlaceMonsterMode(false);
             setSelectedTower(isSelected ? null : type);
           }}
-          disabled={!hasStock || gameState.status !== 'playing'}
+          disabled={interactionLocked || !hasStock || gameState.status !== 'playing'}
           className={`flex flex-1 min-w-0 items-center gap-2.5 px-3 py-3 rounded-lg border transition-all ${
             isSelected
               ? 'border-blue-500 bg-blue-500/15 shadow-[0_0_10px_rgba(59,130,246,0.3)]'
@@ -122,10 +125,11 @@ export const ShopPanel = (props: ShopPanelProps) => {
         <button
           type="button"
           onClick={() => {
+            if (interactionLocked) return;
             setSelectedTower(null);
             setPlaceMonsterMode(!isActive);
           }}
-          disabled={gameState.status !== 'playing'}
+          disabled={interactionLocked || gameState.status !== 'playing'}
           className={`flex items-center gap-2.5 px-3 py-3 rounded-lg border transition-all ${
             isActive
               ? 'border-rose-500 bg-rose-500/15 shadow-[0_0_10px_rgba(244,63,94,0.25)] text-rose-200'
@@ -149,6 +153,7 @@ export const ShopPanel = (props: ShopPanelProps) => {
               <button
                 type="button"
                 onClick={() => setMonsterSubTab('type')}
+                disabled={interactionLocked}
                 className={`flex-1 px-2 py-1.5 rounded-md text-[11px] font-bold transition-all border ${
                   monsterSubTab === 'type'
                     ? 'bg-rose-500/20 text-rose-200 border-rose-500/50'
@@ -160,6 +165,7 @@ export const ShopPanel = (props: ShopPanelProps) => {
               <button
                 type="button"
                 onClick={() => setMonsterSubTab('static')}
+                disabled={interactionLocked}
                 className={`flex-1 px-2 py-1.5 rounded-md text-[11px] font-bold transition-all border ${
                   monsterSubTab === 'static'
                     ? 'bg-rose-500/20 text-rose-200 border-rose-500/50'
@@ -179,11 +185,12 @@ export const ShopPanel = (props: ShopPanelProps) => {
                       key={type}
                       type="button"
                       onClick={() => {
+                        if (interactionLocked) return;
                         setSelectedTower(null);
                         setSelectedMonsterType(type);
                         setPlaceMonsterMode(true);
                       }}
-                      disabled={gameState.status !== 'playing'}
+                      disabled={interactionLocked || gameState.status !== 'playing'}
                       className={`px-2.5 py-2 rounded-md border text-xs font-bold transition-all ${
                         isSelected
                           ? 'border-rose-500 bg-rose-500/15 text-rose-200'
@@ -209,7 +216,7 @@ export const ShopPanel = (props: ShopPanelProps) => {
                   type="checkbox"
                   checked={staticMonster}
                   onChange={(e) => setStaticMonster(e.target.checked)}
-                  disabled={gameState.status !== 'playing'}
+                  disabled={interactionLocked || gameState.status !== 'playing'}
                   className="mt-0.5 h-4 w-4 rounded border-gray-600 bg-gray-800 text-rose-500 focus:ring-rose-500"
                 />
                 <div className="min-w-0">
@@ -282,23 +289,25 @@ export const ShopPanel = (props: ShopPanelProps) => {
 
   const renderShopButtons = (closeSidebar = false, topMargin = true) => {
     const handleBuy = (type: ShopItemType) => {
+      if (interactionLocked) return;
       buyShopPack(type);
       if (closeSidebar) setSidebarOpen(false);
     };
     const handleRefresh = () => {
+      if (interactionLocked) return;
       setRefreshAnimationId(id => id + 1);
       refreshShopOffers();
     };
     const isCustom = gameState.gameMode === 'custom';
-    const canBuy = (price: number) => gameState.status === 'playing' && (isCustom || gameState.gold >= price);
+    const canBuy = (price: number) => !interactionLocked && gameState.status === 'playing' && (isCustom || gameState.gold >= price);
     const offers = gameState.shopOffers.length > 0 ? gameState.shopOffers : (['tower', 'infra', 'command'] as ShopItemType[]);
     const refreshCost = gameState.shopRefreshCost ?? SHOP_CONFIG.initialRefreshCost;
-    const canRefresh = gameState.status === 'playing' && (isCustom || gameState.gold >= refreshCost);
+    const canRefresh = !interactionLocked && gameState.status === 'playing' && (isCustom || gameState.gold >= refreshCost);
     const repairCost = SHOP_CONFIG.repairCost;
     const hasRepairTarget = gameState.towers.some(tower =>
       tower.type !== 'core' && (tower.isRuined || tower.hp < tower.maxHp),
     );
-    const canRepair = gameState.status === 'playing' && hasRepairTarget && (isCustom || gameState.gold >= repairCost);
+    const canRepair = !interactionLocked && gameState.status === 'playing' && hasRepairTarget && (isCustom || gameState.gold >= repairCost);
     const getShopItemUi = (offer: ShopItemType) => {
       const item = SHOP_ITEM_CONFIG[offer];
       if (item.kind === 'machine') {
@@ -451,9 +460,9 @@ export const ShopPanel = (props: ShopPanelProps) => {
         <button
           type="button"
           onClick={openCustomPick}
-          disabled={gameState.status !== 'playing' && gameState.status !== 'paused'}
+          disabled={interactionLocked || (gameState.status !== 'playing' && gameState.status !== 'paused')}
           className={`flex items-center gap-2.5 px-3 py-3 rounded-lg border transition-all ${
-            gameState.status === 'playing' || gameState.status === 'paused'
+            !interactionLocked && (gameState.status === 'playing' || gameState.status === 'paused')
               ? 'border-amber-700/70 bg-amber-500/10 text-amber-200 hover:bg-amber-500/15 hover:border-amber-500/70'
               : 'border-gray-800 bg-gray-900/50 text-gray-500 cursor-not-allowed opacity-50'
           }`}
@@ -477,6 +486,7 @@ export const ShopPanel = (props: ShopPanelProps) => {
         {(gameState.status === 'playing' || gameState.status === 'paused') && !shopPanelHiddenForWave && (
           <button
             onClick={() => setSidebarOpen(v => !v)}
+            disabled={interactionLocked}
             className={`absolute top-1/2 flex h-14 w-[25px] -translate-y-1/2 items-center justify-center rounded-l-lg border border-r-0 border-gray-700 bg-gray-800/90 text-gray-300 shadow-lg backdrop-blur-sm transition-[right,transform,background-color] hover:bg-gray-700 active:scale-95 ${
               tutorialStep === null ? 'z-50' : 'z-30'
             } ${
@@ -513,6 +523,7 @@ export const ShopPanel = (props: ShopPanelProps) => {
       {!shopPanelHiddenForWave && (
         <button
           onClick={() => setSidebarOpen(v => !v)}
+          disabled={interactionLocked}
           className="absolute -left-9 top-1/2 -translate-y-1/2 z-10 w-9 h-16 bg-gray-800 hover:bg-gray-700 border border-gray-700 border-r-0 rounded-l-lg flex items-center justify-center text-gray-400 hover:text-white transition-colors"
           title={sidebarOpen ? i.hidePanel : i.showPanel}
         >

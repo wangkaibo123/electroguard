@@ -153,6 +153,8 @@ export default function App() {
     returnToMenu,
     handlePick,
     forceTutorialGeneratorPick,
+    focusCameraOnWorld,
+    isCameraTransitioning,
     openCustomPick,
     buyShopPack,
     selectedTower,
@@ -290,6 +292,7 @@ export default function App() {
   }, []);
 
   const [tutorialStep, setTutorialStep] = useState<number | null>(null);
+  const tutorialCameraFocusKeyRef = useRef<string | null>(null);
   const [autoDeployTutorialPending, setAutoDeployTutorialPending] = useState(false);
   const [firstWavePickTutorialDone, setFirstWavePickTutorialDone] = useState(false);
   const [wireTutorialDone, setWireTutorialDone] = useState(false);
@@ -304,6 +307,7 @@ export default function App() {
     coreToTurret: false,
     generatorToTurret: false,
   });
+  const tutorialInputLocked = isCameraTransitioning;
   const startTutorial = () => {
     startGame();
     setAutoDeployTutorialPending(true);
@@ -312,6 +316,7 @@ export default function App() {
     setWireTutorialPendingAfterDrop(false);
     setShopTutorialUnlocked(false);
     setDirectPlugProgress({ coreToTurret: false, generatorToTurret: false });
+    tutorialCameraFocusKeyRef.current = null;
     setTutorialStep(0);
   };
   const dismissTutorial = () => {
@@ -322,6 +327,7 @@ export default function App() {
     setWireTutorialPendingAfterDrop(false);
     setShopTutorialUnlocked(false);
     setDirectPlugProgress({ coreToTurret: false, generatorToTurret: false });
+    tutorialCameraFocusKeyRef.current = null;
     try { localStorage.setItem('electroguard_tutorial_done', '1'); } catch {}
   };
   const handleStartGame = () => {
@@ -334,10 +340,60 @@ export default function App() {
         setWireTutorialPendingAfterDrop(false);
         setShopTutorialUnlocked(false);
         setDirectPlugProgress({ coreToTurret: false, generatorToTurret: false });
+        tutorialCameraFocusKeyRef.current = null;
         setTutorialStep(0);
       }
     } catch {}
   };
+
+  useEffect(() => {
+    if (tutorialStep === null || gameState.status === 'menu' || gameState.status === 'gameover') {
+      tutorialCameraFocusKeyRef.current = null;
+      return;
+    }
+
+    const CS = GLOBAL_CONFIG.cellSize;
+    const core = gameState.towers.find(tw => tw.type === 'core');
+    const turret = gameState.towers.find(tw => TURRET_TOWER_TYPES.has(tw.type));
+    const generator = gameState.towers.find(tw => GENERATOR_TOWER_TYPES.has(tw.type));
+    const centerOf = (tower: GameState['towers'][number]) => ({
+      x: (tower.x + tower.width / 2) * CS,
+      y: (tower.y + tower.height / 2) * CS,
+    });
+    const midpoint = (
+      a: GameState['towers'][number] | undefined,
+      b: GameState['towers'][number] | undefined,
+    ) => {
+      if (a && b) {
+        const ac = centerOf(a);
+        const bc = centerOf(b);
+        return { x: (ac.x + bc.x) / 2, y: (ac.y + bc.y) / 2 };
+      }
+      if (a) return centerOf(a);
+      if (b) return centerOf(b);
+      return null;
+    };
+
+    const target =
+      tutorialStep === TURRET_DIRECT_PLUG_TUTORIAL_STEP
+        ? midpoint(turret, core)
+        : tutorialStep === GENERATOR_DIRECT_PLUG_TUTORIAL_STEP
+          ? midpoint(generator, turret)
+        : tutorialStep === POST_WAVE_WIRE_STEP
+          ? midpoint(generator, turret)
+        : tutorialStep === SHOP_MACHINE_CONTROL_TUTORIAL_STEP
+          ? (turret ? centerOf(turret) : null)
+        : core
+          ? centerOf(core)
+        : null;
+
+    if (!target) return;
+
+    const focusKey = `${tutorialStep}:${Math.round(target.x)}:${Math.round(target.y)}`;
+    if (tutorialCameraFocusKeyRef.current === focusKey) return;
+    tutorialCameraFocusKeyRef.current = focusKey;
+    focusCameraOnWorld(target, 700);
+  }, [tutorialStep, gameState.status, gameState.towers, focusCameraOnWorld]);
 
   useEffect(() => {
     if (gameState.status !== 'pick' && pickOverlayHidden) setPickOverlayHidden(false);
@@ -471,6 +527,7 @@ export default function App() {
     !firstWavePickTutorialDone &&
     tutorialStep === POST_WAVE_PICK_STEP;
   const handleNextWaveClick = () => {
+    if (tutorialInputLocked) return;
     if (tutorialStep === NEXT_WAVE_TUTORIAL_STEP && autoDeployTutorialPending) {
       setTutorialStep(null);
     }
@@ -478,6 +535,7 @@ export default function App() {
   };
 
   const handleTutorialPick = (optionId: string, origin?: { x: number; y: number }) => {
+    if (tutorialInputLocked) return;
     const option = gameState.pickOptions.find(pickOption => pickOption.id === optionId);
     if (!option) return;
 
@@ -544,6 +602,11 @@ export default function App() {
   };
 
   const handleTutorialCanvasMouseDown = (event: ReactMouseEvent<HTMLCanvasElement>) => {
+    if (tutorialInputLocked) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     if (event.button === 0 && blockWireDragBeforeWireTutorial(event.clientX, event.clientY, 15)) {
       event.preventDefault();
       event.stopPropagation();
@@ -558,6 +621,11 @@ export default function App() {
   };
 
   const handleTutorialCanvasTouchStart = (event: ReactTouchEvent<HTMLCanvasElement>) => {
+    if (tutorialInputLocked) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     const touch = event.touches[0];
     if (touch && blockWireDragBeforeWireTutorial(touch.clientX, touch.clientY, 20)) {
       event.preventDefault();
@@ -624,7 +692,8 @@ export default function App() {
           {(gameState.status === 'playing' || gameState.status === 'paused') && (
             <button
               onClick={togglePause}
-              className="p-1 sm:p-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-white transition-colors"
+              disabled={tutorialInputLocked}
+              className="p-1 sm:p-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-white transition-colors disabled:cursor-wait disabled:opacity-60"
               title={gameState.status === 'playing' ? i.pause : i.resume}
             >
               {gameState.status === 'playing' ? <Pause size={16} /> : <Play size={16} />}
@@ -672,6 +741,23 @@ export default function App() {
               onTouchCancel={handleCanvasTouchEnd}
               className={`block w-full h-full touch-none ${gameState.status === 'playing' ? (selectedTower || placeMonsterMode || activeCommandCard || activeRepair ? 'cursor-crosshair' : 'cursor-grab active:cursor-grabbing') : ''}`}
             />
+            {tutorialInputLocked && (
+              <div
+                className="absolute inset-0 z-40 cursor-wait"
+                onMouseDown={event => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                }}
+                onTouchStart={event => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                }}
+                onWheel={event => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                }}
+              />
+            )}
 
             {/* Controls Guide — top-left (desktop only) */}
             {showControlsGuide && (
@@ -767,7 +853,7 @@ export default function App() {
                 setCodexTower={setCodexTower}
                 highlightPickIndex={tutorialHighlightedPickIndex}
                 disabledPickIds={tutorialDisabledPickIds}
-                battleViewToggleLocked={battleViewToggleLocked}
+                battleViewToggleLocked={battleViewToggleLocked || tutorialInputLocked}
               />
             )}
 
@@ -1311,6 +1397,7 @@ export default function App() {
             startRepair={startRepair}
             tutorialStep={tutorialStep}
             shopTutorialActive={tutorialStep === SHOP_TUTORIAL_STEP}
+            interactionLocked={tutorialInputLocked}
           />
         )}
 
@@ -1318,7 +1405,8 @@ export default function App() {
           <button
             type="button"
             onClick={handleNextWaveClick}
-            className={`next-wave-button absolute left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-lg border border-blue-400/70 bg-blue-600 px-5 py-3 text-sm font-black text-white shadow-[0_10px_30px_rgba(37,99,235,0.35)] transition-colors hover:bg-blue-500 active:scale-95 sm:px-6 sm:text-base ${nextWavePromptActive ? 'next-wave-breathe' : ''}`}
+            disabled={tutorialInputLocked}
+            className={`next-wave-button absolute left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-lg border border-blue-400/70 bg-blue-600 px-5 py-3 text-sm font-black text-white shadow-[0_10px_30px_rgba(37,99,235,0.35)] transition-colors hover:bg-blue-500 active:scale-95 disabled:cursor-wait disabled:opacity-60 sm:px-6 sm:text-base ${nextWavePromptActive ? 'next-wave-breathe' : ''}`}
           >
             <Play size={18} />
             <span>{i.startNextWave}</span>
