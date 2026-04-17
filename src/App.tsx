@@ -1109,10 +1109,9 @@ export default function App() {
 
                   {/* Arrow to Start Next Wave button */}
                   {isNextWaveTutorialStep && canStartNextWave && (
-                    <div className="absolute bottom-20 left-1/2 -translate-x-1/2 flex flex-col items-center animate-bounce pointer-events-none sm:bottom-24">
-                      <TutorialHandCue className="mb-1" />
-                      <div className="w-[4px] h-10 bg-gradient-to-b from-cyan-300 to-blue-400 rounded-full shadow-[0_0_12px_rgba(34,211,238,0.45)]" />
-                      <div className="w-0 h-0 border-l-[13px] border-r-[13px] border-t-[17px] border-l-transparent border-r-transparent border-t-blue-400" />
+                    <div className="absolute bottom-16 left-1/2 z-10 -translate-x-1/2 flex flex-col items-center animate-bounce pointer-events-none sm:bottom-20">
+                      <div className="w-[4px] h-8 bg-gradient-to-b from-cyan-300 to-blue-400 rounded-full shadow-[0_0_12px_rgba(34,211,238,0.45)]" />
+                      <div className="w-0 h-0 border-l-[12px] border-r-[12px] border-t-[15px] border-l-transparent border-r-transparent border-t-blue-400" />
                     </div>
                   )}
 
