@@ -97,6 +97,17 @@ const CORE_TOWER_TYPES = new Set<TowerType>(['core']);
 const TURRET_TOWER_TYPES = new Set<TowerType>(['blaster', 'gatling', 'sniper', 'tesla', 'missile']);
 const GENERATOR_TOWER_TYPES = new Set<TowerType>(['generator', 'big_generator']);
 
+const getIsMobileViewport = () => {
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+  const shortSide = Math.min(width, height);
+  const hasTouch = navigator.maxTouchPoints > 0;
+  const coarsePointer = window.matchMedia('(pointer: coarse)').matches;
+  const noHover = window.matchMedia('(hover: none)').matches;
+
+  return width < 768 || (shortSide < 520 && (hasTouch || coarsePointer || noHover));
+};
+
 const hasDirectPlugBetween = (
   state: GameState,
   sourceTypes: Set<TowerType>,
@@ -200,18 +211,24 @@ export default function App() {
     return () => window.clearTimeout(timeoutId);
   }, [canStartNextWave]);
 
-  // Mobile detection
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  // Mobile detection includes phones in landscape, where width alone looks desktop-sized.
+  const [isMobile, setIsMobile] = useState(getIsMobileViewport);
   useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth < 768);
+    const onResize = () => setIsMobile(getIsMobileViewport());
     window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
+    window.addEventListener('orientationchange', onResize);
+    window.visualViewport?.addEventListener('resize', onResize);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('orientationchange', onResize);
+      window.visualViewport?.removeEventListener('resize', onResize);
+    };
   }, []);
 
   // On mobile, sidebar starts closed; on mobile the sidebar is an overlay
   useEffect(() => {
-    if (isMobile && gameState.gameMode === 'custom') setSidebarOpen(false);
-  }, [isMobile, gameState.gameMode]);
+    if (isMobile) setSidebarOpen(false);
+  }, [isMobile]);
 
   useEffect(() => {
     const previous = previousPickStateRef.current;
@@ -548,11 +565,11 @@ export default function App() {
   const activeToastMessage = toastMessage ?? tutorialToastMessage;
 
   return (
-    <div className="h-screen bg-gray-950 text-gray-100 font-sans flex flex-col overflow-hidden">
+    <div className="app-shell bg-gray-950 text-gray-100 font-sans flex flex-col overflow-hidden">
 
       {/* Top Stats Bar */}
       <div className="shrink-0 bg-gray-900/90 border-b border-gray-800 px-2 sm:px-4 py-1.5 sm:py-2 flex items-center gap-2 sm:gap-6">
-        <h1 className="text-sm sm:text-lg font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500 shrink-0">
+        <h1 className="app-title text-sm sm:text-lg font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500 shrink-0">
           ELECTROGUARD
         </h1>
 
@@ -1262,7 +1279,7 @@ export default function App() {
           <button
             type="button"
             onClick={handleNextWaveClick}
-            className={`absolute bottom-4 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-lg border border-blue-400/70 bg-blue-600 px-5 py-3 text-sm font-black text-white shadow-[0_10px_30px_rgba(37,99,235,0.35)] transition-colors hover:bg-blue-500 active:scale-95 sm:bottom-6 sm:px-6 sm:text-base ${nextWavePromptActive ? 'next-wave-breathe' : ''}`}
+            className={`next-wave-button absolute left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-lg border border-blue-400/70 bg-blue-600 px-5 py-3 text-sm font-black text-white shadow-[0_10px_30px_rgba(37,99,235,0.35)] transition-colors hover:bg-blue-500 active:scale-95 sm:px-6 sm:text-base ${nextWavePromptActive ? 'next-wave-breathe' : ''}`}
           >
             <Play size={18} />
             <span>{i.startNextWave}</span>

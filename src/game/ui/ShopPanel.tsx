@@ -474,13 +474,15 @@ export const ShopPanel = (props: ShopPanelProps) => {
   if (isMobile) {
     return (
       <>
-        {(gameState.status === 'playing' || gameState.status === 'paused') && !shopPanelHiddenForWave && !sidebarOpen && (
+        {(gameState.status === 'playing' || gameState.status === 'paused') && !shopPanelHiddenForWave && (
           <button
-            onClick={() => setSidebarOpen(true)}
-            className="absolute bottom-3 right-3 z-30 w-12 h-12 bg-gray-800/90 backdrop-blur-sm hover:bg-gray-700 rounded-full border border-gray-600 flex items-center justify-center text-gray-300 shadow-lg active:scale-95 transition-transform"
-            title={i.showPanel}
+            onClick={() => setSidebarOpen(v => !v)}
+            className={`absolute top-1/2 z-50 flex h-14 w-[25px] -translate-y-1/2 items-center justify-center rounded-l-lg border border-r-0 border-gray-700 bg-gray-800/90 text-gray-300 shadow-lg backdrop-blur-sm transition-[right,transform,background-color] hover:bg-gray-700 active:scale-95 ${
+              sidebarOpen ? 'right-[260px]' : 'right-0'
+            }`}
+            title={sidebarOpen ? i.hidePanel : i.showPanel}
           >
-            <Menu size={20} />
+            {sidebarOpen ? <ChevronRight size={16} /> : <Menu size={16} />}
           </button>
         )}
         {shopPanelVisible && (
