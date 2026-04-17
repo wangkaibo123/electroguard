@@ -5,12 +5,21 @@ import {
   getCanvasHeight, getCanvasWidth, getGridHeight, getGridWidth,
 } from './types';
 import { t, pickKey } from './i18n';
-import { GLOBAL_CONFIG, ENEMY_CONFIG, ENEMY_GOLD_REWARD, STARTING_INVENTORY, PICK_POOL_CONFIG, WEAPON_CONFIG, COMMAND_CARD_CONFIG, BASE_UPGRADE_CONFIG, SHOP_CONFIG, SHOP_ITEM_CONFIG, SHOP_OFFER_BUCKETS, ADVANCED_TOWER_TYPES } from './config';
+import { GLOBAL_CONFIG, ENEMY_CONFIG, ENEMY_GOLD_REWARD, ENEMY_SCALING, STARTING_INVENTORY, PICK_POOL_CONFIG, WEAPON_CONFIG, COMMAND_CARD_CONFIG, BASE_UPGRADE_CONFIG, SHOP_CONFIG, SHOP_ITEM_CONFIG, SHOP_OFFER_BUCKETS, ADVANCED_TOWER_TYPES } from './config';
 import { makeTowerCollider, makeEnemyCollider } from './collider';
 import { getLinearTowerBodyAspectRatio, getLinearTowerBodyRect } from './linearTowerGeometry';
 import { footprintsOverlap, getTowerCells, getTowerFootprintCells } from './footprint';
 
 const ENEMY_SPEED_MUL = GLOBAL_CONFIG.enemyBaseSpeedMul;
+
+const getEnemyHp = (type: EnemyType, wave: number) => {
+  const def = ENEMY_CONFIG[type];
+  const growthSteps = Math.max(0, Math.floor(wave / ENEMY_SCALING.hpGrowthInterval));
+  const growthPerStep = type === 'overlord'
+    ? ENEMY_SCALING.bossHpGrowthPerInterval
+    : ENEMY_SCALING.hpGrowthPerInterval;
+  return Math.ceil(def.baseHp * (1 + growthSteps * growthPerStep));
+};
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 let _idCounter = 0;
@@ -881,9 +890,9 @@ const spawnPos = (state: GameState): { x: number; y: number } => {
   return { x, y };
 };
 
-const pushEnemy = (state: GameState, type: EnemyType, _wave: number) => {
+const pushEnemy = (state: GameState, type: EnemyType, wave: number) => {
   const def = ENEMY_CONFIG[type];
-  const hp = def.baseHp;
+  const hp = getEnemyHp(type, wave);
   const { x, y } = spawnPos(state);
   const shieldHp = def.baseShield;
   state.enemies.push({
@@ -915,13 +924,13 @@ export const spawnBoss = (state: GameState, wave: number) => {
 export const spawnEnemyAt = (
   state: GameState,
   type: EnemyType,
-  _wave: number,
+  wave: number,
   x: number,
   y: number,
   options?: { isStatic?: boolean; goldReward?: number },
 ) => {
   const def = ENEMY_CONFIG[type];
-  const hp = def.baseHp;
+  const hp = getEnemyHp(type, wave);
   const shieldHp = def.baseShield;
   state.enemies.push({
     id: genId(), enemyType: type, isStatic: options?.isStatic, x, y,

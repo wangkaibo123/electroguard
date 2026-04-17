@@ -231,6 +231,12 @@ export const ENEMY_SCALING = {
   lateLinear: 0.55,
   /** 第 15 波后普通刷怪额外增长的平方根系数。 */
   lateSqrt: 1.5,
+  /** 每隔多少波提升一次敌人血量。 */
+  hpGrowthInterval: 5,
+  /** 普通怪每次血量提升比例。 */
+  hpGrowthPerInterval: 0.08,
+  /** Boss 每次血量提升比例，略高于普通怪。 */
+  bossHpGrowthPerInterval: 0.12,
 } as const;
 
 export const THEME_WAVE_CONFIG = {
