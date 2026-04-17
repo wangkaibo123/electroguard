@@ -885,7 +885,7 @@ export default function App() {
                 posClass = 'items-end justify-center pb-8 sm:pb-10';
               } else if (isInteractive) {
                 posClass = isDirectPlugStep
-                  ? 'items-end justify-start pb-4 pl-6'
+                  ? 'items-end justify-center pb-6 sm:pb-8 lg:pb-10'
                   : 'items-end justify-center pb-4';
               } else {
                 posClass = ht === 'spotlight'
@@ -1239,13 +1239,13 @@ export default function App() {
                   })()}
 
                   {/* Tutorial card */}
-                  <div className="relative pointer-events-auto bg-gray-900/95 border border-cyan-500/40 rounded-xl p-4 sm:p-5 shadow-[0_0_25px_rgba(6,182,212,0.2)] max-w-md w-full mx-2 sm:mx-4 backdrop-blur-sm">
+                  <div className="relative pointer-events-auto bg-gray-900/95 border border-cyan-500/40 rounded-xl p-4 sm:p-5 lg:p-6 shadow-[0_0_25px_rgba(6,182,212,0.2)] max-w-md sm:max-w-lg lg:max-w-xl w-full mx-2 sm:mx-4 backdrop-blur-sm">
                     <div className="flex items-center justify-between mb-3">
                       <span className="text-cyan-400/70 text-xs font-mono">{displayStepNumber} / {displayStepTotal}</span>
                       <button onClick={dismissTutorial} className="text-gray-500 hover:text-gray-300 text-xs transition-colors">{i.tutorialSkip}</button>
                     </div>
-                    <h3 className="text-lg font-bold text-white mb-2">{step.title}</h3>
-                    <p className="text-gray-300 text-sm leading-relaxed mb-4">{step.text}</p>
+                    <h3 className="text-lg lg:text-xl font-bold text-white mb-2">{step.title}</h3>
+                    <p className="text-gray-300 text-sm lg:text-base leading-relaxed mb-4">{step.text}</p>
                     {actionText && (
                       <div className="text-cyan-300/80 text-xs font-medium animate-pulse mb-3 flex items-center gap-1.5">
                         <TutorialHandCue className="h-7 w-7" />
