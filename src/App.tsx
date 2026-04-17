@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type ReactNode } from 'react';
+import { useState, useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
 import { Activity, BookOpen, Cable, Coins, Globe, Keyboard, LogOut, Pause, Play, RotateCcw, Wrench, X } from 'lucide-react';
 import { useGameLoop } from './game/useGameLoop';
 import type { GameState, TowerType } from './game/types';
@@ -88,7 +88,6 @@ const TURRET_DIRECT_PLUG_TUTORIAL_STEP = 1;
 const GENERATOR_DIRECT_PLUG_TUTORIAL_STEP = 2;
 const POST_WAVE_PICK_STEP = 100;
 const POST_WAVE_WIRE_STEP = 101;
-const POST_WAVE_GENERATOR_STEP = 102;
 const POST_WAVE_TUTORIAL_MIN_WAVE = 1;
 const POST_WAVE_PICK_CARD_INDEX = 1;
 const CORE_TOWER_TYPES = new Set<TowerType>(['core']);
@@ -101,6 +100,23 @@ const hasDirectPlugBetween = (
   targetTypes: Set<TowerType>,
 ) => state.wires.some((wire) => {
   if (!wire.direct) return false;
+  const startTower = state.towerMap.get(wire.startTowerId);
+  const endTower = state.towerMap.get(wire.endTowerId);
+  if (!startTower || !endTower) return false;
+
+  return (
+    (sourceTypes.has(startTower.type) && targetTypes.has(endTower.type)) ||
+    (sourceTypes.has(endTower.type) && targetTypes.has(startTower.type))
+  );
+});
+
+const hasWireBetween = (
+  state: GameState,
+  sourceTypes: Set<TowerType>,
+  targetTypes: Set<TowerType>,
+  requireNonDirect = false,
+) => state.wires.some((wire) => {
+  if (requireNonDirect && wire.direct) return false;
   const startTower = state.towerMap.get(wire.startTowerId);
   const endTower = state.towerMap.get(wire.endTowerId);
   if (!startTower || !endTower) return false;
@@ -249,7 +265,7 @@ export default function App() {
   const [tutorialStep, setTutorialStep] = useState<number | null>(null);
   const [autoDeployTutorialPending, setAutoDeployTutorialPending] = useState(false);
   const [firstWavePickTutorialDone, setFirstWavePickTutorialDone] = useState(false);
-  const [generatorPickTutorialDone, setGeneratorPickTutorialDone] = useState(false);
+  const [wireTutorialPendingAfterDrop, setWireTutorialPendingAfterDrop] = useState(false);
   const [directPlugProgress, setDirectPlugProgress] = useState({
     coreToTurret: false,
     generatorToTurret: false,
@@ -258,7 +274,7 @@ export default function App() {
     startGame();
     setAutoDeployTutorialPending(true);
     setFirstWavePickTutorialDone(false);
-    setGeneratorPickTutorialDone(false);
+    setWireTutorialPendingAfterDrop(false);
     setDirectPlugProgress({ coreToTurret: false, generatorToTurret: false });
     setTutorialStep(0);
   };
@@ -266,7 +282,7 @@ export default function App() {
     setTutorialStep(null);
     setAutoDeployTutorialPending(false);
     setFirstWavePickTutorialDone(false);
-    setGeneratorPickTutorialDone(false);
+    setWireTutorialPendingAfterDrop(false);
     setDirectPlugProgress({ coreToTurret: false, generatorToTurret: false });
     try { localStorage.setItem('electroguard_tutorial_done', '1'); } catch {}
   };
@@ -276,7 +292,7 @@ export default function App() {
       if (localStorage.getItem('electroguard_tutorial_done') !== '1') {
         setAutoDeployTutorialPending(true);
         setFirstWavePickTutorialDone(false);
-        setGeneratorPickTutorialDone(false);
+        setWireTutorialPendingAfterDrop(false);
         setDirectPlugProgress({ coreToTurret: false, generatorToTurret: false });
         setTutorialStep(0);
       }
@@ -290,7 +306,7 @@ export default function App() {
   useEffect(() => {
     if (
       pickOverlayHidden &&
-      (tutorialStep === POST_WAVE_PICK_STEP || tutorialStep === POST_WAVE_GENERATOR_STEP)
+      tutorialStep === POST_WAVE_PICK_STEP
     ) {
       setPickOverlayHidden(false);
     }
@@ -330,6 +346,22 @@ export default function App() {
       }
     }
     else if (
+      tutorialStep === POST_WAVE_WIRE_STEP &&
+      hasWireBetween(gameState, GENERATOR_TOWER_TYPES, TURRET_TOWER_TYPES, true)
+    ) {
+      dismissTutorial();
+    }
+    else if (
+      tutorialStep === null &&
+      autoDeployTutorialPending &&
+      wireTutorialPendingAfterDrop &&
+      gameState.status === 'playing' &&
+      gameState.incomingDrops.length === 0
+    ) {
+      setWireTutorialPendingAfterDrop(false);
+      setTutorialStep(POST_WAVE_WIRE_STEP);
+    }
+    else if (
       tutorialStep === null &&
       autoDeployTutorialPending &&
       gameState.status === 'pick' &&
@@ -337,10 +369,8 @@ export default function App() {
       gameState.wave >= POST_WAVE_TUTORIAL_MIN_WAVE
     ) {
       if (gameState.wave === 1 && !firstWavePickTutorialDone) {
-        setTutorialStep(POST_WAVE_PICK_STEP);
-      } else if (gameState.wave === 2 && !generatorPickTutorialDone) {
         forceTutorialGeneratorPick();
-        setTutorialStep(POST_WAVE_GENERATOR_STEP);
+        setTutorialStep(POST_WAVE_PICK_STEP);
       }
     }
   }, [
@@ -350,7 +380,7 @@ export default function App() {
     directPlugProgress,
     isTowerDragging,
     firstWavePickTutorialDone,
-    generatorPickTutorialDone,
+    wireTutorialPendingAfterDrop,
     forceTutorialGeneratorPick,
   ]);
 
@@ -358,12 +388,12 @@ export default function App() {
     autoDeployTutorialPending &&
     gameState.status === 'pick' &&
     gameState.pickUiPhase === 'standard' &&
-    (tutorialStep === POST_WAVE_PICK_STEP || tutorialStep === POST_WAVE_GENERATOR_STEP)
+    tutorialStep === POST_WAVE_PICK_STEP
       ? POST_WAVE_PICK_CARD_INDEX
       : null;
 
   const tutorialForcedGeneratorOption =
-    tutorialStep === POST_WAVE_GENERATOR_STEP
+    tutorialStep === POST_WAVE_PICK_STEP
       ? gameState.pickOptions[POST_WAVE_PICK_CARD_INDEX]
       : null;
 
@@ -378,7 +408,7 @@ export default function App() {
     const option = gameState.pickOptions.find(pickOption => pickOption.id === optionId);
     if (!option) return;
 
-    if (tutorialStep === POST_WAVE_GENERATOR_STEP) {
+    if (tutorialStep === POST_WAVE_PICK_STEP) {
       const forced = gameState.pickOptions[POST_WAVE_PICK_CARD_INDEX];
       if (
         option.id !== forced?.id ||
@@ -390,15 +420,12 @@ export default function App() {
     }
 
     const wasFirstWavePickTutorial = tutorialStep === POST_WAVE_PICK_STEP && gameState.wave === 1;
-    const wasGeneratorPickTutorial = tutorialStep === POST_WAVE_GENERATOR_STEP && gameState.wave === 2;
     handlePick(optionId, origin);
 
     if (wasFirstWavePickTutorial) {
       setFirstWavePickTutorialDone(true);
-      setTutorialStep(POST_WAVE_WIRE_STEP);
-    } else if (wasGeneratorPickTutorial) {
-      setGeneratorPickTutorialDone(true);
-      dismissTutorial();
+      setTutorialStep(null);
+      setWireTutorialPendingAfterDrop(true);
     }
   };
 
@@ -649,22 +676,19 @@ export default function App() {
             {tutorialStep !== null && (tutorialStep < i.tutorialSteps.length || tutorialStep >= POST_WAVE_PICK_STEP) && (() => {
               const isPostWaveTutorialStep =
                 autoDeployTutorialPending &&
-                (tutorialStep === POST_WAVE_PICK_STEP || tutorialStep === POST_WAVE_WIRE_STEP || tutorialStep === POST_WAVE_GENERATOR_STEP);
+                (tutorialStep === POST_WAVE_PICK_STEP || tutorialStep === POST_WAVE_WIRE_STEP);
               const isPostWavePickStep = isPostWaveTutorialStep && tutorialStep === POST_WAVE_PICK_STEP;
               const isPostWaveWireStep = isPostWaveTutorialStep && tutorialStep === POST_WAVE_WIRE_STEP;
-              const isPostWaveGeneratorStep = isPostWaveTutorialStep && tutorialStep === POST_WAVE_GENERATOR_STEP;
               const postWaveStepIndex =
-                tutorialStep === POST_WAVE_WIRE_STEP ? 1 :
-                tutorialStep === POST_WAVE_GENERATOR_STEP ? 2 :
-                0;
+                tutorialStep === POST_WAVE_WIRE_STEP ? 1 : 0;
               const step = isPostWaveTutorialStep
                 ? i.postWaveTutorialSteps[postWaveStepIndex]
                 : i.tutorialSteps[tutorialStep];
               const isDirectPlugStep =
                 !isPostWaveTutorialStep &&
                 (tutorialStep === TURRET_DIRECT_PLUG_TUTORIAL_STEP || tutorialStep === GENERATOR_DIRECT_PLUG_TUTORIAL_STEP);
-              const isPickChoiceTutorialStep = isPostWavePickStep || isPostWaveGeneratorStep;
-              const isInteractive = isDirectPlugStep || isPickChoiceTutorialStep;
+              const isPickChoiceTutorialStep = isPostWavePickStep;
+              const isInteractive = isDirectPlugStep || isPickChoiceTutorialStep || isPostWaveWireStep;
               const isFinal = tutorialStep === i.tutorialSteps.length - 1;
               const actionText = step.action;
               const advanceTutorial = () => {
@@ -759,6 +783,50 @@ export default function App() {
                       start,
                       end,
                       hand: towerCenter(source),
+                      pathBox: {
+                        left: minX - pad,
+                        top: minY - pad,
+                        width: width + pad * 2,
+                        height: height + pad * 2,
+                      },
+                      line: {
+                        x1: start.x - minX + pad,
+                        y1: start.y - minY + pad,
+                        x2: end.x - minX + pad,
+                        y2: end.y - minY + pad,
+                      },
+                    };
+                  })()
+                : null;
+              const wireDragCue = isPostWaveWireStep && turret
+                ? (() => {
+                    const generators = gameState.towers.filter(tw => GENERATOR_TOWER_TYPES.has(tw.type));
+                    const source = generators.find(candidate =>
+                      !gameState.wires.some(wire =>
+                        wire.direct &&
+                        ((wire.startTowerId === candidate.id && wire.endTowerId === turret.id) ||
+                          (wire.endTowerId === candidate.id && wire.startTowerId === turret.id)),
+                      ),
+                    ) ?? generator;
+                    if (!source) return null;
+
+                    const targetCenterWorld = {
+                      x: (turret.x + turret.width / 2) * CS,
+                      y: (turret.y + turret.height / 2) * CS,
+                    };
+                    const sourcePortWorld = nearestTowerPort(source, targetCenterWorld, 'output');
+                    const targetPortWorld = nearestTowerPort(turret, sourcePortWorld, 'input');
+                    const start = toScreen(sourcePortWorld.x, sourcePortWorld.y);
+                    const end = toScreen(targetPortWorld.x, targetPortWorld.y);
+                    const minX = Math.min(start.x, end.x);
+                    const minY = Math.min(start.y, end.y);
+                    const width = Math.max(24, Math.abs(start.x - end.x));
+                    const height = Math.max(24, Math.abs(start.y - end.y));
+                    const pad = 44;
+
+                    return {
+                      start,
+                      end,
                       pathBox: {
                         left: minX - pad,
                         top: minY - pad,
@@ -891,6 +959,59 @@ export default function App() {
                     );
                   })()}
 
+                  {/* World-position wire drag cue */}
+                  {wireDragCue && (() => {
+                    const { start, end, pathBox, line } = wireDragCue;
+                    return (
+                      <>
+                        <svg
+                          className="tutorial-drag-path absolute pointer-events-none overflow-visible"
+                          style={{
+                            left: `${pathBox.left}px`,
+                            top: `${pathBox.top}px`,
+                            width: `${pathBox.width}px`,
+                            height: `${pathBox.height}px`,
+                          }}
+                          viewBox={`0 0 ${pathBox.width} ${pathBox.height}`}
+                        >
+                          <line
+                            x1={line.x1}
+                            y1={line.y1}
+                            x2={line.x2}
+                            y2={line.y2}
+                            stroke="rgba(8, 47, 73, 0.86)"
+                            strokeWidth="10"
+                            strokeLinecap="round"
+                          />
+                          <line
+                            x1={line.x1}
+                            y1={line.y1}
+                            x2={line.x2}
+                            y2={line.y2}
+                            stroke="rgba(34, 211, 238, 0.9)"
+                            strokeWidth="3"
+                            strokeLinecap="round"
+                            strokeDasharray="12 10"
+                          />
+                          <circle r="5" fill="#67e8f9">
+                            <animateMotion dur="1.35s" repeatCount="indefinite" path={`M ${line.x1} ${line.y1} L ${line.x2} ${line.y2}`} />
+                          </circle>
+                        </svg>
+                        <div
+                          className="tutorial-hand-drag-cue absolute pointer-events-none"
+                          style={{
+                            left: `${start.x}px`,
+                            top: `${start.y}px`,
+                            '--drag-x': `${end.x - start.x}px`,
+                            '--drag-y': `${end.y - start.y}px`,
+                          } as CSSProperties}
+                        >
+                          <TutorialHandCue />
+                        </div>
+                      </>
+                    );
+                  })()}
+
                   {/* Tutorial card */}
                   <div className="relative pointer-events-auto bg-gray-900/95 border border-cyan-500/40 rounded-xl p-4 sm:p-5 shadow-[0_0_25px_rgba(6,182,212,0.2)] max-w-md w-full mx-2 sm:mx-4 backdrop-blur-sm">
                     <div className="flex items-center justify-between mb-3">
@@ -903,21 +1024,6 @@ export default function App() {
                       <div className="text-cyan-300/80 text-xs font-medium animate-pulse mb-3 flex items-center gap-1.5">
                         <TutorialHandCue className="h-7 w-7" />
                         <span>{actionText}</span>
-                      </div>
-                    )}
-                    {/* Wire tutorial images */}
-                    {isPostWaveWireStep && (
-                      <div className="flex flex-col gap-2 mb-4">
-                        <img 
-                          src="/images/tutorial_step5_1.png" 
-                          alt="点击电力输出口" 
-                          className="w-full rounded-lg border border-gray-700"
-                        />
-                        <img 
-                          src="/images/tutorial_step5_2.png" 
-                          alt="连接到输入口" 
-                          className="w-full rounded-lg border border-gray-700"
-                        />
                       </div>
                     )}
                     {!isInteractive && (

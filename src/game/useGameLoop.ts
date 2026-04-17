@@ -295,7 +295,7 @@ export const useGameLoop = () => {
       state.gameMode !== 'normal' ||
       state.status !== 'pick' ||
       state.pickUiPhase !== 'standard' ||
-      state.wave !== 2
+      state.wave !== 1
     ) {
       return;
     }

@@ -227,9 +227,8 @@ const en: I18nStrings = {
     { title: 'Power', text: 'Powered turrets glow and fire.' },
   ],
   postWaveTutorialSteps: [
-    { title: 'Pick One of Three', text: 'After each wave, choose 1 of 3 upgrades. Machines auto-deploy near the Core; wires and command cards go into inventory.', action: 'Pick any reward card' },
-    { title: 'Wire Ports', text: 'Later, ports can be linked across distance. Start from the Core output and end on a tower input.', action: 'Drag from output to input' },
-    { title: 'Add Power', text: 'This wave offers a Generator in the middle slot. Choose it so the next defenses have more power to draw from.', action: 'Pick the Generator' },
+    { title: 'Pick One of Three', text: 'After each wave, choose 1 of 3 upgrades. This first reward is a Generator in the middle slot; choose it so the next defenses have more power.', action: 'Pick the Generator' },
+    { title: 'Wire Ports', text: 'Drag from the Generator output port to a turret input port to link power across distance.', action: 'Drag from output to input' },
   ],
 
   gameTips: {
@@ -477,9 +476,8 @@ const zh: I18nStrings = {
     { title: '电力', text: '通电的炮塔会发光并自动开火。' },
   ],
   postWaveTutorialSteps: [
-    { title: '三选一奖励', text: '每波结束后会出现 3 个升级选项，只能选择 1 个。设备会自动部署到核心附近，线缆和指令卡会进入库存。', action: '选择任意奖励卡' },
-    { title: '端口连线', text: '之后可以远距离连接端口。从输出口开始，接到输入口。', action: '从输出口拖到输入口' },
-    { title: '补充电力', text: '这一波中间位置会出现发电机。请选择它，为后续防线提供更多电力。', action: '选择发电机' },
+    { title: '三选一奖励', text: '每波结束后会出现 3 个升级选项，只能选择 1 个。本次中间位置固定为发电机，请选择它，为后续防线提供更多电力。', action: '选择发电机' },
+    { title: '端口连线', text: '从发电机输出口拖到炮塔输入口，就可以远距离传输电力。', action: '从输出口拖到输入口' },
   ],
 
   gameTips: {

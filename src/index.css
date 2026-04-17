@@ -84,6 +84,25 @@
   will-change: transform, filter;
 }
 
+@keyframes tutorialHandDragMove {
+  0%, 18% {
+    transform: translate(-50%, -50%);
+    opacity: 0;
+  }
+  26%, 74% {
+    opacity: 1;
+  }
+  82%, 100% {
+    transform: translate(calc(-50% + var(--drag-x)), calc(-50% + var(--drag-y)));
+    opacity: 0;
+  }
+}
+
+.tutorial-hand-drag-cue {
+  animation: tutorialHandDragMove 1.8s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
 .tutorial-drag-path line:last-of-type {
   animation: tutorialPathDash 1.35s linear infinite;
 }
