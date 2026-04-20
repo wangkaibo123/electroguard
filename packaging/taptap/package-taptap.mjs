@@ -60,6 +60,39 @@ const unwrapLayerRules = (css) => {
   return output;
 };
 
+const removeAtRuleBlocks = (css, ruleName) => {
+  let output = '';
+  let index = 0;
+
+  while (index < css.length) {
+    if (!css.startsWith(ruleName, index)) {
+      output += css[index];
+      index += 1;
+      continue;
+    }
+
+    const nextBrace = css.indexOf('{', index);
+    const nextSemi = css.indexOf(';', index);
+    if (nextSemi !== -1 && (nextBrace === -1 || nextSemi < nextBrace)) {
+      index = nextSemi + 1;
+      continue;
+    }
+    if (nextBrace === -1) break;
+
+    let depth = 1;
+    let cursor = nextBrace + 1;
+    while (cursor < css.length && depth > 0) {
+      if (css[cursor] === '{') depth += 1;
+      if (css[cursor] === '}') depth -= 1;
+      cursor += 1;
+    }
+
+    index = cursor;
+  }
+
+  return output;
+};
+
 const toLegacyColor = (color) => {
   try {
     const result = transform({
@@ -74,6 +107,9 @@ const toLegacyColor = (color) => {
     return null;
   }
 };
+
+const replaceModernColors = (css) =>
+  css.replace(/oklch\([^)]+\)/g, (color) => toLegacyColor(color) ?? color);
 
 const buildFallbackVariables = (css) => {
   const declarations = [];
@@ -99,9 +135,16 @@ const inlineCompatCss = () => {
 
   const cssPath = join(packageDir, 'assets', cssFile);
   const sourceCss = readFileSync(cssPath, 'utf8');
+  const legacyCss = removeAtRuleBlocks(
+    removeAtRuleBlocks(
+      replaceModernColors(unwrapLayerRules(sourceCss)).replace(/ in oklab/g, ''),
+      '@supports',
+    ),
+    '@property',
+  );
   const compatCss = [
     buildFallbackVariables(sourceCss),
-    unwrapLayerRules(sourceCss),
+    legacyCss,
     `
 html,body,#root{width:100%;height:100%;overflow:hidden;background:#030712;}
 body{position:fixed;inset:0;}

@@ -1182,11 +1182,11 @@ export const useGameLoop = () => {
     // Center on core after first measurement so all devices start with the same view
     centerCameraOnCore(stateRef.current, cameraRef.current, viewportRef.current);
     const deferredResize = () => updateCanvasSize();
-    const ro = new ResizeObserver(deferredResize);
-    ro.observe(canvas);
+    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(deferredResize);
+    ro?.observe(canvas);
     window.addEventListener('resize', deferredResize);
     return () => {
-      ro.disconnect();
+      ro?.disconnect();
       window.removeEventListener('resize', deferredResize);
     };
   }, []);
