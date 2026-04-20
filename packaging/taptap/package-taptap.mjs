@@ -128,7 +128,7 @@ const buildFallbackVariables = (css) => {
   return declarations.length > 0 ? `:root{${declarations.join(';')}}\n` : '';
 };
 
-const inlineCompatCss = () => {
+const writeCompatCss = () => {
   const htmlPath = join(packageDir, 'index.html');
   const cssFile = findAsset('.css');
   if (!cssFile) throw new Error('CSS asset not found in dist/assets.');
@@ -160,19 +160,16 @@ body{position:fixed;inset:0;}
 `,
   ].join('\n');
 
+  writeFileSync(cssPath, compatCss);
+
   let html = readFileSync(htmlPath, 'utf8');
-  html = html.replace(
-    /\s*<link rel="stylesheet"[^>]*href="\.\/assets\/[^"]+\.css"[^>]*>/,
-    `\n    <style>\n${compatCss}\n    </style>`,
-  );
   html = html.replace(/ crossorigin/g, '');
 
-  if (!html.includes('<style>')) {
-    throw new Error('Failed to inline CSS into index.html.');
+  if (!html.includes(`href="./assets/${cssFile}"`)) {
+    throw new Error('CSS link not found in index.html.');
   }
 
   writeFileSync(htmlPath, html);
-  rmSync(cssPath);
 };
 
 if (!existsSync(distDir)) {
@@ -184,7 +181,7 @@ rmSync(zipPath, { force: true });
 mkdirSync(packageDir, { recursive: true });
 cpSync(distDir, packageDir, { recursive: true });
 
-inlineCompatCss();
+writeCompatCss();
 
 execFileSync('zip', ['-r', zipPath, packageDirName], {
   cwd: workDir,
