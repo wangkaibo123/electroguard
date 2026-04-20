@@ -100,7 +100,10 @@ export const useGameLoop = () => {
   const mouseDownPosRef = useRef<{ x: number; y: number } | null>(null);
   const rotStartAngleRef = useRef(0);
   const lastTimeRef = useRef(0);
+  const lastLoopRunAtRef = useRef(0);
+  const gameLoopRafRef = useRef<number | null>(null);
   const renderRequestRef = useRef<number | null>(null);
+  const renderRequestFallbackRef = useRef<number | null>(null);
 
   const cameraRef = useRef(createInitialCamera());
   const cameraTransitionRef = useRef<{
@@ -212,10 +215,25 @@ export const useGameLoop = () => {
 
   const requestRender = () => {
     if (renderRequestRef.current !== null) return;
+    if (renderRequestFallbackRef.current !== null) {
+      window.clearTimeout(renderRequestFallbackRef.current);
+    }
     renderRequestRef.current = requestAnimationFrame(() => {
       renderRequestRef.current = null;
+      if (renderRequestFallbackRef.current !== null) {
+        window.clearTimeout(renderRequestFallbackRef.current);
+        renderRequestFallbackRef.current = null;
+      }
       renderScene();
     });
+    renderRequestFallbackRef.current = window.setTimeout(() => {
+      renderRequestFallbackRef.current = null;
+      if (renderRequestRef.current !== null) {
+        cancelAnimationFrame(renderRequestRef.current);
+        renderRequestRef.current = null;
+      }
+      renderScene();
+    }, 34);
   };
 
   const sync = () => {
@@ -1299,9 +1317,10 @@ export const useGameLoop = () => {
   };
 
   // 鈹€鈹€ Game loop 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
-  const gameLoop = useCallback((time: number) => {
+  const stepGameLoop = useCallback((time: number) => {
+    lastLoopRunAtRef.current = performance.now();
     if (!lastTimeRef.current) lastTimeRef.current = time;
-    const dt = (time - lastTimeRef.current) / 1000;
+    const dt = Math.min((time - lastTimeRef.current) / 1000, 0.1);
     lastTimeRef.current = time;
     const state = stateRef.current;
 
@@ -1342,16 +1361,29 @@ export const useGameLoop = () => {
     // 鈹€鈹€ Render 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
     renderScene();
 
-    requestAnimationFrame(gameLoop);
   }, []);
 
+  const gameLoop = useCallback((time: number) => {
+    stepGameLoop(time);
+    gameLoopRafRef.current = requestAnimationFrame(gameLoop);
+  }, [stepGameLoop]);
+
   useEffect(() => {
-    const id = requestAnimationFrame(gameLoop);
+    gameLoopRafRef.current = requestAnimationFrame(gameLoop);
+    const fallbackId = window.setInterval(() => {
+      const now = performance.now();
+      if (now - lastLoopRunAtRef.current > 30) stepGameLoop(now);
+    }, 33);
     return () => {
-      cancelAnimationFrame(id);
+      if (gameLoopRafRef.current !== null) cancelAnimationFrame(gameLoopRafRef.current);
+      gameLoopRafRef.current = null;
+      window.clearInterval(fallbackId);
       if (renderRequestRef.current !== null) cancelAnimationFrame(renderRequestRef.current);
+      if (renderRequestFallbackRef.current !== null) {
+        window.clearTimeout(renderRequestFallbackRef.current);
+      }
     };
-  }, [gameLoop]);
+  }, [gameLoop, stepGameLoop]);
 
   // 鈹€鈹€ Adaptive canvas resolution (CSS size + DPR backing store) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
   useEffect(() => {
