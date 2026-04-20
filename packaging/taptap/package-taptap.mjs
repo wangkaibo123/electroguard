@@ -13,10 +13,11 @@ import { Features, transform } from 'lightningcss';
 
 const rootDir = process.cwd();
 const distDir = join(rootDir, 'dist');
-const workDir = join(rootDir, '.taptap_upload');
+const outputDir = join(rootDir, 'packaging', 'taptap');
+const workDir = join(outputDir, 'tap_upload');
 const packageDirName = 'electroguard-h5';
 const packageDir = join(workDir, packageDirName);
-const zipPath = join(rootDir, 'electroguard-h5-taptap.zip');
+const zipPath = join(outputDir, 'electroguard-h5-taptap.zip');
 
 const findAsset = (ext) => {
   const assetsDir = join(packageDir, 'assets');
@@ -146,7 +147,5 @@ execFileSync('zip', ['-r', zipPath, packageDirName], {
   cwd: workDir,
   stdio: 'inherit',
 });
-
-rmSync(workDir, { recursive: true, force: true });
 
 console.log(`TapTap package written to ${zipPath}`);
