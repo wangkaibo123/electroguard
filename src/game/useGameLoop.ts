@@ -122,6 +122,9 @@ export const useGameLoop = () => {
   // Pan state
   const isPanningRef = useRef(false);
   const panLastRef = useRef<{ x: number; y: number } | null>(null);
+  const activePointersRef = useRef(new Map<number, { sx: number; sy: number; clientX: number; clientY: number; pointerType: string }>());
+  const lastPointerPinchDistRef = useRef<number | null>(null);
+  const lastPointerEventAtRef = useRef(0);
 
   // Drag cancel state
   const dragOrigPosRef = useRef<{ x: number; y: number } | null>(null);
@@ -594,6 +597,35 @@ export const useGameLoop = () => {
     const r = canvasRef.current?.getBoundingClientRect();
     return r ? { sx: e.clientX - r.left, sy: e.clientY - r.top } : null;
   };
+  const markPointerInput = () => {
+    lastPointerEventAtRef.current = performance.now();
+  };
+
+  const shouldIgnoreLegacyInput = () => performance.now() - lastPointerEventAtRef.current < 800;
+
+  const pointerScreenXY = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const r = canvasRef.current?.getBoundingClientRect();
+    return r ? { sx: e.clientX - r.left, sy: e.clientY - r.top } : null;
+  };
+
+  const getPointerHitOptions = (pointerType: string) => ({
+    wireHitRadius: pointerType === 'mouse' ? 11 : 18,
+    touchPadding: pointerType === 'mouse' ? undefined : 8,
+    panWhenNotPlaying: pointerType === 'mouse' ? 'pick' as const : 'always' as const,
+  });
+
+  const getPointerPinch = () => {
+    const points = Array.from(activePointersRef.current.values());
+    if (points.length < 2) return null;
+    const [a, b] = points;
+    const dx = a.clientX - b.clientX;
+    const dy = a.clientY - b.clientY;
+    return {
+      dist: Math.hypot(dx, dy),
+      sx: (a.sx + b.sx) / 2,
+      sy: (a.sy + b.sy) / 2,
+    };
+  };
 
   const toWorld = (sx: number, sy: number) => {
     return screenToWorld(cameraRef.current, sx, sy);
@@ -816,6 +848,7 @@ export const useGameLoop = () => {
   };
 
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (shouldIgnoreLegacyInput()) return;
     if (isCameraTransitioningRef.current) return;
     const spos = canvasScreenXY(e);
     if (!spos) return;
@@ -830,6 +863,7 @@ export const useGameLoop = () => {
   };
 
   const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (shouldIgnoreLegacyInput()) return;
     if (isCameraTransitioningRef.current) return;
     const spos = canvasScreenXY(e);
     if (!spos) return;
@@ -862,6 +896,7 @@ export const useGameLoop = () => {
   };
 
   const handleCanvasMouseUp = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (shouldIgnoreLegacyInput()) return;
     if (isCameraTransitioningRef.current) return;
     const spos = canvasScreenXY(e);
     const world = spos ? toWorld(spos.sx, spos.sy) : null;
@@ -876,6 +911,133 @@ export const useGameLoop = () => {
     isRotKnobRef.current = false;
     isPanningRef.current = false;
     panLastRef.current = null;
+    activePointersRef.current.clear();
+    lastPointerPinchDistRef.current = null;
+  };
+
+  const handleCanvasPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    markPointerInput();
+    e.preventDefault();
+    if (isCameraTransitioningRef.current) return;
+    const spos = pointerScreenXY(e);
+    if (!spos) return;
+
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    activePointersRef.current.set(e.pointerId, {
+      ...spos,
+      clientX: e.clientX,
+      clientY: e.clientY,
+      pointerType: e.pointerType,
+    });
+
+    if (activePointersRef.current.size >= 2) {
+      cancelTowerDrag();
+      clearWireDragState();
+      isRotKnobRef.current = false;
+      isPanningRef.current = false;
+      panLastRef.current = null;
+      mouseDownPosRef.current = null;
+      const pinch = getPointerPinch();
+      lastPointerPinchDistRef.current = pinch?.dist ?? null;
+      return;
+    }
+
+    if (e.button === 2) {
+      startPanning(spos.sx, spos.sy);
+      return;
+    }
+
+    handlePrimaryPointerDown(spos.sx, spos.sy, getPointerHitOptions(e.pointerType));
+  };
+
+  const handleCanvasPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    markPointerInput();
+    e.preventDefault();
+    if (isCameraTransitioningRef.current) return;
+    const spos = pointerScreenXY(e);
+    if (!spos) return;
+
+    if (activePointersRef.current.has(e.pointerId)) {
+      activePointersRef.current.set(e.pointerId, {
+        ...spos,
+        clientX: e.clientX,
+        clientY: e.clientY,
+        pointerType: e.pointerType,
+      });
+    }
+
+    const pinch = getPointerPinch();
+    if (pinch) {
+      const cam = cameraRef.current;
+      const previousDist = lastPointerPinchDistRef.current ?? pinch.dist;
+      const wx = pinch.sx / cam.zoom + cam.x;
+      const wy = pinch.sy / cam.zoom + cam.y;
+      const factor = previousDist > 0 ? pinch.dist / previousDist : 1;
+      const minZoom = getMinZoom(viewportRef.current, stateRef.current);
+      cam.zoom = Math.max(minZoom, Math.min(MAX_ZOOM, cam.zoom * factor));
+      cam.x = wx - pinch.sx / cam.zoom;
+      cam.y = wy - pinch.sy / cam.zoom;
+      clampCamera(cam, viewportRef.current, stateRef.current);
+      lastPointerPinchDistRef.current = pinch.dist;
+      return;
+    }
+
+    lastPointerPinchDistRef.current = null;
+
+    if (isPanningRef.current && panLastRef.current) {
+      const cam = cameraRef.current;
+      cam.x -= (spos.sx - panLastRef.current.x) / cam.zoom;
+      cam.y -= (spos.sy - panLastRef.current.y) / cam.zoom;
+      clampCamera(cam, viewportRef.current, stateRef.current);
+      panLastRef.current = { x: spos.sx, y: spos.sy };
+      return;
+    }
+
+    const state = stateRef.current;
+    if (state.status !== 'playing') return;
+    const { wx, wy } = toWorld(spos.sx, spos.sy);
+    mousePxRef.current = { x: wx, y: wy };
+
+    hoverRef.current = getHoverCell(state, wx, wy);
+
+    if (dragWireStartRef.current) {
+      dragWirePathRef.current = previewWirePath(state, dragWireStartRef.current, wx, wy, e.pointerType === 'mouse' ? 15 : 20);
+    }
+
+    if (dragTowerRef.current && moveDraggedTower(state, dragTowerRef.current, wx, wy)) {
+      sync();
+    }
+  };
+
+  const handleCanvasPointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    markPointerInput();
+    e.preventDefault();
+    if (isCameraTransitioningRef.current) return;
+
+    const wasPinching = lastPointerPinchDistRef.current !== null || activePointersRef.current.size > 1;
+    activePointersRef.current.delete(e.pointerId);
+    e.currentTarget.releasePointerCapture?.(e.pointerId);
+
+    if (wasPinching) {
+      if (activePointersRef.current.size < 2) lastPointerPinchDistRef.current = null;
+      return;
+    }
+
+    const spos = pointerScreenXY(e);
+    const world = spos ? toWorld(spos.sx, spos.sy) : null;
+    finishPrimaryPointer(
+      world ? { x: world.wx, y: world.wy } : mousePxRef.current,
+      e.pointerType === 'mouse' ? 15 : 20,
+      e.pointerType === 'mouse',
+    );
+  };
+
+  const handleCanvasPointerCancel = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    markPointerInput();
+    e.preventDefault();
+    activePointersRef.current.delete(e.pointerId);
+    lastPointerPinchDistRef.current = null;
+    handleCanvasMouseLeave();
   };
 
   const handleCanvasWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
@@ -916,6 +1078,8 @@ export const useGameLoop = () => {
     isPanningRef.current = false;
     panLastRef.current = null;
     lastPinchDistRef.current = null;
+    activePointersRef.current.clear();
+    lastPointerPinchDistRef.current = null;
   };
 
   const focusCameraOnWorld = useCallback((
@@ -963,6 +1127,7 @@ export const useGameLoop = () => {
   };
 
   const handleCanvasTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (shouldIgnoreLegacyInput()) return;
     e.preventDefault();
     if (isCameraTransitioningRef.current) return;
     if (e.touches.length === 2) {
@@ -985,6 +1150,7 @@ export const useGameLoop = () => {
   };
 
   const handleCanvasTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (shouldIgnoreLegacyInput()) return;
     e.preventDefault();
     if (isCameraTransitioningRef.current) return;
     // Pinch zoom
@@ -1043,6 +1209,7 @@ export const useGameLoop = () => {
   };
 
   const handleCanvasTouchEnd = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (shouldIgnoreLegacyInput()) return;
     e.preventDefault();
     if (isCameraTransitioningRef.current) return;
     // End pinch
@@ -1270,6 +1437,7 @@ export const useGameLoop = () => {
     selectedTower, setSelectedTower, placeMonsterMode, setPlaceMonsterMode, skipToNextWave, toastMessage,
     selectedMonsterType, setSelectedMonsterType, staticMonster, setStaticMonster,
     isTowerDragging,
+    handleCanvasPointerDown, handleCanvasPointerMove, handleCanvasPointerUp, handleCanvasPointerCancel,
     handleCanvasMouseDown, handleCanvasMouseMove, handleCanvasMouseUp, handleCanvasMouseLeave,
     handleCanvasWheel, handleCanvasContextMenu,
     handleCanvasTouchStart, handleCanvasTouchMove, handleCanvasTouchEnd,

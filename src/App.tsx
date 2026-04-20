@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode, type TouchEvent as ReactTouchEvent } from 'react';
+import { useState, useEffect, useRef, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type TouchEvent as ReactTouchEvent } from 'react';
 import { Activity, BookOpen, Cable, Coins, Globe, Keyboard, LogOut, Pause, Play, RotateCcw, Wrench, X } from 'lucide-react';
 import { useGameLoop } from './game/useGameLoop';
 import type { CodexEntryType, GameState, TowerType } from './game/types';
@@ -168,6 +168,10 @@ export default function App() {
     setStaticMonster,
     skipToNextWave,
     toastMessage,
+    handleCanvasPointerDown,
+    handleCanvasPointerMove,
+    handleCanvasPointerUp,
+    handleCanvasPointerCancel,
     handleCanvasMouseDown,
     handleCanvasMouseMove,
     handleCanvasMouseUp,
@@ -640,6 +644,25 @@ export default function App() {
     }
     handleCanvasTouchStart(event);
   };
+
+  const handleTutorialCanvasPointerDown = (event: ReactPointerEvent<HTMLCanvasElement>) => {
+    if (tutorialInputLocked) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+    if (event.button === 0 && blockWireDragBeforeWireTutorial(event.clientX, event.clientY, event.pointerType === 'mouse' ? 15 : 20)) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+    if (event.button === 0 && blockMachineDragDuringWireTutorial(event.clientX, event.clientY, event.pointerType === 'mouse' ? 15 : 20)) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+    handleCanvasPointerDown(event);
+  };
   const activeToastMessage = toastMessage ?? tutorialToastMessage;
 
   return (
@@ -730,6 +753,10 @@ export default function App() {
           <div className="relative rounded-xl overflow-hidden shadow-[0_0_30px_rgba(0,0,0,0.6)] bg-gray-900 w-full h-full">
             <canvas
               ref={canvasRef}
+              onPointerDown={handleTutorialCanvasPointerDown}
+              onPointerMove={handleCanvasPointerMove}
+              onPointerUp={handleCanvasPointerUp}
+              onPointerCancel={handleCanvasPointerCancel}
               onMouseDown={handleTutorialCanvasMouseDown}
               onMouseMove={handleCanvasMouseMove}
               onMouseUp={handleCanvasMouseUp}
