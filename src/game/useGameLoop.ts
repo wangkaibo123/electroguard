@@ -100,6 +100,7 @@ export const useGameLoop = () => {
   const mouseDownPosRef = useRef<{ x: number; y: number } | null>(null);
   const rotStartAngleRef = useRef(0);
   const lastTimeRef = useRef(0);
+  const renderRequestRef = useRef<number | null>(null);
 
   const cameraRef = useRef(createInitialCamera());
   const cameraTransitionRef = useRef<{
@@ -165,7 +166,62 @@ export const useGameLoop = () => {
     toastTimerRef.current = setTimeout(() => setToastMessage(null), durationMs);
   };
 
-  const sync = () => setGameState({ ...stateRef.current });
+  const renderScene = () => {
+    const pending = pendingCanvasSizeRef.current;
+    if (pending && canvasRef.current) {
+      const c = canvasRef.current;
+      if (c.width !== pending.pw) c.width = pending.pw;
+      if (c.height !== pending.ph) c.height = pending.ph;
+      viewportRef.current = { width: pending.w, height: pending.h };
+      const cam = cameraRef.current;
+      const minZoom = getMinZoom(viewportRef.current, stateRef.current);
+      if (cam.zoom < minZoom) cam.zoom = minZoom;
+      clampCamera(cam, viewportRef.current, stateRef.current);
+      pendingCanvasSizeRef.current = null;
+    }
+    const ctx = canvasRef.current?.getContext('2d');
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const state = stateRef.current;
+    const vp = viewportRef.current;
+    const hover = hoverRef.current;
+    const sel = selectedTowerRef.current;
+    renderGame(
+      ctx, state, vp.width, vp.height, cameraRef.current,
+      hover, sel,
+      hover && sel ? canPlace(hover.x, hover.y, sel, state) : false,
+      dragWireStartRef.current,
+      mousePxRef.current,
+      dragWirePathRef.current,
+      dragTowerRef.current,
+      rotatingRef.current,
+      placeMonsterModeRef.current && mousePxRef.current
+        ? {
+            x: mousePxRef.current.x,
+            y: mousePxRef.current.y,
+            enemyType: selectedMonsterTypeRef.current,
+            isStatic: staticMonsterRef.current,
+          }
+        : null,
+      activeCommandCardRef.current,
+      activeRepairRef.current,
+    );
+  };
+
+  const requestRender = () => {
+    if (renderRequestRef.current !== null) return;
+    renderRequestRef.current = requestAnimationFrame(() => {
+      renderRequestRef.current = null;
+      renderScene();
+    });
+  };
+
+  const sync = () => {
+    setGameState({ ...stateRef.current });
+    requestRender();
+  };
 
   const cancelTowerDrag = () => {
     if (dragTowerRef.current && dragOrigPosRef.current) {
@@ -505,11 +561,13 @@ export const useGameLoop = () => {
     dragOrigPosRef.current = null;
     dragOrigWiresRef.current = null;
     setIsTowerDragging(false);
+    requestRender();
   };
 
   const clearWireDragState = () => {
     dragWireStartRef.current = null;
     dragWirePathRef.current = null;
+    requestRender();
   };
 
   const commitWireDrag = (state: GameState, pointer: { x: number; y: number }, hitRadius: number) => {
@@ -728,6 +786,7 @@ export const useGameLoop = () => {
   const startPanning = (sx: number, sy: number) => {
     isPanningRef.current = true;
     panLastRef.current = { x: sx, y: sy };
+    requestRender();
   };
 
   const handlePrimaryPointerDown = (
@@ -821,6 +880,7 @@ export const useGameLoop = () => {
     if (isPanningRef.current) {
       isPanningRef.current = false;
       panLastRef.current = null;
+      requestRender();
       return;
     }
 
@@ -876,6 +936,7 @@ export const useGameLoop = () => {
       cam.y -= (sy - panLastRef.current.y) / cam.zoom;
       clampCamera(cam, viewportRef.current, stateRef.current);
       panLastRef.current = { x: sx, y: sy };
+      requestRender();
       return;
     }
 
@@ -889,6 +950,7 @@ export const useGameLoop = () => {
     if (dragWireStartRef.current) {
       dragWirePathRef.current = previewWirePath(state, dragWireStartRef.current, wx, wy, 15);
     }
+    requestRender();
 
     if (dragTowerRef.current && moveDraggedTower(state, dragTowerRef.current, wx, wy)) {
       sync();
@@ -913,6 +975,7 @@ export const useGameLoop = () => {
     panLastRef.current = null;
     activePointersRef.current.clear();
     lastPointerPinchDistRef.current = null;
+    requestRender();
   };
 
   const handleCanvasPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -979,6 +1042,7 @@ export const useGameLoop = () => {
       cam.y = wy - pinch.sy / cam.zoom;
       clampCamera(cam, viewportRef.current, stateRef.current);
       lastPointerPinchDistRef.current = pinch.dist;
+      requestRender();
       return;
     }
 
@@ -990,6 +1054,7 @@ export const useGameLoop = () => {
       cam.y -= (spos.sy - panLastRef.current.y) / cam.zoom;
       clampCamera(cam, viewportRef.current, stateRef.current);
       panLastRef.current = { x: spos.sx, y: spos.sy };
+      requestRender();
       return;
     }
 
@@ -1003,6 +1068,7 @@ export const useGameLoop = () => {
     if (dragWireStartRef.current) {
       dragWirePathRef.current = previewWirePath(state, dragWireStartRef.current, wx, wy, e.pointerType === 'mouse' ? 15 : 20);
     }
+    requestRender();
 
     if (dragTowerRef.current && moveDraggedTower(state, dragTowerRef.current, wx, wy)) {
       sync();
@@ -1061,6 +1127,7 @@ export const useGameLoop = () => {
     cam.x = wx - sx / cam.zoom;
     cam.y = wy - sy / cam.zoom;
     clampCamera(cam, viewportRef.current, stateRef.current);
+    requestRender();
   };
 
   const handleCanvasContextMenu = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -1080,6 +1147,7 @@ export const useGameLoop = () => {
     lastPinchDistRef.current = null;
     activePointersRef.current.clear();
     lastPointerPinchDistRef.current = null;
+    requestRender();
   };
 
   const focusCameraOnWorld = useCallback((
@@ -1103,6 +1171,7 @@ export const useGameLoop = () => {
       Math.hypot(cam.x - next.x, cam.y - next.y) < 1 &&
       Math.abs(cam.zoom - next.zoom) < 0.005
     ) {
+      requestRender();
       return;
     }
 
@@ -1119,6 +1188,7 @@ export const useGameLoop = () => {
     };
     isCameraTransitioningRef.current = true;
     setIsCameraTransitioning(true);
+    requestRender();
   }, []);
 
   const touchScreenXY = (touch: React.Touch) => {
@@ -1136,6 +1206,7 @@ export const useGameLoop = () => {
       const dy = e.touches[0].clientY - e.touches[1].clientY;
       lastPinchDistRef.current = Math.hypot(dx, dy);
       isPanningRef.current = false;
+      requestRender();
       return;
     }
     if (e.touches.length !== 1) return;
@@ -1174,6 +1245,7 @@ export const useGameLoop = () => {
         clampCamera(cam, viewportRef.current, stateRef.current);
       }
       lastPinchDistRef.current = dist;
+      requestRender();
       return;
     }
     if (e.touches.length !== 1) return;
@@ -1189,6 +1261,7 @@ export const useGameLoop = () => {
       cam.y -= (sy - panLastRef.current.y) / cam.zoom;
       clampCamera(cam, viewportRef.current, stateRef.current);
       panLastRef.current = { x: sx, y: sy };
+      requestRender();
       return;
     }
 
@@ -1202,6 +1275,7 @@ export const useGameLoop = () => {
     if (dragWireStartRef.current) {
       dragWirePathRef.current = previewWirePath(state, dragWireStartRef.current, wx, wy, 20);
     }
+    requestRender();
 
     if (dragTowerRef.current && moveDraggedTower(state, dragTowerRef.current, wx, wy)) {
       sync();
@@ -1266,53 +1340,17 @@ export const useGameLoop = () => {
     }
 
     // 鈹€鈹€ Render 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
-    const pending = pendingCanvasSizeRef.current;
-    if (pending && canvasRef.current) {
-      const c = canvasRef.current;
-      if (c.width !== pending.pw) c.width = pending.pw;
-      if (c.height !== pending.ph) c.height = pending.ph;
-      viewportRef.current = { width: pending.w, height: pending.h };
-      const cam = cameraRef.current;
-      const minZoom = getMinZoom(viewportRef.current, stateRef.current);
-      if (cam.zoom < minZoom) cam.zoom = minZoom;
-      clampCamera(cam, viewportRef.current, stateRef.current);
-      pendingCanvasSizeRef.current = null;
-    }
-    const ctx = canvasRef.current?.getContext('2d');
-    if (ctx) {
-      const dpr = window.devicePixelRatio || 1;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const vp = viewportRef.current;
-      const hover = hoverRef.current;
-      const sel = selectedTowerRef.current;
-      renderGame(
-        ctx, state, vp.width, vp.height, cameraRef.current,
-        hover, sel,
-        hover && sel ? canPlace(hover.x, hover.y, sel, state) : false,
-        dragWireStartRef.current,
-        mousePxRef.current,
-        dragWirePathRef.current,
-        dragTowerRef.current,
-        rotatingRef.current,
-        placeMonsterModeRef.current && mousePxRef.current
-          ? {
-              x: mousePxRef.current.x,
-              y: mousePxRef.current.y,
-              enemyType: selectedMonsterTypeRef.current,
-              isStatic: staticMonsterRef.current,
-            }
-          : null,
-        activeCommandCardRef.current,
-        activeRepairRef.current,
-      );
-    }
+    renderScene();
 
     requestAnimationFrame(gameLoop);
   }, []);
 
   useEffect(() => {
     const id = requestAnimationFrame(gameLoop);
-    return () => cancelAnimationFrame(id);
+    return () => {
+      cancelAnimationFrame(id);
+      if (renderRequestRef.current !== null) cancelAnimationFrame(renderRequestRef.current);
+    };
   }, [gameLoop]);
 
   // 鈹€鈹€ Adaptive canvas resolution (CSS size + DPR backing store) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
