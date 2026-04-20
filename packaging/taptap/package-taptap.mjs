@@ -128,6 +128,16 @@ const buildFallbackVariables = (css) => {
   return declarations.length > 0 ? `:root{${declarations.join(';')}}\n` : '';
 };
 
+const injectHeadAsset = (html, assetHtml) => {
+  if (html.includes(assetHtml)) return html;
+  const scriptIndex = html.indexOf('    <script ');
+  if (scriptIndex !== -1) {
+    return `${html.slice(0, scriptIndex)}${assetHtml}\n${html.slice(scriptIndex)}`;
+  }
+
+  return html.replace('</head>', `${assetHtml}\n  </head>`);
+};
+
 const writeCompatCss = () => {
   const htmlPath = join(packageDir, 'index.html');
   const cssFile = findAsset('.css');
@@ -165,9 +175,15 @@ body{position:fixed;inset:0;}
   let html = readFileSync(htmlPath, 'utf8');
   html = html.replace(/ crossorigin/g, '');
 
-  if (!html.includes(`href="./assets/${cssFile}"`)) {
-    throw new Error('CSS link not found in index.html.');
-  }
+  html = html.replace(
+    /\s*<link rel="stylesheet"[^>]*href="\.\/assets\/[^"]+\.css"[^>]*>/,
+    '',
+  );
+  html = injectHeadAsset(html, `    <link rel="stylesheet" href="./assets/${cssFile}">`);
+  html = injectHeadAsset(
+    html,
+    `    <style id="tap-h5-compat-css" data-build="tap-h5-css-dual">\n${compatCss}\n    </style>`,
+  );
 
   writeFileSync(htmlPath, html);
 };
