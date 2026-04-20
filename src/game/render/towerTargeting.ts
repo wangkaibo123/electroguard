@@ -2,6 +2,7 @@ import { COMMAND_CARD_CONFIG } from '../config';
 import { canUseCommandCardOnTower } from '../commandCards';
 import { CELL_SIZE, CommandCardType, GameState, Tower, getCanvasHeight, getCanvasWidth } from '../types';
 import { TWO_PI } from './constants';
+import { addRoundedRectPath } from './helpers';
 
 const drawTowerTargeting = (
   ctx: CanvasRenderingContext2D,
@@ -19,19 +20,21 @@ const drawTowerTargeting = (
   const outlinePad = compact ? 2 : 8;
   const haloScale = compact ? 0.62 : 0.9;
 
-  ctx.save();
-  const mask = new Path2D();
-  mask.rect(0, 0, getCanvasWidth(state), getCanvasHeight(state));
-  for (const tower of targets) {
-    const px = tower.x * CELL_SIZE;
-    const py = tower.y * CELL_SIZE;
-    const tw = tower.width * CELL_SIZE;
-    const th = tower.height * CELL_SIZE;
-    mask.roundRect(px - maskPad, py - maskPad, tw + maskPad * 2, th + maskPad * 2, 6);
+  if (typeof Path2D !== 'undefined') {
+    ctx.save();
+    const mask = new Path2D();
+    mask.rect(0, 0, getCanvasWidth(state), getCanvasHeight(state));
+    for (const tower of targets) {
+      const px = tower.x * CELL_SIZE;
+      const py = tower.y * CELL_SIZE;
+      const tw = tower.width * CELL_SIZE;
+      const th = tower.height * CELL_SIZE;
+      addRoundedRectPath(mask as unknown as CanvasRenderingContext2D, px - maskPad, py - maskPad, tw + maskPad * 2, th + maskPad * 2, 6);
+    }
+    ctx.fillStyle = 'rgba(2, 6, 23, 0.58)';
+    ctx.fill(mask, 'evenodd');
+    ctx.restore();
   }
-  ctx.fillStyle = 'rgba(2, 6, 23, 0.58)';
-  ctx.fill(mask, 'evenodd');
-  ctx.restore();
 
   for (const tower of targets) {
     const px = tower.x * CELL_SIZE;

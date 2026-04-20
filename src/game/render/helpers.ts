@@ -8,6 +8,54 @@ export const FLASH_DUR_GATLING = 100;
 export const FLASH_DUR_SNIPER = 250;
 export const FLASH_DUR_TESLA = 300;
 
+type RoundedRectPathTarget = Pick<
+  CanvasRenderingContext2D,
+  'moveTo' | 'lineTo' | 'quadraticCurveTo' | 'closePath'
+>;
+
+export const addRoundedRectPath = (
+  target: RoundedRectPathTarget,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+) => {
+  const r = Math.max(0, Math.min(radius, Math.abs(width) / 2, Math.abs(height) / 2));
+  const right = x + width;
+  const bottom = y + height;
+
+  target.moveTo(x + r, y);
+  target.lineTo(right - r, y);
+  target.quadraticCurveTo(right, y, right, y + r);
+  target.lineTo(right, bottom - r);
+  target.quadraticCurveTo(right, bottom, right - r, bottom);
+  target.lineTo(x + r, bottom);
+  target.quadraticCurveTo(x, bottom, x, bottom - r);
+  target.lineTo(x, y + r);
+  target.quadraticCurveTo(x, y, x + r, y);
+  target.closePath();
+};
+
+export const addEllipsePath = (
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  radiusX: number,
+  radiusY: number,
+  rotation: number,
+  startAngle: number,
+  endAngle: number,
+  counterclockwise = false,
+) => {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rotation);
+  ctx.scale(radiusX, radiusY);
+  ctx.arc(0, 0, 1, startAngle, endAngle, counterclockwise);
+  ctx.restore();
+};
+
 export const drawPowerArc = (ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, maxPower: number, storedPower: number, color = PULSE_CLR) => {
   if (maxPower <= 0 || storedPower <= 0) return;
   const arcPer = TWO_PI / maxPower;

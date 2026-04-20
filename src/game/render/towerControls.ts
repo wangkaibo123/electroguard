@@ -3,6 +3,7 @@ import { __iconNode as trash2IconNode } from 'lucide-react/dist/esm/icons/trash-
 import { getTowerSellPrice } from '../config';
 import { CELL_SIZE, GameState, Tower } from '../types';
 import { KNOB_CLR } from './constants';
+import { addRoundedRectPath } from './helpers';
 import { drawLucideIconNode, LucideIconNode } from './towerDrawingUtils';
 
 const ROTATION_KNOB_BASE_OFFSET = 20;
@@ -100,7 +101,7 @@ export const drawRotationKnob = (ctx: CanvasRenderingContext2D, state: GameState
   ctx.shadowBlur = 10;
   ctx.shadowOffsetY = 3;
   ctx.beginPath();
-  ctx.roundRect(buttonX, buttonY, buttonWidth, buttonHeight, 8);
+  addRoundedRectPath(ctx, buttonX, buttonY, buttonWidth, buttonHeight, 8);
   ctx.fill();
   ctx.shadowColor = 'transparent';
   ctx.shadowBlur = 0;
@@ -128,7 +129,7 @@ export const drawDeleteButton = (ctx: CanvasRenderingContext2D, state: GameState
   ctx.shadowBlur = 10;
   ctx.shadowOffsetY = 3;
   ctx.beginPath();
-  ctx.roundRect(buttonX, buttonY, buttonWidth, buttonHeight, 8);
+  addRoundedRectPath(ctx, buttonX, buttonY, buttonWidth, buttonHeight, 8);
   ctx.fill();
   ctx.shadowColor = 'transparent';
   ctx.shadowBlur = 0;

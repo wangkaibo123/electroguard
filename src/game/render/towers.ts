@@ -5,6 +5,7 @@ import { TWO_PI, UNPOWERED, PULSE_CLR, HP_BG, HP_FG, INSET } from './constants';
 import { getTowerCells } from '../footprint';
 import { drawFootprintCells } from './towerDrawingUtils';
 import { drawTowerDetails } from './towerDetails';
+import { addRoundedRectPath } from './helpers';
 
 export { drawPorts } from './towerPorts';
 export {
@@ -67,9 +68,9 @@ const drawCommandUpgradeMarks = (
   ctx.strokeStyle = 'rgba(10,14,26,0.9)';
   ctx.lineWidth = 1.5;
   for (let i = 0; i < count; i++) {
-    const x = startX + i * (markSize + gap);
-    ctx.beginPath();
-    ctx.roundRect(x, y, markSize, markSize, 1.5);
+      const x = startX + i * (markSize + gap);
+      ctx.beginPath();
+      addRoundedRectPath(ctx, x, y, markSize, markSize, 1.5);
     ctx.fill();
     ctx.stroke();
   }
@@ -135,6 +136,8 @@ export const drawTowers = (ctx: CanvasRenderingContext2D, state: GameState, now:
   const generatorPowerProgress = state.powerTimer / GLOBAL_CONFIG.powerInterval;
 
   for (const tower of state.towers) {
+    let towerTransformSaved = false;
+    try {
     const px = tower.x * CELL_SIZE, py = tower.y * CELL_SIZE;
     const tw = tower.width * CELL_SIZE, th = tower.height * CELL_SIZE;
     const cx = px + tw / 2, cy = py + th / 2;
@@ -142,6 +145,7 @@ export const drawTowers = (ctx: CanvasRenderingContext2D, state: GameState, now:
     const inset = (tower.width === 1 && tower.height === 1) ? 5 : INSET;
 
     ctx.save();
+    towerTransformSaved = true;
     ctx.translate(cx, cy);
     ctx.rotate(tower.rotation);
     ctx.translate(-cx, -cy);
@@ -158,7 +162,7 @@ export const drawTowers = (ctx: CanvasRenderingContext2D, state: GameState, now:
     if (tower.type === 'gatling') {
       const cr = 8;
       ctx.beginPath();
-      ctx.roundRect(visual.px + inset, visual.py + inset, visual.tw - inset * 2, visual.th - inset * 2, cr);
+      addRoundedRectPath(ctx, visual.px + inset, visual.py + inset, visual.tw - inset * 2, visual.th - inset * 2, cr);
       ctx.fill();
       ctx.stroke();
       ctx.strokeStyle = tColor; ctx.lineWidth = 1; ctx.globalAlpha = 0.4;
@@ -231,6 +235,7 @@ export const drawTowers = (ctx: CanvasRenderingContext2D, state: GameState, now:
     }
 
     ctx.restore();
+    towerTransformSaved = false;
 
     if (!tower.isRuined) drawCommandUpgradeMarks(ctx, tower, px, py, tw);
 
@@ -266,7 +271,12 @@ export const drawTowers = (ctx: CanvasRenderingContext2D, state: GameState, now:
         ctx.globalAlpha = 1;
       }
     }
+    } catch (error) {
+      if (towerTransformSaved) ctx.restore();
+      ctx.globalAlpha = 1;
+      ctx.shadowBlur = 0;
+      ctx.setLineDash([]);
+      console.warn('Tower render skipped after canvas error:', tower.type, error);
+    }
   }
 };
-
-

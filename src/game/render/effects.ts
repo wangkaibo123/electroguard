@@ -4,6 +4,7 @@ import {
   TWO_PI, WIRE_ON, WIRE_OFF, PULSE_CLR, PROJ_CLR, HP_BG, HP_FG,
   WIRE_LINE_WIDTH, portOutward, posOnPath,
 } from './constants';
+import { addEllipsePath, addRoundedRectPath } from './helpers';
 
 const GENERATOR_LAUNCH_EFFECT_RADIUS =
   Math.min(TOWER_STATS.generator.width, TOWER_STATS.generator.height) * CELL_SIZE * 0.48;
@@ -336,7 +337,7 @@ const drawRepairDroneModel = (
   ctx.strokeStyle = bodyColor;
   ctx.lineWidth = 1.4;
   ctx.beginPath();
-  ctx.roundRect(-7, -4, 14, 8, 3);
+  addRoundedRectPath(ctx, -7, -4, 14, 8, 3);
   ctx.fill();
   ctx.stroke();
 
@@ -361,7 +362,7 @@ const drawRepairDroneModel = (
     { x: 10, y: 9 },
   ]) {
     ctx.beginPath();
-    ctx.ellipse(rotor.x, rotor.y, 5 + pulse * 2, 1.5, rotorAngle, 0, TWO_PI);
+    addEllipsePath(ctx, rotor.x, rotor.y, 5 + pulse * 2, 1.5, rotorAngle, 0, TWO_PI);
     ctx.stroke();
   }
 
@@ -376,7 +377,7 @@ const drawRepairDroneModel = (
     ctx.shadowColor = '#fef08a';
     ctx.shadowBlur = 7;
     ctx.beginPath();
-    ctx.roundRect(-6.5, -3, 13, 6, 3);
+    addRoundedRectPath(ctx, -6.5, -3, 13, 6, 3);
     ctx.fill();
 
     ctx.fillStyle = '#fef08a';
@@ -385,7 +386,7 @@ const drawRepairDroneModel = (
     for (let i = 0; i < energy; i++) {
       const bx = -5.5 + i * 5.5;
       ctx.beginPath();
-      ctx.roundRect(bx, -2, 4, 4, 1);
+      addRoundedRectPath(ctx, bx, -2, 4, 4, 1);
       ctx.fill();
       ctx.stroke();
     }

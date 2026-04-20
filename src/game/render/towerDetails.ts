@@ -5,6 +5,7 @@ import {
   drawPowerArc, drawMuzzleFlash,
   FLASH_DUR_BLASTER, FLASH_DUR_GATLING, FLASH_DUR_SNIPER, FLASH_DUR_TESLA,
   SNIPER_COOLDOWN_MS,
+  addEllipsePath, addRoundedRectPath,
 } from './helpers';
 
 const ENERGY_EFFECT_SIZE = CELL_SIZE * 0.5;
@@ -221,7 +222,7 @@ const drawCapsuleBarrel = (
   ctx.strokeStyle = stroke;
   ctx.lineWidth = strokeWidth;
   ctx.beginPath();
-  ctx.roundRect(startDist, -halfWidth, len, halfWidth * 2, halfWidth);
+  addRoundedRectPath(ctx, startDist, -halfWidth, len, halfWidth * 2, halfWidth);
   ctx.fill();
   ctx.stroke();
   ctx.restore();
@@ -250,7 +251,7 @@ const drawBarrelBand = (
   ctx.strokeStyle = stroke;
   ctx.lineWidth = 1.2;
   ctx.beginPath();
-  ctx.roundRect(dist - width / 2, -halfWidth, width, halfWidth * 2, Math.min(halfWidth, 3));
+  addRoundedRectPath(ctx, dist - width / 2, -halfWidth, width, halfWidth * 2, Math.min(halfWidth, 3));
   ctx.fill();
   ctx.stroke();
   ctx.restore();
@@ -272,12 +273,12 @@ const drawMuzzleRing = (
   ctx.strokeStyle = stroke;
   ctx.lineWidth = 1.6;
   ctx.beginPath();
-  ctx.ellipse(0, 0, radius * 0.72, radius, 0, 0, TWO_PI);
+  addEllipsePath(ctx, 0, 0, radius * 0.72, radius, 0, 0, TWO_PI);
   ctx.fill();
   ctx.stroke();
   ctx.fillStyle = 'rgba(5,8,16,0.78)';
   ctx.beginPath();
-  ctx.ellipse(0, 0, radius * 0.34, radius * 0.48, 0, 0, TWO_PI);
+  addEllipsePath(ctx, 0, 0, radius * 0.34, radius * 0.48, 0, 0, TWO_PI);
   ctx.fill();
   ctx.restore();
 };
@@ -634,7 +635,7 @@ export function drawTowerDetails(
     ctx.strokeStyle = tColor;
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.roundRect(cx - span * 0.36, cy - span * 0.36, span * 0.72, span * 0.72, 6);
+    addRoundedRectPath(ctx, cx - span * 0.36, cy - span * 0.36, span * 0.72, span * 0.72, 6);
     ctx.stroke();
 
     for (let i = 0; i < 4; i++) {
@@ -651,7 +652,7 @@ export function drawTowerDetails(
       ctx.shadowColor = isLoaded ? '#fb7185' : 'transparent';
       ctx.shadowBlur = isLoaded ? 8 : 0;
       ctx.beginPath();
-      ctx.roundRect(sx - siloSize / 2, sy - siloSize / 2, siloSize, siloSize, 5);
+      addRoundedRectPath(ctx, sx - siloSize / 2, sy - siloSize / 2, siloSize, siloSize, 5);
       ctx.fill();
       ctx.stroke();
       ctx.shadowBlur = 0;

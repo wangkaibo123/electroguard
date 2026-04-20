@@ -36,7 +36,13 @@ export const drawLucideIconNode = (
 
   for (const [tag, attrs] of iconNode) {
     if (tag === 'path' && attrs.d) {
-      ctx.stroke(new Path2D(attrs.d));
+      if (typeof Path2D !== 'undefined') {
+        try {
+          ctx.stroke(new Path2D(attrs.d));
+        } catch {
+          // Some embedded WebViews expose Path2D but not SVG path-string parsing.
+        }
+      }
     } else if (tag === 'circle') {
       ctx.beginPath();
       ctx.arc(Number(attrs.cx), Number(attrs.cy), Number(attrs.r), 0, Math.PI * 2);
