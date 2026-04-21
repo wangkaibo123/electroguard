@@ -42,6 +42,8 @@ import {
 
 const { maxZoom: MAX_ZOOM } = GLOBAL_CONFIG;
 const COMMAND_CARD_TYPES = Object.keys(COMMAND_CARD_CONFIG) as CommandCardType[];
+const RAF_STALL_FALLBACK_MS = 120;
+const RAF_STALL_POLL_MS = 50;
 
 export const useGameLoop = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -101,6 +103,7 @@ export const useGameLoop = () => {
   const rotStartAngleRef = useRef(0);
   const lastTimeRef = useRef(0);
   const lastLoopRunAtRef = useRef(0);
+  const isGameLoopStepRef = useRef(false);
   const gameLoopRafRef = useRef<number | null>(null);
   const renderRequestRef = useRef<number | null>(null);
   const renderRequestFallbackRef = useRef<number | null>(null);
@@ -238,7 +241,7 @@ export const useGameLoop = () => {
 
   const sync = () => {
     setGameState({ ...stateRef.current });
-    requestRender();
+    if (!isGameLoopStepRef.current) requestRender();
   };
 
   const cancelTowerDrag = () => {
@@ -1318,6 +1321,7 @@ export const useGameLoop = () => {
 
   // 鈹€鈹€ Game loop 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
   const stepGameLoop = useCallback((time: number) => {
+    isGameLoopStepRef.current = true;
     lastLoopRunAtRef.current = performance.now();
     if (!lastTimeRef.current) lastTimeRef.current = time;
     const dt = Math.min((time - lastTimeRef.current) / 1000, 0.1);
@@ -1360,6 +1364,7 @@ export const useGameLoop = () => {
 
     // 鈹€鈹€ Render 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
     renderScene();
+    isGameLoopStepRef.current = false;
 
   }, []);
 
@@ -1372,8 +1377,8 @@ export const useGameLoop = () => {
     gameLoopRafRef.current = requestAnimationFrame(gameLoop);
     const fallbackId = window.setInterval(() => {
       const now = performance.now();
-      if (now - lastLoopRunAtRef.current > 30) stepGameLoop(now);
-    }, 33);
+      if (now - lastLoopRunAtRef.current > RAF_STALL_FALLBACK_MS) stepGameLoop(now);
+    }, RAF_STALL_POLL_MS);
     return () => {
       if (gameLoopRafRef.current !== null) cancelAnimationFrame(gameLoopRafRef.current);
       gameLoopRafRef.current = null;
