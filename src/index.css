@@ -1,5 +1,12 @@
 @import "tailwindcss";
 
+:root {
+  --app-top-safe-area: env(safe-area-inset-top, 0px);
+  --app-mini-top-clearance: 0px;
+  --app-top-offset: max(var(--app-top-safe-area), var(--app-mini-top-clearance));
+  --app-mini-menu-safe-right: 0px;
+}
+
 html {
   height: -webkit-fill-available;
 }
@@ -18,9 +25,21 @@ body {
 }
 
 .app-shell {
+  box-sizing: border-box;
   height: 100vh;
   height: -webkit-fill-available;
   height: 100dvh;
+  padding-top: var(--app-top-offset);
+}
+
+.top-stats-bar {
+  padding-right: max(0.5rem, calc(var(--app-mini-menu-safe-right) + 0.5rem));
+  min-height: 2.75rem;
+}
+
+.top-stat-item,
+.top-stats-actions {
+  white-space: nowrap;
 }
 
 .next-wave-button {
@@ -30,6 +49,11 @@ body {
 @media (max-width: 767px) and (orientation: portrait) {
   .app-title {
     display: none;
+  }
+
+  .top-stats-bar {
+    gap: 0.55rem;
+    min-height: 2.5rem;
   }
 }
 

@@ -109,6 +109,55 @@ const getIsMobileViewport = () => {
   return width < 768 || (shortSide < 520 && (hasTouch || coarsePointer || noHover));
 };
 
+const getMiniProgramMenuRect = () => {
+  const wx = (window as typeof window & {
+    wx?: {
+      getMenuButtonBoundingClientRect?: () => {
+        top?: number;
+        right?: number;
+        bottom?: number;
+        left?: number;
+        width?: number;
+        height?: number;
+      };
+      getSystemInfoSync?: () => {
+        statusBarHeight?: number;
+      };
+    };
+    __wxjs_environment?: string;
+  }).wx;
+
+  try {
+    return wx?.getMenuButtonBoundingClientRect?.() ?? null;
+  } catch {
+    return null;
+  }
+};
+
+const getMiniProgramStatusBarHeight = () => {
+  const wx = (window as typeof window & {
+    wx?: {
+      getSystemInfoSync?: () => {
+        statusBarHeight?: number;
+      };
+    };
+  }).wx;
+
+  try {
+    return wx?.getSystemInfoSync?.().statusBarHeight ?? 0;
+  } catch {
+    return 0;
+  }
+};
+
+const isLikelyMiniProgramWebView = () => {
+  const hostWindow = window as typeof window & { __wxjs_environment?: string };
+  return (
+    hostWindow.__wxjs_environment === 'miniprogram' ||
+    /MicroMessenger|miniProgram/i.test(navigator.userAgent)
+  );
+};
+
 const hasDirectPlugBetween = (
   state: GameState,
   sourceTypes: Set<TowerType>,
@@ -231,6 +280,50 @@ export default function App() {
       window.removeEventListener('resize', onResize);
       window.removeEventListener('orientationchange', onResize);
       window.visualViewport?.removeEventListener('resize', onResize);
+    };
+  }, []);
+
+  useEffect(() => {
+    const root = document.documentElement;
+
+    const applyTopSafeArea = () => {
+      const portrait = window.innerHeight >= window.innerWidth;
+      const mobile = getIsMobileViewport();
+      const menuRect = getMiniProgramMenuRect();
+      const statusBarHeight = getMiniProgramStatusBarHeight();
+
+      const fallbackTopClearance = mobile && portrait ? 24 : 0;
+      const menuTopClearance =
+        menuRect && typeof menuRect.top === 'number'
+          ? Math.max(statusBarHeight, menuRect.top - 8)
+          : 0;
+      const topClearance = Math.max(fallbackTopClearance, menuTopClearance);
+
+      const hasMeasuredMenu =
+        menuRect &&
+        typeof menuRect.left === 'number' &&
+        typeof menuRect.right === 'number' &&
+        typeof menuRect.width === 'number' &&
+        menuRect.width > 0;
+      const fallbackMenuReserve = mobile && portrait && isLikelyMiniProgramWebView() ? 104 : 0;
+      const menuSafeRight = hasMeasuredMenu
+        ? Math.max(0, window.innerWidth - menuRect.left + 8)
+        : fallbackMenuReserve;
+
+      root.style.setProperty('--app-mini-top-clearance', `${Math.round(topClearance)}px`);
+      root.style.setProperty('--app-mini-menu-safe-right', `${Math.round(menuSafeRight)}px`);
+    };
+
+    applyTopSafeArea();
+    window.addEventListener('resize', applyTopSafeArea);
+    window.addEventListener('orientationchange', applyTopSafeArea);
+    window.visualViewport?.addEventListener('resize', applyTopSafeArea);
+    return () => {
+      root.style.removeProperty('--app-mini-top-clearance');
+      root.style.removeProperty('--app-mini-menu-safe-right');
+      window.removeEventListener('resize', applyTopSafeArea);
+      window.removeEventListener('orientationchange', applyTopSafeArea);
+      window.visualViewport?.removeEventListener('resize', applyTopSafeArea);
     };
   }, []);
 
@@ -669,42 +762,42 @@ export default function App() {
     <div className="app-shell bg-gray-950 text-gray-100 font-sans flex flex-col overflow-hidden">
 
       {/* Top Stats Bar */}
-      <div className="shrink-0 bg-gray-900/90 border-b border-gray-800 px-2 sm:px-4 py-1.5 sm:py-2 flex items-center gap-2 sm:gap-6">
+      <div className="top-stats-bar shrink-0 bg-gray-900/90 border-b border-gray-800 pl-2 sm:pl-4 py-1.5 sm:py-2 flex items-center gap-2 sm:gap-6 overflow-hidden">
         <h1 className="app-title text-sm sm:text-lg font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500 shrink-0">
           ELECTROGUARD
         </h1>
 
         {gameState.gameMode === 'custom' ? (
-          <div className="flex items-center gap-1 sm:gap-1.5 text-orange-400">
+          <div className="top-stat-item flex items-center gap-1 sm:gap-1.5 text-orange-400">
             <Wrench size={14} />
             <span className="text-xs uppercase font-bold hidden sm:inline">{i.customMode}</span>
           </div>
         ) : (
-          <div className="flex items-center gap-1 sm:gap-1.5 text-red-400">
+          <div className="top-stat-item flex items-center gap-1 sm:gap-1.5 text-red-400">
             <Activity size={14} />
             <span className="text-xs text-gray-500 uppercase font-bold hidden sm:inline">{i.wave}</span>
             <span className="text-base sm:text-lg font-mono font-bold ml-0.5 sm:ml-1">{gameState.wave || '-'}</span>
           </div>
         )}
 
-        <div className="flex items-center gap-1 sm:gap-1.5 text-blue-400">
+        <div className="top-stat-item flex items-center gap-1 sm:gap-1.5 text-blue-400">
           <Cable size={14} />
           <span className="text-xs text-gray-500 uppercase font-bold hidden sm:inline">{i.wires}</span>
           <span className="text-base sm:text-lg font-mono font-bold ml-0.5 sm:ml-1">{gameState.gameMode === 'custom' ? '\u221E' : gameState.wireInventory}</span>
         </div>
 
-        <div className="flex items-center gap-1 sm:gap-1.5 text-white">
+        <div className="top-stat-item flex items-center gap-1 sm:gap-1.5 text-white">
           <span className="text-xs text-gray-500 uppercase font-bold hidden sm:inline">{i.score}</span>
           <span className="text-base sm:text-lg font-mono font-bold ml-0.5 sm:ml-1">{gameState.score}</span>
         </div>
 
-        <div className="flex items-center gap-1 sm:gap-1.5 text-yellow-400">
+        <div className="top-stat-item flex items-center gap-1 sm:gap-1.5 text-yellow-400">
           <Coins size={14} />
           <span className="text-xs text-gray-500 uppercase font-bold hidden sm:inline">{i.gold}</span>
           <span className="text-base sm:text-lg font-mono font-bold ml-0.5 sm:ml-1">{gameState.gameMode === 'custom' ? '\u221E' : gameState.gold}</span>
         </div>
 
-        <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
+        <div className="top-stats-actions ml-auto flex items-center gap-1.5 sm:gap-2">
           <button
             onClick={toggleLocale}
             className="p-1 sm:p-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-400 hover:text-white transition-colors text-xs font-bold flex items-center gap-1"
