@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type TouchEvent as ReactTouchEvent } from 'react';
-import { Activity, BookOpen, Cable, Coins, Globe, Keyboard, LogOut, Pause, Play, RotateCcw, Wrench, X } from 'lucide-react';
+import { Activity, BookOpen, Cable, Coins, Globe, Keyboard, LogOut, Pause, Play, RotateCcw, Smartphone, Wrench, X } from 'lucide-react';
 import { useGameLoop } from './game/useGameLoop';
 import type { CodexEntryType, GameState, TowerType } from './game/types';
 import { t, getLocale, setLocale, Locale } from './game/i18n';
@@ -150,6 +150,28 @@ const getMiniProgramStatusBarHeight = () => {
   }
 };
 
+const setMiniProgramPageOrientation = (orientation: 'portrait' | 'landscape') => {
+  const wx = (window as typeof window & {
+    wx?: {
+      setPageOrientation?: (options: {
+        orientation: 'portrait' | 'landscape' | 'auto';
+        success?: () => void;
+        fail?: () => void;
+      }) => void;
+    };
+  }).wx;
+
+  if (!wx?.setPageOrientation) return null;
+
+  return new Promise<boolean>((resolve) => {
+    wx.setPageOrientation?.({
+      orientation,
+      success: () => resolve(true),
+      fail: () => resolve(false),
+    });
+  });
+};
+
 const isLikelyMiniProgramWebView = () => {
   const hostWindow = window as typeof window & { __wxjs_environment?: string };
   return (
@@ -271,8 +293,12 @@ export default function App() {
 
   // Mobile detection includes phones in landscape, where width alone looks desktop-sized.
   const [isMobile, setIsMobile] = useState(getIsMobileViewport);
+  const [isPortraitViewport, setIsPortraitViewport] = useState(() => window.innerHeight >= window.innerWidth);
   useEffect(() => {
-    const onResize = () => setIsMobile(getIsMobileViewport());
+    const onResize = () => {
+      setIsMobile(getIsMobileViewport());
+      setIsPortraitViewport(window.innerHeight >= window.innerWidth);
+    };
     window.addEventListener('resize', onResize);
     window.addEventListener('orientationchange', onResize);
     window.visualViewport?.addEventListener('resize', onResize);
@@ -630,6 +656,35 @@ export default function App() {
       setTutorialStep(null);
     }
     skipToNextWave();
+  };
+
+  const handleSwitchOrientation = async () => {
+    const target = isPortraitViewport ? 'landscape' : 'portrait';
+
+    try {
+      const miniProgramResult = await setMiniProgramPageOrientation(target);
+      if (miniProgramResult) return;
+
+      const orientation = screen.orientation as ScreenOrientation & {
+        lock?: (orientation: 'portrait' | 'landscape') => Promise<void>;
+      };
+
+      if (orientation?.lock) {
+        if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+          try {
+            await document.documentElement.requestFullscreen();
+          } catch {
+            // Some WebViews allow orientation lock without fullscreen; try it below.
+          }
+        }
+        await orientation.lock(target);
+        return;
+      }
+    } catch {
+      // Fall through to the user-facing unsupported message.
+    }
+
+    showTutorialToast(i.orientationSwitchUnsupported);
   };
 
   const handleTutorialPick = (optionId: string, origin?: { x: number; y: number }) => {
@@ -991,6 +1046,17 @@ export default function App() {
                     <Play size={20} /> {i.resume}
                   </span>
                 </button>
+                {isMobile && (
+                  <button
+                    onClick={handleSwitchOrientation}
+                    className="group relative px-8 py-4 bg-cyan-700 hover:bg-cyan-600 text-white font-bold rounded-xl transition-all overflow-hidden mt-3 border border-cyan-600"
+                  >
+                    <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform"></div>
+                    <span className="relative flex items-center gap-2">
+                      <Smartphone size={20} /> {isPortraitViewport ? i.switchToLandscape : i.switchToPortrait}
+                    </span>
+                  </button>
+                )}
                 <button
                   onClick={returnToMenu}
                   className="group relative px-8 py-4 bg-gray-700 hover:bg-gray-600 text-white font-bold rounded-xl transition-all overflow-hidden mt-3 border border-gray-600"

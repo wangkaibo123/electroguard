@@ -30,6 +30,9 @@ export interface I18nStrings {
 
   // Paused
   systemPaused: string;
+  switchToLandscape: string;
+  switchToPortrait: string;
+  orientationSwitchUnsupported: string;
   exitToMenu: string;
 
   // Game over
@@ -174,6 +177,9 @@ const en: I18nStrings = {
   bossBonusPickDescription: 'Boss defeated — choose one: wires, generator, or shield.',
 
   systemPaused: 'SYSTEM PAUSED',
+  switchToLandscape: 'Switch to Landscape',
+  switchToPortrait: 'Switch to Portrait',
+  orientationSwitchUnsupported: 'Orientation switching is not supported here',
   exitToMenu: 'EXIT TO MENU',
 
   coreBreached: 'CORE BREACHED',
@@ -438,6 +444,9 @@ const zh: I18nStrings = {
   bossBonusPickDescription: '击败 Boss 后的定向三选一：线缆、发电机、护盾塔各一项，请选其一。',
 
   systemPaused: '系统暂停',
+  switchToLandscape: '切换横屏',
+  switchToPortrait: '切换竖屏',
+  orientationSwitchUnsupported: '当前环境不支持屏幕方向切换',
   exitToMenu: '退出到主界面',
 
   coreBreached: '核心失守',
