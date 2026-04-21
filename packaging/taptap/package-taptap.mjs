@@ -167,6 +167,9 @@ body{position:fixed;inset:0;}
 .translate-y-full{transform:translateY(100%);}
 .scale-90{transform:scale(.9);}
 .active\\:scale-95:active{transform:scale(.95);}
+.-translate-x-1\\/2.active\\:scale-95:active{transform:translateX(-50%) scale(.95);}
+.-translate-y-1\\/2.active\\:scale-95:active{transform:translateY(-50%) scale(.95);}
+.-translate-x-1\\/2.-translate-y-1\\/2.active\\:scale-95:active{transform:translate(-50%,-50%) scale(.95);}
 `,
   ].join('\n');
 
