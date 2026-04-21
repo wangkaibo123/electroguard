@@ -263,10 +263,7 @@ export default function App() {
   const [codexTower, setCodexTower] = useState<CodexEntryType | null>(null);
   const [locale, _setLocale] = useState<Locale>(getLocale());
   const [monsterSubTab, setMonsterSubTab] = useState<'type' | 'static'>('type');
-  const previousPickStateRef = useRef({
-    status: gameState.status,
-    pickUiPhase: gameState.pickUiPhase,
-  });
+  const sidebarOpenBeforeTargetingRef = useRef<boolean | null>(null);
   const canStartNextWave =
     gameState.gameMode !== 'custom' &&
     gameState.status === 'playing' &&
@@ -358,37 +355,6 @@ export default function App() {
     if (isMobile) setSidebarOpen(false);
   }, [isMobile]);
 
-  useEffect(() => {
-    const previous = previousPickStateRef.current;
-    const previousWasWavePick =
-      previous.status === 'pick' &&
-      previous.pickUiPhase !== 'shop_tower' &&
-      previous.pickUiPhase !== 'shop_infra' &&
-      previous.pickUiPhase !== 'shop_command' &&
-      previous.pickUiPhase !== 'shop_base_upgrade';
-
-    if (
-      gameState.gameMode !== 'custom' &&
-      previousWasWavePick &&
-      gameState.status === 'playing' &&
-      !gameState.pendingBossBonusPick &&
-      !gameState.needsPick
-    ) {
-      setSidebarOpen(true);
-    }
-
-    previousPickStateRef.current = {
-      status: gameState.status,
-      pickUiPhase: gameState.pickUiPhase,
-    };
-  }, [
-    gameState.status,
-    gameState.pickUiPhase,
-    gameState.gameMode,
-    gameState.pendingBossBonusPick,
-    gameState.needsPick,
-  ]);
-
   const toggleLocale = () => {
     const next: Locale = locale === 'en' ? 'zh' : 'en';
     setLocale(next);
@@ -427,6 +393,21 @@ export default function App() {
     gameState.gameMode !== 'custom' &&
     !shopTutorialUnlocked;
   const shopPanelVisible = sidebarOpen && !shopPanelHiddenForWave;
+  const shopTargetingActive = Boolean(activeCommandCard || activeRepair);
+  useEffect(() => {
+    if (shopTargetingActive) {
+      if (sidebarOpenBeforeTargetingRef.current === null) {
+        sidebarOpenBeforeTargetingRef.current = sidebarOpen;
+        if (sidebarOpen) setSidebarOpen(false);
+      }
+      return;
+    }
+
+    if (sidebarOpenBeforeTargetingRef.current !== null) {
+      if (sidebarOpenBeforeTargetingRef.current) setSidebarOpen(true);
+      sidebarOpenBeforeTargetingRef.current = null;
+    }
+  }, [shopTargetingActive, sidebarOpen]);
   const [directPlugProgress, setDirectPlugProgress] = useState({
     coreToTurret: false,
     generatorToTurret: false,

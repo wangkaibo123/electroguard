@@ -291,7 +291,7 @@ export const ShopPanel = (props: ShopPanelProps) => {
     const handleBuy = (type: ShopItemType) => {
       if (interactionLocked) return;
       buyShopPack(type);
-      if (closeSidebar) setSidebarOpen(false);
+      if (closeSidebar && SHOP_ITEM_CONFIG[type].kind !== 'command_card') setSidebarOpen(false);
     };
     const handleRefresh = () => {
       if (interactionLocked) return;
