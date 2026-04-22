@@ -261,6 +261,7 @@ export default function App() {
     activeRepair,
     startRepair,
     grantGold,
+    reviveAfterRewardedAd,
     isTowerDragging,
   } = useGameLoop();
 
@@ -269,6 +270,7 @@ export default function App() {
   const [locale, _setLocale] = useState<Locale>(getLocale());
   const [monsterSubTab, setMonsterSubTab] = useState<'type' | 'static'>('type');
   const [sponsoredGoldPending, setSponsoredGoldPending] = useState(false);
+  const [reviveAdPending, setReviveAdPending] = useState(false);
   const sidebarOpenBeforeTargetingRef = useRef<boolean | null>(null);
   const canStartNextWave =
     gameState.gameMode !== 'custom' &&
@@ -697,6 +699,29 @@ export default function App() {
     }
   };
 
+  const handleRewardedRevive = async () => {
+    if (reviveAdPending || gameState.gameMode === 'custom' || gameState.status !== 'gameover') return;
+    if (!canUseTapTapRewardedAd()) {
+      showTutorialToast(i.rewardedAdUnavailable);
+      return;
+    }
+
+    setReviveAdPending(true);
+    try {
+      const watchedToEnd = await showTapTapRewardedAd();
+      if (!watchedToEnd) {
+        showTutorialToast(i.rewardedAdIncomplete);
+        return;
+      }
+
+      if (reviveAfterRewardedAd(SHOP_CONFIG.reviveGoldReward)) {
+        showTutorialToast(i.reviveRewardGranted(SHOP_CONFIG.reviveGoldReward));
+      }
+    } finally {
+      setReviveAdPending(false);
+    }
+  };
+
   const handleTutorialPick = (optionId: string, origin?: { x: number; y: number }) => {
     if (tutorialInputLocked) return;
     const option = gameState.pickOptions.find(pickOption => pickOption.id === optionId);
@@ -1089,6 +1114,24 @@ export default function App() {
                     <div className="text-gray-400 text-sm uppercase tracking-wider mb-2">{i.finalScore}</div>
                     <div className="text-4xl font-mono font-bold text-white">{gameState.score}</div>
                     <div className="text-gray-500 text-sm mt-2">{i.survivedWaves(gameState.wave)}</div>
+                  </div>
+                )}
+                {gameState.gameMode !== 'custom' && (
+                  <div className="mb-4 flex flex-col items-center">
+                    <button
+                      type="button"
+                      onClick={handleRewardedRevive}
+                      disabled={reviveAdPending}
+                      className="group relative px-8 py-4 bg-amber-500 hover:bg-amber-400 disabled:bg-gray-800 disabled:text-gray-500 border border-amber-300/70 disabled:border-gray-700 text-gray-950 disabled:cursor-wait font-black rounded-xl transition-all overflow-hidden flex items-center gap-2"
+                    >
+                      <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform"></div>
+                      <span className="relative flex items-center gap-2">
+                        <Play size={20} /> {reviveAdPending ? i.reviveAdLoading : i.reviveAndFight}
+                      </span>
+                    </button>
+                    <p className="mt-2 text-xs sm:text-sm font-bold text-amber-200/90">
+                      {i.reviveAndFightDesc(SHOP_CONFIG.reviveGoldReward)}
+                    </p>
                   </div>
                 )}
                 <button

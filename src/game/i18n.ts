@@ -41,6 +41,10 @@ export interface I18nStrings {
   finalScore: string;
   survivedWaves: (waves: number) => string;
   rebootSystem: string;
+  reviveAndFight: string;
+  reviveAndFightDesc: (amount: number) => string;
+  reviveAdLoading: string;
+  reviveRewardGranted: (amount: number) => string;
 
   // Sidebar
   inventory: string;
@@ -193,6 +197,10 @@ const en: I18nStrings = {
   finalScore: 'Final Score',
   survivedWaves: (w) => `Survived ${w} Waves`,
   rebootSystem: 'REBOOT SYSTEM',
+  reviveAndFight: 'REVIVE AND FIGHT!',
+  reviveAndFightDesc: (amount: number) => `Repair all machines and receive ${amount} gold!`,
+  reviveAdLoading: 'Loading ad...',
+  reviveRewardGranted: (amount: number) => `Revived! Received ${amount} gold.`,
 
   inventory: 'Inventory',
   hidePanel: 'Hide panel',
@@ -466,6 +474,10 @@ const zh: I18nStrings = {
   finalScore: '最终分数',
   survivedWaves: (w) => `存活 ${w} 波`,
   rebootSystem: '重启系统',
+  reviveAndFight: '复活再战！',
+  reviveAndFightDesc: (amount: number) => `修复所有机器，获得${amount}金币！`,
+  reviveAdLoading: '广告加载中...',
+  reviveRewardGranted: (amount: number) => `复活成功，获得 ${amount} 金币！`,
 
   inventory: '库存',
   hidePanel: '隐藏面板',

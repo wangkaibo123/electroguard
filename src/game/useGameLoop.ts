@@ -504,6 +504,37 @@ export const useGameLoop = () => {
     sync();
   };
 
+  const reviveAfterRewardedAd = (bonusGold: number) => {
+    const state = stateRef.current;
+    if (state.status !== 'gameover' || state.gameMode === 'custom') return false;
+    const core = state.towers.find(tower => tower.type === 'core');
+    if (!core) return false;
+
+    const now = performance.now();
+    for (const tower of state.towers) {
+      tower.isRuined = false;
+      tower.hp = tower.maxHp;
+      tower.shieldHp = tower.maxShieldHp;
+      tower.lastDamagedAt = now;
+      tower.heat = 0;
+      tower.overloaded = false;
+      tower.gatlingAmmo = 0;
+      tower.sniperAimSince = undefined;
+      tower.missileSiloCursor = tower.type === 'missile' ? 0 : tower.missileSiloCursor;
+    }
+
+    state.gold += bonusGold;
+    state.status = 'playing';
+    rebuildTowerMap(state);
+    updatePowerGrid(state);
+    setActiveCommandCard(null);
+    setActiveRepair(false);
+    setSelectedTower(null);
+    updateRotating(null);
+    sync();
+    return true;
+  };
+
   const sellTower = (towerId: string) => {
     const state = stateRef.current;
     if (state.status !== 'playing') return;
@@ -1514,7 +1545,7 @@ export const useGameLoop = () => {
     canvasRef, cameraRef, gameState, startGame, startCustomGame, togglePause, returnToMenu, handlePick,
     forceTutorialGeneratorPick,
     focusCameraOnWorld, isCameraTransitioning,
-    openCustomPick, buyShopPack, refreshShopOffers, grantGold, sellTower, rotatingTowerId,
+    openCustomPick, buyShopPack, refreshShopOffers, grantGold, reviveAfterRewardedAd, sellTower, rotatingTowerId,
     startCommandCardUse, activeCommandCard, startRepair, activeRepair,
     selectedTower, setSelectedTower, placeMonsterMode, setPlaceMonsterMode, skipToNextWave, toastMessage,
     selectedMonsterType, setSelectedMonsterType, staticMonster, setStaticMonster,

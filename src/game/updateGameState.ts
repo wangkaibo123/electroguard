@@ -763,9 +763,9 @@ const updateEnemyState = (state: GameState, dt: number, now: number) => {
       createExplosion(state, targetPos.x, targetPos.y, '#f87171', 4);
 
       if (targetTower.hp <= 0) {
-        if (targetTower.type === 'core') state.status = 'gameover';
         if (targetTower.type === 'core') {
-          destroyTower(state, targetTower.id);
+          targetTower.hp = 0;
+          state.status = 'gameover';
         } else {
           ruinTower(state, targetTower);
         }
