@@ -18,6 +18,10 @@ const workDir = join(outputDir, 'tap_upload');
 const packageDirName = 'electroguard-h5';
 const packageDir = join(workDir, packageDirName);
 const zipPath = join(outputDir, 'electroguard-h5-taptap.zip');
+const rewardedAdUnitId =
+  process.env.TAPTAP_REWARDED_AD_UNIT_ID ||
+  process.env.VITE_TAPTAP_REWARDED_AD_UNIT_ID ||
+  '';
 
 const findAsset = (ext) => {
   const assetsDir = join(packageDir, 'assets');
@@ -183,6 +187,11 @@ body{position:fixed;inset:0;}
     '',
   );
   html = injectHeadAsset(html, `    <link rel="stylesheet" href="./assets/${cssFile}">`);
+  html = injectHeadAsset(html, `    <script>window.__TAPTAP_PACKAGE__=true;</script>`);
+  html = injectHeadAsset(
+    html,
+    `    <script>window.__TAPTAP_REWARDED_AD_UNIT_ID__=${JSON.stringify(rewardedAdUnitId)};</script>`,
+  );
   html = injectHeadAsset(
     html,
     `    <style id="tap-h5-compat-css" data-build="tap-h5-css-dual">\n${compatCss}\n    </style>`,

@@ -3,12 +3,13 @@ import { Activity, BookOpen, Cable, Coins, Globe, Keyboard, LogOut, Pause, Play,
 import { useGameLoop } from './game/useGameLoop';
 import type { CodexEntryType, GameState, TowerType } from './game/types';
 import { t, getLocale, setLocale, Locale } from './game/i18n';
-import { GLOBAL_CONFIG, TIPS_CONFIG } from './game/config';
+import { GLOBAL_CONFIG, SHOP_CONFIG, TIPS_CONFIG } from './game/config';
 import { findWirePath, getPortCell, getPortPos, isPortAccessible } from './game/engine';
 import { findTowerAtWorldPoint } from './game/gameActions';
 import { PickOverlay } from './game/ui/PickOverlay';
 import { ShopPanel } from './game/ui/ShopPanel';
 import { CodexModal } from './game/ui/CodexModal';
+import { canUseTapTapRewardedAd, showTapTapRewardedAd } from './rewardedAds';
 
 const KeyCap = ({ children, className = '' }: { children: ReactNode; className?: string }) => (
   <span className={`inline-flex h-6 min-w-8 items-center justify-center rounded-md border border-gray-600/70 bg-gray-900/90 px-2 text-[10px] font-black uppercase text-gray-200 shadow-[inset_0_-2px_0_rgba(255,255,255,0.06)] ${className}`}>
@@ -108,6 +109,9 @@ const getIsMobileViewport = () => {
 
   return width < 768 || (shortSide < 520 && (hasTouch || coarsePointer || noHover));
 };
+
+const isTapTapPackage = () =>
+  Boolean((window as typeof window & { __TAPTAP_PACKAGE__?: boolean }).__TAPTAP_PACKAGE__);
 
 const getMiniProgramMenuRect = () => {
   const wx = (window as typeof window & {
@@ -256,6 +260,7 @@ export default function App() {
     activeCommandCard,
     activeRepair,
     startRepair,
+    grantGold,
     isTowerDragging,
   } = useGameLoop();
 
@@ -263,6 +268,7 @@ export default function App() {
   const [codexTower, setCodexTower] = useState<CodexEntryType | null>(null);
   const [locale, _setLocale] = useState<Locale>(getLocale());
   const [monsterSubTab, setMonsterSubTab] = useState<'type' | 'static'>('type');
+  const [sponsoredGoldPending, setSponsoredGoldPending] = useState(false);
   const sidebarOpenBeforeTargetingRef = useRef<boolean | null>(null);
   const canStartNextWave =
     gameState.gameMode !== 'custom' &&
@@ -291,6 +297,7 @@ export default function App() {
   // Mobile detection includes phones in landscape, where width alone looks desktop-sized.
   const [isMobile, setIsMobile] = useState(getIsMobileViewport);
   const [isPortraitViewport, setIsPortraitViewport] = useState(() => window.innerHeight >= window.innerWidth);
+  const hideOrientationSwitch = isTapTapPackage();
   useEffect(() => {
     const onResize = () => {
       setIsMobile(getIsMobileViewport());
@@ -668,6 +675,28 @@ export default function App() {
     showTutorialToast(i.orientationSwitchUnsupported);
   };
 
+  const claimSponsoredGold = async () => {
+    if (sponsoredGoldPending || gameState.gameMode === 'custom' || gameState.status !== 'playing') return;
+    if (!canUseTapTapRewardedAd()) {
+      showTutorialToast(i.rewardedAdUnavailable);
+      return;
+    }
+
+    setSponsoredGoldPending(true);
+    try {
+      const watchedToEnd = await showTapTapRewardedAd();
+      if (!watchedToEnd) {
+        showTutorialToast(i.rewardedAdIncomplete);
+        return;
+      }
+
+      grantGold(SHOP_CONFIG.sponsoredGoldReward);
+      showTutorialToast(i.sponsoredGoldGranted(SHOP_CONFIG.sponsoredGoldReward));
+    } finally {
+      setSponsoredGoldPending(false);
+    }
+  };
+
   const handleTutorialPick = (optionId: string, origin?: { x: number; y: number }) => {
     if (tutorialInputLocked) return;
     const option = gameState.pickOptions.find(pickOption => pickOption.id === optionId);
@@ -1027,7 +1056,7 @@ export default function App() {
                     <Play size={20} /> {i.resume}
                   </span>
                 </button>
-                {isMobile && (
+                {isMobile && !hideOrientationSwitch && (
                   <button
                     onClick={handleSwitchOrientation}
                     className="group relative px-8 py-4 bg-cyan-700 hover:bg-cyan-600 text-white font-bold rounded-xl transition-all overflow-hidden mt-3 border border-cyan-600"
@@ -1563,6 +1592,8 @@ export default function App() {
             activeCommandCard={activeCommandCard}
             activeRepair={activeRepair}
             startRepair={startRepair}
+            claimSponsoredGold={claimSponsoredGold}
+            sponsoredGoldPending={sponsoredGoldPending}
             tutorialStep={tutorialStep}
             shopTutorialActive={tutorialStep === SHOP_TUTORIAL_STEP}
             interactionLocked={tutorialInputLocked}

@@ -1,5 +1,5 @@
 import { useState, type ComponentType, type Dispatch, type SetStateAction } from 'react';
-import { Activity, BookOpen, Cable, ChevronLeft, ChevronRight, Coins, Menu, Play, RotateCcw, ShoppingBag, Wrench, X, Crosshair, Zap, Rocket } from 'lucide-react';
+import { Activity, BookOpen, Cable, ChevronLeft, ChevronRight, Coins, Gift, Menu, Play, RotateCcw, ShoppingBag, Wrench, X, Crosshair, Zap, Rocket } from 'lucide-react';
 import { SHOP_CONFIG, SHOP_ITEM_CONFIG } from '../config';
 import type { I18nStrings } from '../i18n';
 import type { CommandCardType, EnemyType, GameState, ShopItemType, ShopPackType, TowerType } from '../types';
@@ -46,6 +46,8 @@ type ShopPanelProps = {
   activeCommandCard: CommandCardType | null;
   activeRepair: boolean;
   startRepair: () => void;
+  claimSponsoredGold: () => void;
+  sponsoredGoldPending: boolean;
   tutorialStep: number | null;
   shopTutorialActive?: boolean;
   interactionLocked?: boolean;
@@ -76,6 +78,8 @@ export const ShopPanel = (props: ShopPanelProps) => {
     activeCommandCard,
     activeRepair,
     startRepair,
+    claimSponsoredGold,
+    sponsoredGoldPending,
     tutorialStep,
     shopTutorialActive = false,
     interactionLocked = false,
@@ -304,10 +308,12 @@ export const ShopPanel = (props: ShopPanelProps) => {
     const refreshCost = gameState.shopRefreshCost ?? SHOP_CONFIG.initialRefreshCost;
     const canRefresh = !interactionLocked && gameState.status === 'playing' && (isCustom || gameState.gold >= refreshCost);
     const repairCost = SHOP_CONFIG.repairCost;
+    const sponsoredGoldReward = SHOP_CONFIG.sponsoredGoldReward;
     const hasRepairTarget = gameState.towers.some(tower =>
       tower.type !== 'core' && (tower.isRuined || tower.hp < tower.maxHp),
     );
     const canRepair = !interactionLocked && gameState.status === 'playing' && hasRepairTarget && (isCustom || gameState.gold >= repairCost);
+    const canClaimSponsoredGold = !interactionLocked && !isCustom && gameState.status === 'playing' && !sponsoredGoldPending;
     const getShopItemUi = (offer: ShopItemType) => {
       const item = SHOP_ITEM_CONFIG[offer];
       if (item.kind === 'machine') {
@@ -427,6 +433,20 @@ export const ShopPanel = (props: ShopPanelProps) => {
             <span className="flex items-center gap-1 text-yellow-400">
               <Coins size={12} />{repairCost}
             </span>
+          </button>
+          <button
+            type="button"
+            onClick={claimSponsoredGold}
+            disabled={!canClaimSponsoredGold}
+            className={`flex items-center justify-center gap-2.5 px-3 py-2.5 rounded-lg border text-sm font-black transition-all ${
+              canClaimSponsoredGold
+                ? 'border-amber-700/70 bg-amber-500/10 text-amber-100 hover:bg-amber-500/15 hover:border-amber-500/70'
+                : 'border-gray-800 bg-gray-900/50 text-gray-500 cursor-not-allowed opacity-40'
+            }`}
+            title={i.sponsoredGoldDesc(sponsoredGoldReward)}
+          >
+            <Gift size={16} />
+            <span>{sponsoredGoldPending ? i.sponsoredGoldLoading : i.sponsoredGold(sponsoredGoldReward)}</span>
           </button>
         </div>
       </>

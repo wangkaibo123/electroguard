@@ -307,6 +307,7 @@ export const SHOP_CONFIG = {
   initialRefreshCost: 0,
   refreshCost: 5,
   repairCost: 5,
+  sponsoredGoldReward: 300,
   sellPrice: 5,
   advancedRuinSellPrice: 25,
 } as const;

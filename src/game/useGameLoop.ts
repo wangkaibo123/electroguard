@@ -497,6 +497,13 @@ export const useGameLoop = () => {
     sync();
   };
 
+  const grantGold = (amount: number) => {
+    const state = stateRef.current;
+    if (state.gameMode === 'custom' || amount <= 0) return;
+    state.gold += amount;
+    sync();
+  };
+
   const sellTower = (towerId: string) => {
     const state = stateRef.current;
     if (state.status !== 'playing') return;
@@ -1507,7 +1514,7 @@ export const useGameLoop = () => {
     canvasRef, cameraRef, gameState, startGame, startCustomGame, togglePause, returnToMenu, handlePick,
     forceTutorialGeneratorPick,
     focusCameraOnWorld, isCameraTransitioning,
-    openCustomPick, buyShopPack, refreshShopOffers, sellTower, rotatingTowerId,
+    openCustomPick, buyShopPack, refreshShopOffers, grantGold, sellTower, rotatingTowerId,
     startCommandCardUse, activeCommandCard, startRepair, activeRepair,
     selectedTower, setSelectedTower, placeMonsterMode, setPlaceMonsterMode, skipToNextWave, toastMessage,
     selectedMonsterType, setSelectedMonsterType, staticMonster, setStaticMonster,

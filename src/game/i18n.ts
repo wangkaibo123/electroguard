@@ -62,6 +62,12 @@ export interface I18nStrings {
   refreshShopDesc: (cost: number) => string;
   repair: string;
   repairDesc: (cost: number) => string;
+  sponsoredGold: (amount: number) => string;
+  sponsoredGoldDesc: (amount: number) => string;
+  sponsoredGoldLoading: string;
+  sponsoredGoldGranted: (amount: number) => string;
+  rewardedAdUnavailable: string;
+  rewardedAdIncomplete: string;
   towerPack: string;
   towerPackDesc: string;
   infraPack: string;
@@ -206,6 +212,12 @@ const en: I18nStrings = {
   refreshShopDesc: (cost: number) => `Refresh shop offers for ${cost} gold`,
   repair: 'Repair',
   repairDesc: (cost: number) => `Repair a damaged machine or ruin for ${cost} gold`,
+  sponsoredGold: (amount: number) => `Get ${amount} Sponsor`,
+  sponsoredGoldDesc: (amount: number) => `Watch a rewarded ad to receive ${amount} gold`,
+  sponsoredGoldLoading: 'Loading ad...',
+  sponsoredGoldGranted: (amount: number) => `Received ${amount} gold!`,
+  rewardedAdUnavailable: 'No ad available. Please try again later.',
+  rewardedAdIncomplete: 'Watch the full ad to receive the sponsor.',
   towerPack: 'Turret Pack',
   towerPackDesc: 'Pick 1 of 3 random turrets',
   infraPack: 'Infra Pack',
@@ -473,6 +485,12 @@ const zh: I18nStrings = {
   refreshShopDesc: (cost: number) => `花费 ${cost} 金币刷新商店商品`,
   repair: '维修',
   repairDesc: (cost: number) => `花费 ${cost} 金币维修受损机器或废墟`,
+  sponsoredGold: (amount: number) => `获得${amount}资助`,
+  sponsoredGoldDesc: (amount: number) => `观看激励广告后获得 ${amount} 金币`,
+  sponsoredGoldLoading: '广告加载中...',
+  sponsoredGoldGranted: (amount: number) => `获得 ${amount} 金币！`,
+  rewardedAdUnavailable: '暂无广告，请稍后再试',
+  rewardedAdIncomplete: '完整观看广告后才能获得资助',
   towerPack: '炮塔卡包',
   towerPackDesc: '获得一次只含炮塔的三选一',
   infraPack: '基建卡包',

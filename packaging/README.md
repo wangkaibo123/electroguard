@@ -10,6 +10,12 @@ Run:
 npm run package:taptap
 ```
 
+Set the rewarded video ad unit id before packaging:
+
+```bash
+TAPTAP_REWARDED_AD_UNIT_ID=your-ad-unit-id npm run package:taptap
+```
+
 Outputs:
 
 - `packaging/taptap/electroguard-h5-taptap.zip`
