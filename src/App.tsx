@@ -323,7 +323,7 @@ export default function App() {
     activeRepair,
     startRepair,
     grantGold,
-    grantTowerInventory,
+    grantTowerDropNearCore,
     reviveAfterRewardedAd,
     isTowerDragging,
   } = useGameLoop();
@@ -819,7 +819,7 @@ export default function App() {
         return;
       }
 
-      if (grantTowerInventory(towerType, 1)) {
+      if (grantTowerDropNearCore(towerType)) {
         setFreeRewardClaimedWave(gameState.wave);
         showTutorialToast(i.freeRewardGranted(i.towerName[towerType] ?? towerType));
       }
@@ -1110,20 +1110,20 @@ export default function App() {
                 type="button"
                 onClick={claimFreeRewardTower}
                 disabled={freeRewardPending || tutorialInputLocked}
-                className="absolute top-2 left-2 z-40 flex h-16 max-w-[min(16rem,calc(100%-1rem))] items-center gap-2.5 rounded-lg border border-amber-400/70 bg-gray-950/88 px-3 py-2 text-left text-amber-100 shadow-[0_10px_26px_rgba(0,0,0,0.35)] backdrop-blur-sm transition-colors hover:bg-gray-900/95 hover:border-amber-300 disabled:cursor-wait disabled:opacity-60"
+                className="absolute top-2 left-2 z-40 flex h-12 max-w-[min(13rem,calc(100%-1rem))] items-center gap-2 rounded-lg border border-amber-400/70 bg-gray-950/88 px-2.5 py-1.5 text-left text-amber-100 shadow-[0_10px_24px_rgba(0,0,0,0.32)] backdrop-blur-sm transition-colors hover:bg-gray-900/95 hover:border-amber-300 disabled:cursor-wait disabled:opacity-60"
                 title={i.freeRewardDesc(freeRewardTowerName)}
               >
-                <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-amber-400/40 bg-amber-500/10 text-amber-300">
-                  <Clapperboard size={19} />
-                  <span className="absolute -right-1 -bottom-1 flex h-5 w-5 items-center justify-center rounded-full border border-gray-950 bg-gray-900 text-cyan-300">
-                    <TowerIcon type={freeRewardTower} size={13} />
+                <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-amber-400/40 bg-amber-500/10 text-amber-300">
+                  <Clapperboard size={16} />
+                  <span className="absolute -right-1 -bottom-1 flex h-4 w-4 items-center justify-center rounded-full border border-gray-950 bg-gray-900 text-cyan-300">
+                    <TowerIcon type={freeRewardTower} size={11} />
                   </span>
                 </span>
                 <span className="flex min-w-0 flex-col">
-                  <span className="text-[11px] font-black uppercase leading-tight tracking-wider text-amber-300">
+                  <span className="text-[10px] font-black uppercase leading-tight tracking-wider text-amber-300">
                     {freeRewardPending ? i.freeRewardLoading : i.freeReward}
                   </span>
-                  <span className="truncate text-sm font-black leading-tight text-white">{freeRewardTowerName}</span>
+                  <span className="truncate text-xs font-black leading-tight text-white">{freeRewardTowerName}</span>
                 </span>
               </button>
             )}
@@ -1133,7 +1133,7 @@ export default function App() {
               controlsHidden ? (
                 <button
                   onClick={() => setControlsHidden(false)}
-                  className={`absolute ${showFreeRewardButton ? 'top-20' : 'top-2'} left-2 p-1.5 bg-gray-950/60 backdrop-blur-sm rounded-lg border border-gray-700/40 text-gray-500 hover:text-gray-300 hover:bg-gray-800/70 transition-colors`}
+                  className={`absolute ${showFreeRewardButton ? 'top-16' : 'top-2'} left-2 p-1.5 bg-gray-950/60 backdrop-blur-sm rounded-lg border border-gray-700/40 text-gray-500 hover:text-gray-300 hover:bg-gray-800/70 transition-colors`}
                   title={locale === 'zh' ? '显示操作指南' : 'Show Controls'}
                 >
                   <Keyboard size={14} />
