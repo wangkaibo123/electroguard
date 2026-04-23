@@ -9,7 +9,15 @@ import { findTowerAtWorldPoint } from './game/gameActions';
 import { PickOverlay } from './game/ui/PickOverlay';
 import { ShopPanel } from './game/ui/ShopPanel';
 import { CodexModal } from './game/ui/CodexModal';
-import { canUseTapTapRewardedAd, showTapTapRewardedAd } from './rewardedAds';
+import {
+  canUseTapTapBannerAd,
+  canUseTapTapRewardedAd,
+  destroyTapTapPauseBannerAd,
+  hideTapTapPauseBannerAd,
+  refreshTapTapPauseBannerAdPosition,
+  showTapTapPauseBannerAd,
+  showTapTapRewardedAd,
+} from './rewardedAds';
 
 const KeyCap = ({ children, className = '' }: { children: ReactNode; className?: string }) => (
   <span className={`inline-flex h-6 min-w-8 items-center justify-center rounded-md border border-gray-600/70 bg-gray-900/90 px-2 text-[10px] font-black uppercase text-gray-200 shadow-[inset_0_-2px_0_rgba(255,255,255,0.06)] ${className}`}>
@@ -112,6 +120,53 @@ const getIsMobileViewport = () => {
 
 const isTapTapPackage = () =>
   Boolean((window as typeof window & { __TAPTAP_PACKAGE__?: boolean }).__TAPTAP_PACKAGE__);
+
+const TapTapPauseBannerAd = ({ active }: { active: boolean }) => {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    if (!active || !isTapTapPackage() || !canUseTapTapBannerAd()) {
+      setVisible(false);
+      hideTapTapPauseBannerAd();
+      return;
+    }
+
+    let cancelled = false;
+    const showBanner = async () => {
+      const shown = await showTapTapPauseBannerAd();
+      if (!cancelled) setVisible(shown);
+    };
+    const refreshPosition = () => {
+      refreshTapTapPauseBannerAdPosition();
+    };
+
+    void showBanner();
+    window.addEventListener('resize', refreshPosition);
+    window.addEventListener('orientationchange', refreshPosition);
+    window.visualViewport?.addEventListener('resize', refreshPosition);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener('resize', refreshPosition);
+      window.removeEventListener('orientationchange', refreshPosition);
+      window.visualViewport?.removeEventListener('resize', refreshPosition);
+      hideTapTapPauseBannerAd();
+    };
+  }, [active]);
+
+  useEffect(() => () => {
+    destroyTapTapPauseBannerAd();
+  }, []);
+
+  if (!active || !visible) return null;
+
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute bottom-0 left-0 right-0 h-[70px]"
+    />
+  );
+};
 
 const getMiniProgramMenuRect = () => {
   const wx = (window as typeof window & {
@@ -847,6 +902,7 @@ export default function App() {
     handleCanvasPointerDown(event);
   };
   const activeToastMessage = toastMessage ?? tutorialToastMessage;
+  const showTapTapPauseBanner = gameState.status === 'paused' && isTapTapPackage() && canUseTapTapBannerAd();
 
   return (
     <div className="app-shell bg-gray-950 text-gray-100 font-sans flex flex-col overflow-hidden">
@@ -1070,7 +1126,14 @@ export default function App() {
 
             {/* Paused Overlay */}
             {gameState.status === 'paused' && (
-              <div className="absolute inset-0 bg-gray-950/50 backdrop-blur-sm flex flex-col items-center justify-center p-4 sm:p-8 text-center">
+              <div
+                className="absolute inset-0 bg-gray-950/50 backdrop-blur-sm flex flex-col items-center justify-center p-4 sm:p-8 text-center"
+                style={
+                  showTapTapPauseBanner
+                    ? ({ paddingBottom: 'max(5.5rem, calc(env(safe-area-inset-bottom) + 5.5rem))' } as CSSProperties)
+                    : undefined
+                }
+              >
                 <h2 className="text-3xl sm:text-5xl font-black mb-4 sm:mb-6 text-white tracking-tight">{i.systemPaused}</h2>
                 <button
                   onClick={togglePause}
@@ -1101,6 +1164,7 @@ export default function App() {
                     <LogOut size={20} /> {i.exitToMenu}
                   </span>
                 </button>
+                <TapTapPauseBannerAd active={showTapTapPauseBanner} />
               </div>
             )}
 

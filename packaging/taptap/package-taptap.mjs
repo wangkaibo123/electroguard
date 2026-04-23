@@ -12,6 +12,29 @@ import { join } from 'node:path';
 import { Features, transform } from 'lightningcss';
 
 const rootDir = process.cwd();
+const loadEnvFile = (fileName) => {
+  const envPath = join(rootDir, fileName);
+  if (!existsSync(envPath)) return;
+
+  const envText = readFileSync(envPath, 'utf8');
+  for (const line of envText.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+
+    const equalsIndex = trimmed.indexOf('=');
+    if (equalsIndex === -1) continue;
+
+    const key = trimmed.slice(0, equalsIndex).trim();
+    const rawValue = trimmed.slice(equalsIndex + 1).trim();
+    if (!key || process.env[key] != null) continue;
+
+    process.env[key] = rawValue.replace(/^(['"])(.*)\1$/, '$2');
+  }
+};
+
+loadEnvFile('.env');
+loadEnvFile('.env.local');
+
 const distDir = join(rootDir, 'dist');
 const outputDir = join(rootDir, 'packaging', 'taptap');
 const workDir = join(outputDir, 'tap_upload');
@@ -21,6 +44,10 @@ const zipPath = join(outputDir, 'electroguard-h5-taptap.zip');
 const rewardedAdUnitId =
   process.env.TAPTAP_REWARDED_AD_UNIT_ID ||
   process.env.VITE_TAPTAP_REWARDED_AD_UNIT_ID ||
+  '';
+const bannerAdUnitId =
+  process.env.TAPTAP_BANNER_AD_UNIT_ID ||
+  process.env.VITE_TAPTAP_BANNER_AD_UNIT_ID ||
   '';
 
 const findAsset = (ext) => {
@@ -191,6 +218,10 @@ body{position:fixed;inset:0;}
   html = injectHeadAsset(
     html,
     `    <script>window.__TAPTAP_REWARDED_AD_UNIT_ID__=${JSON.stringify(rewardedAdUnitId)};</script>`,
+  );
+  html = injectHeadAsset(
+    html,
+    `    <script>window.__TAPTAP_BANNER_AD_UNIT_ID__=${JSON.stringify(bannerAdUnitId)};</script>`,
   );
   html = injectHeadAsset(
     html,
