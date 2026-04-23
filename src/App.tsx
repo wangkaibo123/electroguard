@@ -1,14 +1,15 @@
 import { useState, useEffect, useRef, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type TouchEvent as ReactTouchEvent } from 'react';
-import { Activity, BookOpen, Cable, Coins, Globe, Keyboard, LogOut, Pause, Play, RotateCcw, Smartphone, Wrench, X } from 'lucide-react';
+import { Activity, BookOpen, Cable, Clapperboard, Coins, Globe, Keyboard, LogOut, Pause, Play, RotateCcw, Smartphone, Wrench, X } from 'lucide-react';
 import { useGameLoop } from './game/useGameLoop';
 import type { CodexEntryType, GameState, TowerType } from './game/types';
 import { t, getLocale, setLocale, Locale } from './game/i18n';
-import { GLOBAL_CONFIG, SHOP_CONFIG, TIPS_CONFIG } from './game/config';
+import { ADVANCED_TOWER_TYPES, GLOBAL_CONFIG, SHOP_CONFIG, TIPS_CONFIG } from './game/config';
 import { findWirePath, getPortCell, getPortPos, isPortAccessible } from './game/engine';
 import { findTowerAtWorldPoint } from './game/gameActions';
 import { PickOverlay } from './game/ui/PickOverlay';
 import { ShopPanel } from './game/ui/ShopPanel';
 import { CodexModal } from './game/ui/CodexModal';
+import { TowerIcon } from './game/ui/icons';
 import {
   canUseTapTapBannerAd,
   canUseTapTapRewardedAd,
@@ -106,6 +107,9 @@ const POST_WAVE_PICK_CARD_INDEX = 1;
 const CORE_TOWER_TYPES = new Set<TowerType>(['core']);
 const TURRET_TOWER_TYPES = new Set<TowerType>(['blaster', 'gatling', 'sniper', 'tesla', 'missile']);
 const GENERATOR_TOWER_TYPES = new Set<TowerType>(['generator', 'big_generator']);
+const FREE_REWARD_REFRESH_WAVES = 3;
+const randomFreeRewardTower = () =>
+  ADVANCED_TOWER_TYPES[Math.floor(Math.random() * ADVANCED_TOWER_TYPES.length)] as TowerType;
 
 const getIsMobileViewport = () => {
   const width = window.innerWidth;
@@ -134,7 +138,12 @@ const TapTapPauseBannerAd = ({ active }: { active: boolean }) => {
     let cancelled = false;
     const showBanner = async () => {
       const shown = await showTapTapPauseBannerAd();
-      if (!cancelled) setVisible(shown);
+      if (cancelled) {
+        hideTapTapPauseBannerAd();
+        return;
+      }
+
+      setVisible(shown);
     };
     const refreshPosition = () => {
       refreshTapTapPauseBannerAdPosition();
@@ -143,13 +152,11 @@ const TapTapPauseBannerAd = ({ active }: { active: boolean }) => {
     void showBanner();
     window.addEventListener('resize', refreshPosition);
     window.addEventListener('orientationchange', refreshPosition);
-    window.visualViewport?.addEventListener('resize', refreshPosition);
 
     return () => {
       cancelled = true;
       window.removeEventListener('resize', refreshPosition);
       window.removeEventListener('orientationchange', refreshPosition);
-      window.visualViewport?.removeEventListener('resize', refreshPosition);
       hideTapTapPauseBannerAd();
     };
   }, [active]);
@@ -316,6 +323,7 @@ export default function App() {
     activeRepair,
     startRepair,
     grantGold,
+    grantTowerInventory,
     reviveAfterRewardedAd,
     isTowerDragging,
   } = useGameLoop();
@@ -326,6 +334,10 @@ export default function App() {
   const [monsterSubTab, setMonsterSubTab] = useState<'type' | 'static'>('type');
   const [sponsoredGoldPending, setSponsoredGoldPending] = useState(false);
   const [reviveAdPending, setReviveAdPending] = useState(false);
+  const [freeRewardPending, setFreeRewardPending] = useState(false);
+  const [freeRewardTower, setFreeRewardTower] = useState<TowerType>(randomFreeRewardTower);
+  const [freeRewardClaimedWave, setFreeRewardClaimedWave] = useState<number | null>(null);
+  const previousGameStatusRef = useRef(gameState.status);
   const sidebarOpenBeforeTargetingRef = useRef<boolean | null>(null);
   const canStartNextWave =
     gameState.gameMode !== 'custom' &&
@@ -350,6 +362,35 @@ export default function App() {
 
     return () => window.clearTimeout(timeoutId);
   }, [canStartNextWave]);
+
+  useEffect(() => {
+    const previousStatus = previousGameStatusRef.current;
+    previousGameStatusRef.current = gameState.status;
+
+    if (
+      (previousStatus === 'menu' || previousStatus === 'gameover') &&
+      gameState.status === 'playing' &&
+      gameState.gameMode === 'normal' &&
+      gameState.wave === 0
+    ) {
+      setFreeRewardTower(randomFreeRewardTower());
+      setFreeRewardClaimedWave(null);
+      setFreeRewardPending(false);
+    }
+  }, [gameState.status, gameState.gameMode, gameState.wave]);
+
+  useEffect(() => {
+    if (
+      gameState.gameMode !== 'normal' ||
+      freeRewardClaimedWave === null ||
+      gameState.wave < freeRewardClaimedWave + FREE_REWARD_REFRESH_WAVES
+    ) {
+      return;
+    }
+
+    setFreeRewardTower(randomFreeRewardTower());
+    setFreeRewardClaimedWave(null);
+  }, [freeRewardClaimedWave, gameState.gameMode, gameState.wave]);
 
   // Mobile detection includes phones in landscape, where width alone looks desktop-sized.
   const [isMobile, setIsMobile] = useState(getIsMobileViewport);
@@ -754,6 +795,39 @@ export default function App() {
     }
   };
 
+  const claimFreeRewardTower = async () => {
+    if (
+      freeRewardPending ||
+      freeRewardClaimedWave !== null ||
+      gameState.gameMode === 'custom' ||
+      gameState.status !== 'playing'
+    ) {
+      return;
+    }
+
+    if (!canUseTapTapRewardedAd()) {
+      showTutorialToast(i.rewardedAdUnavailable);
+      return;
+    }
+
+    const towerType = freeRewardTower;
+    setFreeRewardPending(true);
+    try {
+      const watchedToEnd = await showTapTapRewardedAd();
+      if (!watchedToEnd) {
+        showTutorialToast(i.rewardedAdIncomplete);
+        return;
+      }
+
+      if (grantTowerInventory(towerType, 1)) {
+        setFreeRewardClaimedWave(gameState.wave);
+        showTutorialToast(i.freeRewardGranted(i.towerName[towerType] ?? towerType));
+      }
+    } finally {
+      setFreeRewardPending(false);
+    }
+  };
+
   const handleRewardedRevive = async () => {
     if (reviveAdPending || gameState.gameMode === 'custom' || gameState.status !== 'gameover') return;
     if (!canUseTapTapRewardedAd()) {
@@ -903,6 +977,11 @@ export default function App() {
   };
   const activeToastMessage = toastMessage ?? tutorialToastMessage;
   const showTapTapPauseBanner = gameState.status === 'paused' && isTapTapPackage() && canUseTapTapBannerAd();
+  const showFreeRewardButton =
+    gameState.status === 'playing' &&
+    gameState.gameMode === 'normal' &&
+    freeRewardClaimedWave === null;
+  const freeRewardTowerName = i.towerName[freeRewardTower] ?? freeRewardTower;
 
   return (
     <div className="app-shell bg-gray-950 text-gray-100 font-sans flex flex-col overflow-hidden">
@@ -1026,18 +1105,41 @@ export default function App() {
               />
             )}
 
+            {showFreeRewardButton && (
+              <button
+                type="button"
+                onClick={claimFreeRewardTower}
+                disabled={freeRewardPending || tutorialInputLocked}
+                className="absolute top-2 left-2 z-40 flex h-16 max-w-[min(16rem,calc(100%-1rem))] items-center gap-2.5 rounded-lg border border-amber-400/70 bg-gray-950/88 px-3 py-2 text-left text-amber-100 shadow-[0_10px_26px_rgba(0,0,0,0.35)] backdrop-blur-sm transition-colors hover:bg-gray-900/95 hover:border-amber-300 disabled:cursor-wait disabled:opacity-60"
+                title={i.freeRewardDesc(freeRewardTowerName)}
+              >
+                <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-amber-400/40 bg-amber-500/10 text-amber-300">
+                  <Clapperboard size={19} />
+                  <span className="absolute -right-1 -bottom-1 flex h-5 w-5 items-center justify-center rounded-full border border-gray-950 bg-gray-900 text-cyan-300">
+                    <TowerIcon type={freeRewardTower} size={13} />
+                  </span>
+                </span>
+                <span className="flex min-w-0 flex-col">
+                  <span className="text-[11px] font-black uppercase leading-tight tracking-wider text-amber-300">
+                    {freeRewardPending ? i.freeRewardLoading : i.freeReward}
+                  </span>
+                  <span className="truncate text-sm font-black leading-tight text-white">{freeRewardTowerName}</span>
+                </span>
+              </button>
+            )}
+
             {/* Controls Guide — top-left (desktop only) */}
             {showControlsGuide && (
               controlsHidden ? (
                 <button
                   onClick={() => setControlsHidden(false)}
-                  className="absolute top-2 left-2 p-1.5 bg-gray-950/60 backdrop-blur-sm rounded-lg border border-gray-700/40 text-gray-500 hover:text-gray-300 hover:bg-gray-800/70 transition-colors"
+                  className={`absolute ${showFreeRewardButton ? 'top-20' : 'top-2'} left-2 p-1.5 bg-gray-950/60 backdrop-blur-sm rounded-lg border border-gray-700/40 text-gray-500 hover:text-gray-300 hover:bg-gray-800/70 transition-colors`}
                   title={locale === 'zh' ? '显示操作指南' : 'Show Controls'}
                 >
                   <Keyboard size={14} />
                 </button>
               ) : (
-                <div className="absolute top-2 left-2 select-none">
+                <div className={`absolute ${showFreeRewardButton ? 'top-20' : 'top-2'} left-2 select-none`}>
                   <div className="w-[220px] bg-gray-950/70 backdrop-blur-sm rounded-lg px-2.5 py-2 border border-gray-700/40 shadow-lg">
                     <div className="flex items-center justify-between mb-1.5">
                       <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider">{locale === 'zh' ? '操作指南' : 'Controls'}</span>

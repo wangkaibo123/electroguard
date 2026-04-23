@@ -48,6 +48,9 @@ type TapApi = {
 };
 
 const getTapApi = () => (window as typeof window & { tap?: TapApi }).tap;
+const BANNER_DEFAULT_HEIGHT = 50;
+const BANNER_MAX_WIDTH = 360;
+const BANNER_MIN_WIDTH = 300;
 
 export const getTapTapRewardedAdUnitId = () => {
   const hostWindow = window as typeof window & {
@@ -142,8 +145,8 @@ const getTapViewport = () => {
 
   try {
     const systemInfo = tap?.getSystemInfoSync?.();
-    const width = systemInfo?.windowWidth ?? systemInfo?.screenWidth ?? window.innerWidth;
-    const height = systemInfo?.windowHeight ?? systemInfo?.screenHeight ?? window.innerHeight;
+    const width = systemInfo?.screenWidth ?? systemInfo?.windowWidth ?? window.innerWidth;
+    const height = systemInfo?.screenHeight ?? systemInfo?.windowHeight ?? window.innerHeight;
     const safeBottom =
       typeof systemInfo?.screenHeight === 'number' &&
       typeof systemInfo.safeArea?.bottom === 'number'
@@ -158,8 +161,8 @@ const getTapViewport = () => {
 
 const getPauseBannerStyle = (realHeight?: number): TapBannerAdStyle => {
   const viewport = getTapViewport();
-  const width = Math.min(viewport.width, Math.max(300, Math.min(360, viewport.width)));
-  const height = realHeight ?? 50;
+  const width = Math.min(viewport.width, Math.max(BANNER_MIN_WIDTH, Math.min(BANNER_MAX_WIDTH, viewport.width)));
+  const height = realHeight ?? BANNER_DEFAULT_HEIGHT;
 
   return {
     left: Math.max(0, Math.round((viewport.width - width) / 2)),
@@ -198,7 +201,6 @@ const getTapTapPauseBannerAd = () => {
     if (!pauseBannerAd) return;
     pauseBannerAd.style.realWidth = size.width ?? pauseBannerAd.style.realWidth;
     pauseBannerAd.style.realHeight = size.height ?? pauseBannerAd.style.realHeight;
-    positionTapTapPauseBannerAd();
   };
   pauseBannerAd.onResize?.(pauseBannerResizeListener);
 

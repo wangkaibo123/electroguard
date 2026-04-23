@@ -70,6 +70,10 @@ export interface I18nStrings {
   sponsoredGoldDesc: (amount: number) => string;
   sponsoredGoldLoading: string;
   sponsoredGoldGranted: (amount: number) => string;
+  freeReward: string;
+  freeRewardDesc: (towerName: string) => string;
+  freeRewardLoading: string;
+  freeRewardGranted: (towerName: string) => string;
   rewardedAdUnavailable: string;
   rewardedAdIncomplete: string;
   towerPack: string;
@@ -224,6 +228,10 @@ const en: I18nStrings = {
   sponsoredGoldDesc: (amount: number) => `Watch a rewarded ad to receive ${amount} gold`,
   sponsoredGoldLoading: 'Loading ad...',
   sponsoredGoldGranted: (amount: number) => `Received ${amount} gold!`,
+  freeReward: 'Free Reward',
+  freeRewardDesc: (towerName: string) => `Watch a rewarded ad to receive ${towerName}`,
+  freeRewardLoading: 'Loading reward...',
+  freeRewardGranted: (towerName: string) => `Received ${towerName}!`,
   rewardedAdUnavailable: 'No ad available. Please try again later.',
   rewardedAdIncomplete: 'Watch the full ad to receive the sponsor.',
   towerPack: 'Turret Pack',
@@ -501,6 +509,10 @@ const zh: I18nStrings = {
   sponsoredGoldDesc: (amount: number) => `观看激励广告后获得 ${amount} 金币`,
   sponsoredGoldLoading: '广告加载中...',
   sponsoredGoldGranted: (amount: number) => `获得 ${amount} 金币！`,
+  freeReward: '免费奖励',
+  freeRewardDesc: (towerName: string) => `观看激励广告后获得${towerName}`,
+  freeRewardLoading: '广告加载中...',
+  freeRewardGranted: (towerName: string) => `获得${towerName}！`,
   rewardedAdUnavailable: '暂无广告，请稍后再试',
   rewardedAdIncomplete: '完整观看广告后才能获得资助',
   towerPack: '炮塔卡包',

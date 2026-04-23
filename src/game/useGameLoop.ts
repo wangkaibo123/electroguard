@@ -504,6 +504,14 @@ export const useGameLoop = () => {
     sync();
   };
 
+  const grantTowerInventory = (towerType: TowerType, count = 1) => {
+    const state = stateRef.current;
+    if (state.gameMode === 'custom' || count <= 0) return false;
+    state.towerInventory[towerType] = (state.towerInventory[towerType] ?? 0) + count;
+    sync();
+    return true;
+  };
+
   const reviveAfterRewardedAd = (bonusGold: number) => {
     const state = stateRef.current;
     if (state.status !== 'gameover' || state.gameMode === 'custom') return false;
@@ -1545,7 +1553,7 @@ export const useGameLoop = () => {
     canvasRef, cameraRef, gameState, startGame, startCustomGame, togglePause, returnToMenu, handlePick,
     forceTutorialGeneratorPick,
     focusCameraOnWorld, isCameraTransitioning,
-    openCustomPick, buyShopPack, refreshShopOffers, grantGold, reviveAfterRewardedAd, sellTower, rotatingTowerId,
+    openCustomPick, buyShopPack, refreshShopOffers, grantGold, grantTowerInventory, reviveAfterRewardedAd, sellTower, rotatingTowerId,
     startCommandCardUse, activeCommandCard, startRepair, activeRepair,
     selectedTower, setSelectedTower, placeMonsterMode, setPlaceMonsterMode, skipToNextWave, toastMessage,
     selectedMonsterType, setSelectedMonsterType, staticMonster, setStaticMonster,

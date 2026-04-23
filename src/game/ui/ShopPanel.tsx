@@ -1,5 +1,5 @@
 import { useState, type ComponentType, type Dispatch, type SetStateAction } from 'react';
-import { Activity, BookOpen, Cable, ChevronLeft, ChevronRight, Coins, Gift, Menu, Play, RotateCcw, ShoppingBag, Wrench, X, Crosshair, Zap, Rocket } from 'lucide-react';
+import { Activity, BookOpen, Cable, ChevronLeft, ChevronRight, Clapperboard, Coins, Menu, Play, RotateCcw, ShoppingBag, Wrench, X, Crosshair, Zap, Rocket } from 'lucide-react';
 import { SHOP_CONFIG, SHOP_ITEM_CONFIG } from '../config';
 import type { I18nStrings } from '../i18n';
 import type { CommandCardType, EnemyType, GameState, ShopItemType, ShopPackType, TowerType } from '../types';
@@ -445,7 +445,7 @@ export const ShopPanel = (props: ShopPanelProps) => {
             }`}
             title={i.sponsoredGoldDesc(sponsoredGoldReward)}
           >
-            <Gift size={16} />
+            <Clapperboard size={16} />
             <span>{sponsoredGoldPending ? i.sponsoredGoldLoading : i.sponsoredGold(sponsoredGoldReward)}</span>
           </button>
         </div>
