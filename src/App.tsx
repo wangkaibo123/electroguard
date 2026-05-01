@@ -285,6 +285,8 @@ export default function App() {
     cameraRef,
     gameState,
     startGame,
+    continueGame,
+    hasSave,
     startCustomGame,
     togglePause,
     returnToMenu,
@@ -1189,6 +1191,16 @@ export default function App() {
                   <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform"></div>
                   <span className="relative flex items-center justify-center gap-2 text-sm sm:text-base">
                     <Play size={18} /> {i.initializeCore}
+                  </span>
+                </button>
+                <button
+                  onClick={() => { if (hasSave) continueGame(); }}
+                  disabled={!hasSave}
+                  className="group relative w-52 sm:w-64 px-6 sm:px-8 py-3 sm:py-4 bg-emerald-600 hover:bg-emerald-500 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all overflow-hidden mt-2 sm:mt-3 border border-emerald-500 disabled:border-gray-600"
+                >
+                  <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform group-disabled:hidden"></div>
+                  <span className="relative flex items-center justify-center gap-2 text-sm sm:text-base">
+                    <RotateCcw size={18} /> {i.continueGame}
                   </span>
                 </button>
                 <button

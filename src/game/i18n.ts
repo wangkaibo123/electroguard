@@ -9,6 +9,7 @@ export interface I18nStrings {
   initializeCore: string;
   customMode: string;
   tutorial: string;
+  continueGame: string;
 
   // HUD
   wave: string;
@@ -174,6 +175,7 @@ const en: I18nStrings = {
   initializeCore: 'INITIALIZE CORE',
   customMode: 'Custom Mode',
   tutorial: 'Tutorial',
+  continueGame: 'CONTINUE',
 
   wave: 'Wave',
   wires: 'Wires',
@@ -455,6 +457,7 @@ const zh: I18nStrings = {
   initializeCore: '启动核心',
   customMode: '自定义模式',
   tutorial: '新手教程',
+  continueGame: '继续游戏',
 
   wave: '波次',
   wires: '线缆',

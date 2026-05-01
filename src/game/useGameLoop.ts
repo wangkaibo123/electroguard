@@ -20,6 +20,7 @@ import { addTowerToState, createTowerAt } from './towerFactory';
 import { startNextWave, updateGameState } from './updateGameState';
 import { isMachineCommandCard } from './commandCards';
 import { centerCameraOnCore, clampCamera, createInitialCamera, getMinZoom, screenToWorld } from './camera';
+import { clearSavedGame, hasSavedGame, loadSavedGame, saveGameState } from './saveGame';
 import {
   applyBaseUpgradeToCore,
   applyMachineCommandCard,
@@ -271,6 +272,8 @@ export const useGameLoop = () => {
 
   // 鈹€鈹€ Actions 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
+  const [hasSave, setHasSave] = useState<boolean>(() => hasSavedGame());
+
   const startGame = () => {
     const s = createInitialState();
     deployStartingLoadout(s);
@@ -284,7 +287,29 @@ export const useGameLoop = () => {
     setSelectedMonsterType('grunt');
     setStaticMonster(true);
     centerCameraOnCore(s, cameraRef.current, viewportRef.current);
+    clearSavedGame();
+    setHasSave(false);
     sync();
+  };
+
+  const continueGame = () => {
+    const s = loadSavedGame();
+    if (!s) {
+      setHasSave(false);
+      return false;
+    }
+    stateRef.current = s;
+    lastMapSizeRef.current = { width: s.mapWidth, height: s.mapHeight };
+    setSelectedTower(null);
+    setPlaceMonsterMode(false);
+    setSelectedMonsterType('grunt');
+    setStaticMonster(true);
+    setActiveCommandCard(null);
+    setActiveRepair(false);
+    updateRotating(null);
+    centerCameraOnCore(s, cameraRef.current, viewportRef.current);
+    sync();
+    return true;
   };
 
   const startCustomGame = () => {
@@ -1406,8 +1431,22 @@ export const useGameLoop = () => {
       }
     }
 
+    const prevStatus = state.status;
     if (state.status === 'playing' && updateGameState(state, dt)) {
       sync();
+    }
+    if (
+      state.gameMode === 'normal' &&
+      prevStatus === 'playing' &&
+      state.status === 'pick' &&
+      state.wave > 0
+    ) {
+      saveGameState(state);
+      setHasSave(true);
+    }
+    if (prevStatus !== 'gameover' && state.status === 'gameover') {
+      clearSavedGame();
+      setHasSave(false);
     }
 
     const previousMapSize = lastMapSizeRef.current;
@@ -1562,7 +1601,7 @@ export const useGameLoop = () => {
   }, []);
 
   return {
-    canvasRef, cameraRef, gameState, startGame, startCustomGame, togglePause, returnToMenu, handlePick,
+    canvasRef, cameraRef, gameState, startGame, continueGame, hasSave, startCustomGame, togglePause, returnToMenu, handlePick,
     forceTutorialGeneratorPick,
     focusCameraOnWorld, isCameraTransitioning,
     openCustomPick, buyShopPack, refreshShopOffers, grantGold, grantTowerInventory, grantTowerDropNearCore, reviveAfterRewardedAd, sellTower, rotatingTowerId,
