@@ -10,6 +10,7 @@ export interface I18nStrings {
   customMode: string;
   tutorial: string;
   continueGame: string;
+  highScore: string;
 
   // HUD
   wave: string;
@@ -176,6 +177,7 @@ const en: I18nStrings = {
   customMode: 'Custom Mode',
   tutorial: 'Tutorial',
   continueGame: 'CONTINUE',
+  highScore: 'HIGH SCORE',
 
   wave: 'Wave',
   wires: 'Wires',
@@ -458,6 +460,7 @@ const zh: I18nStrings = {
   customMode: '自定义模式',
   tutorial: '新手教程',
   continueGame: '继续游戏',
+  highScore: '历史最高分',
 
   wave: '波次',
   wires: '线缆',

@@ -340,6 +340,22 @@ export default function App() {
   const [freeRewardTower, setFreeRewardTower] = useState<TowerType>(randomFreeRewardTower);
   const [freeRewardClaimedWave, setFreeRewardClaimedWave] = useState<number | null>(null);
   const previousGameStatusRef = useRef(gameState.status);
+  const [highScore, setHighScore] = useState<number>(() => {
+    try {
+      const raw = localStorage.getItem('electroguard_high_score');
+      const parsed = raw ? parseInt(raw, 10) : 0;
+      return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+    } catch {
+      return 0;
+    }
+  });
+  useEffect(() => {
+    if (gameState.gameMode !== 'normal') return;
+    if (gameState.score > highScore) {
+      setHighScore(gameState.score);
+      try { localStorage.setItem('electroguard_high_score', String(gameState.score)); } catch {}
+    }
+  }, [gameState.score, gameState.gameMode, highScore]);
   const sidebarOpenBeforeTargetingRef = useRef<boolean | null>(null);
   const canStartNextWave =
     gameState.gameMode !== 'custom' &&
@@ -1180,6 +1196,10 @@ export default function App() {
             {/* Menu Overlay */}
             {gameState.status === 'menu' && (
               <div className="absolute inset-0 bg-gray-950/80 backdrop-blur-sm flex flex-col items-center justify-center p-4 sm:p-8 text-center">
+                <div className="absolute top-3 left-3 sm:top-4 sm:left-4 z-10 flex flex-col items-start rounded-lg border border-amber-400/60 bg-gray-950/80 px-3 py-2 shadow-[0_0_18px_rgba(251,191,36,0.18)] backdrop-blur-sm">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-amber-300/90">{i.highScore}</span>
+                  <span className="font-mono text-lg sm:text-xl font-black text-amber-100">{highScore}</span>
+                </div>
                 <h2 className="text-3xl sm:text-5xl font-black mb-3 sm:mb-4 text-white tracking-tight">{i.systemOffline}</h2>
                 <p className="text-gray-400 mb-6 sm:mb-8 max-w-lg text-xs sm:text-sm px-2">
                   {i.menuDescription}
