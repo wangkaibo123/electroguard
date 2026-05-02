@@ -118,39 +118,96 @@ const gatlingHasTarget = (state: GameState, tower: Tower) => {
 
   const range = getTowerRange(tower);
   if (range == null) return false;
+  const rangeSq = range * range;
 
   const cx = (tower.x + tower.width / 2) * CELL_SIZE;
   const cy = (tower.y + tower.height / 2) * CELL_SIZE;
 
-  return state.enemies.some((enemy) => Math.hypot(enemy.x - cx, enemy.y - cy) < range);
+  return state.enemies.some((enemy) => {
+    const dx = enemy.x - cx;
+    const dy = enemy.y - cy;
+    return dx * dx + dy * dy < rangeSq;
+  });
 };
 
-const towerCanReceiveGeneratorPower = (state: GameState, source: Tower, tower: Tower) => {
+type PowerOutputFrameCache = {
+  state: GameState;
+  now: number;
+  activeRepairDroneIds: Set<string>;
+  adjacency: Map<string, string[]>;
+  outputTargets: Map<string, boolean>;
+};
+
+let powerOutputFrameCache: PowerOutputFrameCache | null = null;
+
+const getPowerOutputFrameCache = (state: GameState, now: number): PowerOutputFrameCache => {
+  if (powerOutputFrameCache?.state === state && powerOutputFrameCache.now === now) {
+    return powerOutputFrameCache;
+  }
+
+  const activeRepairDroneIds = new Set<string>();
+  for (const drone of state.repairDrones) {
+    activeRepairDroneIds.add(drone.sourceTowerId);
+  }
+
+  const adjacency = new Map<string, string[]>();
+  const addEdge = (fromId: string, toId: string) => {
+    const targets = adjacency.get(fromId);
+    if (targets) targets.push(toId);
+    else adjacency.set(fromId, [toId]);
+  };
+
+  for (const wire of state.wires) {
+    const startTower = state.towerMap.get(wire.startTowerId);
+    const endTower = state.towerMap.get(wire.endTowerId);
+    if (!startTower || !endTower || startTower.isRuined || endTower.isRuined) continue;
+
+    const startPort = startTower.ports.find(port => port.id === wire.startPortId);
+    const endPort = endTower.ports.find(port => port.id === wire.endPortId);
+    if (startPort?.portType === 'output') addEdge(startTower.id, endTower.id);
+    if (endPort?.portType === 'output') addEdge(endTower.id, startTower.id);
+  }
+
+  powerOutputFrameCache = {
+    state,
+    now,
+    activeRepairDroneIds,
+    adjacency,
+    outputTargets: new Map(),
+  };
+  return powerOutputFrameCache;
+};
+
+const towerCanReceiveGeneratorPower = (
+  state: GameState,
+  source: Tower,
+  tower: Tower,
+  activeRepairDroneIds: Set<string>,
+) => {
   if (tower.isRuined || tower.id === source.id) return false;
-  if (tower.type === 'repair_drone' && state.repairDrones.some((drone) => drone.sourceTowerId === tower.id)) return false;
+  if (tower.type === 'repair_drone' && activeRepairDroneIds.has(tower.id)) return false;
   if (tower.type === 'gatling') return gatlingHasTarget(state, tower);
 
   return tower.maxPower > 0 && (tower.storedPower + tower.incomingPower) < tower.maxPower;
 };
 
-const hasGeneratorOutputTarget = (state: GameState, source: Tower) => {
+const hasGeneratorOutputTarget = (state: GameState, source: Tower, now: number) => {
   if (source.isRuined || !source.powered) return false;
+  const cache = getPowerOutputFrameCache(state, now);
+  const cached = cache.outputTargets.get(source.id);
+  if (cached !== undefined) return cached;
 
   const queue = [source];
   const visited = new Set([source.id]);
 
   while (queue.length > 0) {
     const tower = queue.shift()!;
-    if (towerCanReceiveGeneratorPower(state, source, tower)) return true;
+    if (towerCanReceiveGeneratorPower(state, source, tower, cache.activeRepairDroneIds)) {
+      cache.outputTargets.set(source.id, true);
+      return true;
+    }
 
-    for (const wire of state.wires) {
-      let nextId: string | null = null;
-      if (wire.startTowerId === tower.id) {
-        if (tower.ports.find(port => port.id === wire.startPortId)?.portType === 'output') nextId = wire.endTowerId;
-      } else if (wire.endTowerId === tower.id) {
-        if (tower.ports.find(port => port.id === wire.endPortId)?.portType === 'output') nextId = wire.startTowerId;
-      }
-
+    for (const nextId of cache.adjacency.get(tower.id) ?? []) {
       if (!nextId || visited.has(nextId)) continue;
       const next = state.towerMap.get(nextId);
       if (!next || next.isRuined) continue;
@@ -159,6 +216,7 @@ const hasGeneratorOutputTarget = (state: GameState, source: Tower) => {
     }
   }
 
+  cache.outputTargets.set(source.id, false);
   return false;
 };
 
@@ -323,7 +381,7 @@ export function drawTowerDetails(
   tColor: string, inset: number, now: number, generatorPowerProgress: number,
 ) {
   if (t.type === 'core') {
-    const outputting = hasGeneratorOutputTarget(state, t);
+    const outputting = hasGeneratorOutputTarget(state, t, now);
     const generatorColor = TOWER_STATS.generator.color;
     drawEnergyEffect(ctx, cx, cy, now, t.powered, generatorColor, outputting ? generatorPowerProgress : 0, outputting);
     drawPowerOutputIndicator(ctx, cx, cy, GENERATOR_POWER_OUTPUT_RADIUS, getPowerOutputAmount(t), now, generatorColor);
@@ -689,7 +747,7 @@ export function drawTowerDetails(
     }
 
   } else if (t.type === 'generator' || t.type === 'big_generator') {
-    const outputting = hasGeneratorOutputTarget(state, t);
+    const outputting = hasGeneratorOutputTarget(state, t, now);
     drawEnergyEffect(ctx, cx, cy, now, t.powered, tColor, outputting ? generatorPowerProgress : 0, outputting);
     drawPowerOutputIndicator(ctx, cx, cy, GENERATOR_POWER_OUTPUT_RADIUS, getPowerOutputAmount(t), now, tColor);
   } else if (t.type === 'repair_drone') {

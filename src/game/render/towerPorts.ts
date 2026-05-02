@@ -1,5 +1,5 @@
 import { GameState } from '../types';
-import { getPortPos, isPortAccessible } from '../engine';
+import { getPortCell, getPortPos } from '../engine';
 import { BG_DARK, PORT_OUT, PORT_OUT_USED, PORT_IN, PORT_IN_USED, portOutward } from './constants';
 
 // ── Ports (drawn under tower bodies) ─────────────────────────────────────
@@ -30,9 +30,11 @@ export const drawPorts = (ctx: CanvasRenderingContext2D, state: GameState) => {
   };
 
   const wireByPortId = new Map<string, GameState['wires'][number]>();
+  const wireCells = new Set<string>();
   for (const wire of state.wires) {
     wireByPortId.set(wire.startPortId, wire);
     wireByPortId.set(wire.endPortId, wire);
+    for (const point of wire.path) wireCells.add(`${point.x},${point.y}`);
   }
 
   for (const tower of state.towers) {
@@ -50,7 +52,17 @@ export const drawPorts = (ctx: CanvasRenderingContext2D, state: GameState) => {
       const lineX = directWire ? pos.x + unit.x * directOutputInsert - unit.x * recoil : pos.x + off.x;
       const lineY = directWire ? pos.y + unit.y * directOutputInsert - unit.y * recoil : pos.y + off.y;
       const used = Boolean(linkedWire);
-      const accessible = used || isPortAccessible(state, tower, port);
+      let accessible = used;
+      if (!accessible) {
+        const cell = getPortCell(tower, port);
+        const cellKey = `${cell.x},${cell.y}`;
+        accessible =
+          cell.x >= 0 &&
+          cell.x < state.mapWidth &&
+          cell.y >= 0 &&
+          cell.y < state.mapHeight &&
+          !wireCells.has(cellKey);
+      }
       const portColor = port.portType === 'output'
         ? (used ? PORT_OUT_USED : PORT_OUT)
         : (used ? PORT_IN_USED : PORT_IN);

@@ -94,6 +94,8 @@ export interface Tower {
   corePowerBonus?: number;
   coreTurretUnlocked?: boolean;
   coreTurretLastShot?: number;
+  aiTargetId?: string;
+  aiRetargetAt?: number;
   collider: Collider;     // collision shape (regenerated on rotation)
 }
 

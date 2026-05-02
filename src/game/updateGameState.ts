@@ -141,6 +141,19 @@ const getMissileSiloWorldPosition = (tower: Tower, index: number) => {
 };
 
 const GATLING_SHOT_INTERVAL = 1000 / GATLING_SHOTS_PER_SECOND;
+const TOWER_RETARGET_MS = 150;
+const TOWER_RETARGET_JITTER_MS = 70;
+
+const getStableRetargetDelay = (id: string, baseMs: number, jitterMs: number) => {
+  let hash = 0;
+  for (let index = 0; index < id.length; index++) {
+    hash = (hash * 31 + id.charCodeAt(index)) | 0;
+  }
+  return baseMs + Math.abs(hash % jitterMs);
+};
+
+const getTowerRetargetDelay = (towerId: string) =>
+  getStableRetargetDelay(towerId, TOWER_RETARGET_MS, TOWER_RETARGET_JITTER_MS);
 
 const fireGatlingShot = (
   state: GameState,
@@ -400,6 +413,39 @@ const updatePulses = (state: GameState, dt: number, now: number) => {
 
 const updateCombatTowers = (state: GameState, dt: number, now: number) => {
   let changed = false;
+  const enemyMap = state.enemies.length > 0
+    ? new Map(state.enemies.map((enemy) => [enemy.id, enemy]))
+    : null;
+
+  const resolveTowerTarget = (tower: Tower, baseX: number, baseY: number, range: number) => {
+    if (!tower.aiTargetId || !enemyMap) return null;
+    const target = enemyMap.get(tower.aiTargetId);
+    if (!target || target.hp <= 0) return null;
+
+    const dx = target.x - baseX;
+    const dy = target.y - baseY;
+    if (dx * dx + dy * dy > range * range) return null;
+    return target;
+  };
+
+  const acquireTowerTarget = (tower: Tower, baseX: number, baseY: number, range: number) => {
+    let bestDistanceSq = range * range;
+    let bestEnemy: GameState['enemies'][number] | null = null;
+
+    for (const enemy of state.enemies) {
+      const dx = enemy.x - baseX;
+      const dy = enemy.y - baseY;
+      const distanceSq = dx * dx + dy * dy;
+      if (distanceSq < bestDistanceSq) {
+        bestDistanceSq = distanceSq;
+        bestEnemy = enemy;
+      }
+    }
+
+    tower.aiTargetId = bestEnemy?.id;
+    tower.aiRetargetAt = now + getTowerRetargetDelay(tower.id);
+    return bestEnemy;
+  };
 
   for (const tower of state.towers) {
     if (tower.isRuined) continue;
@@ -478,24 +524,13 @@ const updateCombatTowers = (state: GameState, dt: number, now: number) => {
       tower.type === 'missile' ? MISSILE_RANGE :
       BLASTER_RANGE);
 
-    let bestDistanceSq = range * range;
-    let targetX = 0;
-    let targetY = 0;
-    let hasTarget = false;
-    let bestEnemy: GameState['enemies'][number] | null = null;
-
-    for (const enemy of state.enemies) {
-      const dx = enemy.x - baseX;
-      const dy = enemy.y - baseY;
-      const distanceSq = dx * dx + dy * dy;
-      if (distanceSq < bestDistanceSq) {
-        bestDistanceSq = distanceSq;
-        targetX = enemy.x;
-        targetY = enemy.y;
-        hasTarget = true;
-        bestEnemy = enemy;
-      }
+    let bestEnemy = resolveTowerTarget(tower, baseX, baseY, range);
+    if (!bestEnemy || now >= (tower.aiRetargetAt ?? 0)) {
+      bestEnemy = acquireTowerTarget(tower, baseX, baseY, range);
     }
+    const hasTarget = Boolean(bestEnemy);
+    const targetX = bestEnemy?.x ?? 0;
+    const targetY = bestEnemy?.y ?? 0;
 
     if (hasTarget) {
       const desired = Math.atan2(targetY - baseY, targetX - baseX);
@@ -715,11 +750,7 @@ const ENEMY_RETARGET_MS = 220;
 const ENEMY_RETARGET_JITTER_MS = 90;
 
 const getEnemyRetargetDelay = (enemyId: string) => {
-  let hash = 0;
-  for (let index = 0; index < enemyId.length; index++) {
-    hash = (hash * 31 + enemyId.charCodeAt(index)) | 0;
-  }
-  return ENEMY_RETARGET_MS + Math.abs(hash % ENEMY_RETARGET_JITTER_MS);
+  return getStableRetargetDelay(enemyId, ENEMY_RETARGET_MS, ENEMY_RETARGET_JITTER_MS);
 };
 
 const resolveCachedEnemyTarget = (
