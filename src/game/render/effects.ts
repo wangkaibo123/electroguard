@@ -395,20 +395,27 @@ const drawRepairDroneModel = (
   ctx.restore();
 };
 
+const activeRepairDroneTowerIds = new Set<string>();
+
 export const drawRepairDrones = (ctx: CanvasRenderingContext2D, state: GameState, now: number) => {
-  const activeDroneTowerIds = new Set(state.repairDrones.map((drone) => drone.sourceTowerId));
-  const dockedDrones = state.towers.filter((tower) =>
+  activeRepairDroneTowerIds.clear();
+  for (const drone of state.repairDrones) {
+    activeRepairDroneTowerIds.add(drone.sourceTowerId);
+  }
+
+  const hasDockedDrone = state.towers.some((tower) =>
     tower.type === 'repair_drone' &&
     !tower.isRuined &&
-    !activeDroneTowerIds.has(tower.id)
+    !activeRepairDroneTowerIds.has(tower.id)
   );
 
-  if (!state.repairDrones.length && !dockedDrones.length) return;
+  if (!state.repairDrones.length && !hasDockedDrone) return;
 
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
 
-  for (const tower of dockedDrones) {
+  for (const tower of state.towers) {
+    if (tower.type !== 'repair_drone' || tower.isRuined || activeRepairDroneTowerIds.has(tower.id)) continue;
     const x = (tower.x + tower.width / 2) * CELL_SIZE;
     const y = (tower.y + tower.height / 2) * CELL_SIZE;
     const hasPower = tower.storedPower > 0;

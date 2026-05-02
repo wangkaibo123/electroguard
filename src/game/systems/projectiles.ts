@@ -3,7 +3,11 @@ import { GLOBAL_CONFIG } from '../config';
 import { applyDamageToEnemy, findNearestEnemy } from './combatUtils';
 
 const MISSILE_RETARGET_RANGE = GLOBAL_CONFIG.cellSize * 10;
-const findEnemyById = (state: GameState, id: string) => state.enemies.find((enemy) => enemy.id === id);
+const findEnemyById = (state: GameState, id: string, enemyMap?: Map<string, GameState['enemies'][number]>) => {
+  const cached = enemyMap?.get(id);
+  if (cached && cached.hp > 0) return cached;
+  return state.enemies.find((enemy) => enemy.id === id);
+};
 
 const distanceToSegment = (
   px: number,
@@ -54,12 +58,15 @@ const applySplashDamage = (
 
 export const updateProjectiles = (state: GameState, dt: number) => {
   let changed = false;
+  const enemyMap = state.projectiles.length > 0
+    ? new Map(state.enemies.map((enemy) => [enemy.id, enemy]))
+    : undefined;
 
   for (let index = state.projectiles.length - 1; index >= 0; index--) {
     const projectile = state.projectiles[index];
 
     if (projectile.arcHeight !== undefined) {
-      let target = findEnemyById(state, projectile.targetId);
+      let target = findEnemyById(state, projectile.targetId, enemyMap);
       if (!target) {
         target = findNearestEnemy(state.enemies, projectile.x, projectile.y, MISSILE_RETARGET_RANGE);
         if (target) {
@@ -170,7 +177,7 @@ export const updateProjectiles = (state: GameState, dt: number) => {
     let targetX = 0;
     let targetY = 0;
     let targetFound = false;
-    const target = findEnemyById(state, projectile.targetId);
+    const target = findEnemyById(state, projectile.targetId, enemyMap);
     if (!target) {
       if (!projectile.piercing) {
         state.projectiles.splice(index, 1);

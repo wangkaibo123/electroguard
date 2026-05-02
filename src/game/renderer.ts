@@ -12,6 +12,34 @@ import {
   drawParticles, drawHitEffects, drawShieldBreakEffects, drawIncomingDrops, drawRepairDrones,
 } from './render/effects';
 
+let cachedBackground:
+  | { ctx: CanvasRenderingContext2D; width: number; height: number; gradient: CanvasGradient }
+  | null = null;
+
+const getBackgroundGradient = (ctx: CanvasRenderingContext2D, viewWidth: number, viewHeight: number) => {
+  if (
+    cachedBackground &&
+    cachedBackground.ctx === ctx &&
+    cachedBackground.width === viewWidth &&
+    cachedBackground.height === viewHeight
+  ) {
+    return cachedBackground.gradient;
+  }
+
+  const gradient = ctx.createRadialGradient(
+    viewWidth / 2,
+    viewHeight / 2,
+    0,
+    viewWidth / 2,
+    viewHeight / 2,
+    Math.max(viewWidth, viewHeight) * 0.7,
+  );
+  gradient.addColorStop(0, BG_MID);
+  gradient.addColorStop(1, BG_DARK);
+  cachedBackground = { ctx, width: viewWidth, height: viewHeight, gradient };
+  return gradient;
+};
+
 export const renderGame = (
   ctx: CanvasRenderingContext2D,
   state: GameState,
@@ -32,17 +60,7 @@ export const renderGame = (
 ) => {
   const now = performance.now();
 
-  const grad = ctx.createRadialGradient(
-    viewWidth / 2,
-    viewHeight / 2,
-    0,
-    viewWidth / 2,
-    viewHeight / 2,
-    Math.max(viewWidth, viewHeight) * 0.7,
-  );
-  grad.addColorStop(0, BG_MID);
-  grad.addColorStop(1, BG_DARK);
-  ctx.fillStyle = grad;
+  ctx.fillStyle = getBackgroundGradient(ctx, viewWidth, viewHeight);
   ctx.fillRect(0, 0, viewWidth, viewHeight);
 
   ctx.save();

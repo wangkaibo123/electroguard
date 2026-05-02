@@ -107,6 +107,7 @@ const MISSILE_MAX_SPEED = MISSILE_SPEED * 2;
 const MISSILE_INITIAL_SPEED = MISSILE_MAX_SPEED * 0.19;
 const MISSILE_ACCELERATION = 260;
 const MISSILE_ACCELERATION_GROWTH = 720;
+const TURRET_TYPES = new Set<Tower['type']>(['blaster', 'gatling', 'sniper', 'missile', 'repair_drone']);
 
 const normalizeAngleDiff = (angle: number) => {
   while (angle > Math.PI) angle -= TWO_PI;
@@ -375,12 +376,10 @@ const updateCombatTowers = (state: GameState, dt: number, now: number) => {
     }
   }
 
-  const turretTypes = new Set<Tower['type']>(['blaster', 'gatling', 'sniper', 'missile', 'repair_drone']);
-
   for (const tower of state.towers) {
     if (tower.isRuined) continue;
 
-    if (!turretTypes.has(tower.type)) continue;
+    if (!TURRET_TYPES.has(tower.type)) continue;
     if (!tower.powered) {
       if (tower.type === 'sniper') tower.sniperAimSince = undefined;
       continue;
@@ -392,11 +391,20 @@ const updateCombatTowers = (state: GameState, dt: number, now: number) => {
     if (tower.type === 'repair_drone') {
       if (state.repairDrones.some((drone) => drone.sourceTowerId === tower.id)) continue;
 
-      const repairTarget = state.towers
-        .filter((other) => !other.isRuined && other.id !== tower.id && other.hp < other.maxHp)
-        .map((other) => ({ tower: other, distance: Math.hypot((other.x + other.width / 2) * GLOBAL_CONFIG.cellSize - baseX, (other.y + other.height / 2) * GLOBAL_CONFIG.cellSize - baseY) }))
-        .filter((item) => item.distance <= REPAIR_DRONE_REPAIR_RANGE)
-        .sort((a, b) => (a.tower.hp / a.tower.maxHp) - (b.tower.hp / b.tower.maxHp))[0]?.tower;
+      let repairTarget: Tower | null = null;
+      let repairTargetHpRatio = Infinity;
+      const repairRangeSq = REPAIR_DRONE_REPAIR_RANGE * REPAIR_DRONE_REPAIR_RANGE;
+      for (const other of state.towers) {
+        if (other.isRuined || other.id === tower.id || other.hp >= other.maxHp) continue;
+        const dx = (other.x + other.width / 2) * GLOBAL_CONFIG.cellSize - baseX;
+        const dy = (other.y + other.height / 2) * GLOBAL_CONFIG.cellSize - baseY;
+        if (dx * dx + dy * dy > repairRangeSq) continue;
+        const hpRatio = other.hp / other.maxHp;
+        if (hpRatio < repairTargetHpRatio) {
+          repairTargetHpRatio = hpRatio;
+          repairTarget = other;
+        }
+      }
 
       if (repairTarget) {
         if (tower.storedPower >= REPAIR_DRONE_REPAIR_COST && now - tower.lastActionTime >= REPAIR_DRONE_REPAIR_COOLDOWN) {
@@ -418,16 +426,18 @@ const updateCombatTowers = (state: GameState, dt: number, now: number) => {
       tower.type === 'missile' ? MISSILE_RANGE :
       BLASTER_RANGE);
 
-    let bestDistance = range;
+    let bestDistanceSq = range * range;
     let targetX = 0;
     let targetY = 0;
     let hasTarget = false;
     let bestEnemy: GameState['enemies'][number] | null = null;
 
     for (const enemy of state.enemies) {
-      const distance = Math.hypot(enemy.x - baseX, enemy.y - baseY);
-      if (distance < bestDistance) {
-        bestDistance = distance;
+      const dx = enemy.x - baseX;
+      const dy = enemy.y - baseY;
+      const distanceSq = dx * dx + dy * dy;
+      if (distanceSq < bestDistanceSq) {
+        bestDistanceSq = distanceSq;
         targetX = enemy.x;
         targetY = enemy.y;
         hasTarget = true;

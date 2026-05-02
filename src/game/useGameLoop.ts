@@ -45,6 +45,8 @@ const { maxZoom: MAX_ZOOM } = GLOBAL_CONFIG;
 const COMMAND_CARD_TYPES = Object.keys(COMMAND_CARD_CONFIG) as CommandCardType[];
 const RAF_STALL_FALLBACK_MS = 120;
 const RAF_STALL_POLL_MS = 50;
+const GAMEPLAY_UI_SYNC_INTERVAL_MS = 200;
+const MAX_CANVAS_DPR = 2;
 
 export const useGameLoop = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -54,7 +56,10 @@ export const useGameLoop = () => {
     width: VIEWPORT_WIDTH,
     height: VIEWPORT_HEIGHT,
   });
-  const pendingCanvasSizeRef = useRef<{ w: number; h: number; pw: number; ph: number } | null>(null);
+  const renderDprRef = useRef(1);
+  const lastGameStateSyncAtRef = useRef(0);
+  const lastSyncedStatusRef = useRef<GameState['status']>(stateRef.current.status);
+  const pendingCanvasSizeRef = useRef<{ w: number; h: number; pw: number; ph: number; dpr: number } | null>(null);
   const markRepairTargetBarsForFade = () => {
     const now = performance.now();
     for (const tower of stateRef.current.towers) {
@@ -179,6 +184,7 @@ export const useGameLoop = () => {
       const c = canvasRef.current;
       if (c.width !== pending.pw) c.width = pending.pw;
       if (c.height !== pending.ph) c.height = pending.ph;
+      renderDprRef.current = pending.dpr;
       viewportRef.current = { width: pending.w, height: pending.h };
       const cam = cameraRef.current;
       const minZoom = getMinZoom(viewportRef.current, stateRef.current);
@@ -189,7 +195,7 @@ export const useGameLoop = () => {
     const ctx = canvasRef.current?.getContext('2d');
     if (!ctx) return;
 
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = renderDprRef.current;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const state = stateRef.current;
     const vp = viewportRef.current;
@@ -241,7 +247,18 @@ export const useGameLoop = () => {
   };
 
   const sync = () => {
-    setGameState({ ...stateRef.current });
+    const now = performance.now();
+    const statusChanged = lastSyncedStatusRef.current !== stateRef.current.status;
+    const shouldSyncReact =
+      !isGameLoopStepRef.current ||
+      statusChanged ||
+      now - lastGameStateSyncAtRef.current >= GAMEPLAY_UI_SYNC_INTERVAL_MS;
+
+    if (shouldSyncReact) {
+      lastGameStateSyncAtRef.current = now;
+      lastSyncedStatusRef.current = stateRef.current.status;
+      setGameState({ ...stateRef.current });
+    }
     if (!isGameLoopStepRef.current) requestRender();
   };
 
@@ -1506,14 +1523,15 @@ export const useGameLoop = () => {
       const rect = canvas.getBoundingClientRect();
       const width = Math.max(1, Math.round(rect.width));
       const height = Math.max(1, Math.round(rect.height));
-      const dpr = window.devicePixelRatio || 1;
+      const dpr = Math.min(window.devicePixelRatio || 1, MAX_CANVAS_DPR);
       const pixelW = Math.max(1, Math.round(width * dpr));
       const pixelH = Math.max(1, Math.round(height * dpr));
 
       if (immediate) {
+        renderDprRef.current = dpr;
         applyCanvasSize(width, height, pixelW, pixelH);
       } else {
-        pendingCanvasSizeRef.current = { w: width, h: height, pw: pixelW, ph: pixelH };
+        pendingCanvasSizeRef.current = { w: width, h: height, pw: pixelW, ph: pixelH, dpr };
       }
     };
 
