@@ -184,7 +184,8 @@ export interface RepairDroneTask {
   id: string;
   sourceTowerId: string;
   targetId: string;
-  phase: 'outbound' | 'repairing' | 'returning';
+  targetKind?: 'tower' | 'enemy';
+  phase: 'outbound' | 'repairing' | 'attacking' | 'returning';
   x: number;
   y: number;
   homeX: number;
@@ -195,6 +196,10 @@ export interface RepairDroneTask {
   amount: number;
   energy: number;
   repairTimer: number;
+  attackTimer?: number;
+  attackCooldown?: number;
+  damage?: number;
+  sourceRange?: number;
 }
 
 export interface IncomingDrop {

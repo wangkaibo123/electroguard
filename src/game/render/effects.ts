@@ -435,7 +435,9 @@ export const drawRepairDrones = (ctx: CanvasRenderingContext2D, state: GameState
     const destinationX = drone.phase === 'returning' ? drone.homeX : drone.targetX;
     const destinationY = drone.phase === 'returning' ? drone.homeY : drone.targetY;
     const angle = Math.atan2(destinationY - drone.y, destinationX - drone.x);
-    const color = drone.phase === 'repairing' ? '#99f6e4' : '#2dd4bf';
+    const attacking = drone.targetKind === 'enemy';
+    const color = attacking ? '#fb7185' : drone.phase === 'repairing' ? '#99f6e4' : '#2dd4bf';
+    const trailColor = attacking ? '251,113,133' : '45,212,191';
 
     ctx.save();
     const trail = ctx.createLinearGradient(
@@ -444,8 +446,8 @@ export const drawRepairDrones = (ctx: CanvasRenderingContext2D, state: GameState
       drone.x,
       drone.y,
     );
-    trail.addColorStop(0, 'rgba(45,212,191,0)');
-    trail.addColorStop(1, `rgba(45,212,191,${drone.phase === 'outbound' ? 0.45 : 0.22})`);
+    trail.addColorStop(0, `rgba(${trailColor},0)`);
+    trail.addColorStop(1, `rgba(${trailColor},${drone.phase === 'outbound' ? 0.45 : 0.22})`);
     ctx.strokeStyle = trail;
     ctx.lineWidth = 3;
     ctx.beginPath();
@@ -456,9 +458,9 @@ export const drawRepairDrones = (ctx: CanvasRenderingContext2D, state: GameState
 
     drawRepairDroneModel(ctx, drone.x, drone.y, angle, now, color, drone.energy);
 
-    if (drone.phase === 'repairing') {
+    if (drone.phase === 'repairing' || drone.phase === 'attacking') {
       ctx.save();
-      ctx.strokeStyle = 'rgba(94,234,212,0.65)';
+      ctx.strokeStyle = attacking ? 'rgba(251,113,133,0.65)' : 'rgba(94,234,212,0.65)';
       ctx.lineWidth = 1.2;
       ctx.setLineDash([3, 4]);
       ctx.beginPath();

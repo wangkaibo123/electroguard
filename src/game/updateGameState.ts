@@ -90,6 +90,11 @@ const {
   splashRadius: MISSILE_SPLASH_RADIUS,
 } = WEAPON_CONFIG.missile;
 const {
+  attackCooldown: REPAIR_DRONE_ATTACK_COOLDOWN,
+  attackCost: REPAIR_DRONE_ATTACK_COST,
+  attackDamage: REPAIR_DRONE_ATTACK_DAMAGE,
+  attackRange: REPAIR_DRONE_ATTACK_RANGE,
+  attackShots: REPAIR_DRONE_ATTACK_SHOTS,
   repairAmount: REPAIR_DRONE_REPAIR_AMOUNT,
   repairCooldown: REPAIR_DRONE_REPAIR_COOLDOWN,
   repairCost: REPAIR_DRONE_REPAIR_COST,
@@ -202,6 +207,7 @@ const launchRepairDrone = (
     id: genId(),
     sourceTowerId: tower.id,
     targetId,
+    targetKind: 'tower',
     phase: 'outbound',
     x: homeX,
     y: homeY,
@@ -213,6 +219,38 @@ const launchRepairDrone = (
     amount,
     energy: REPAIR_DRONE_REPAIR_COST,
     repairTimer: 0,
+  });
+};
+
+const launchAttackDrone = (
+  state: GameState,
+  tower: Tower,
+  target: GameState['enemies'][number],
+  range: number,
+) => {
+  const homeX = (tower.x + tower.width / 2) * GLOBAL_CONFIG.cellSize;
+  const homeY = (tower.y + tower.height / 2) * GLOBAL_CONFIG.cellSize;
+
+  state.repairDrones.push({
+    id: genId(),
+    sourceTowerId: tower.id,
+    targetId: target.id,
+    targetKind: 'enemy',
+    phase: 'outbound',
+    x: homeX,
+    y: homeY,
+    homeX,
+    homeY,
+    targetX: target.x,
+    targetY: target.y,
+    speed: 420,
+    amount: 0,
+    energy: REPAIR_DRONE_ATTACK_SHOTS,
+    repairTimer: 0,
+    attackTimer: REPAIR_DRONE_ATTACK_COOLDOWN,
+    attackCooldown: REPAIR_DRONE_ATTACK_COOLDOWN,
+    damage: REPAIR_DRONE_ATTACK_DAMAGE,
+    sourceRange: range,
   });
 };
 
@@ -390,6 +428,7 @@ const updateCombatTowers = (state: GameState, dt: number, now: number) => {
 
     if (tower.type === 'repair_drone') {
       if (state.repairDrones.some((drone) => drone.sourceTowerId === tower.id)) continue;
+      const fullyCharged = tower.maxPower > 0 && tower.storedPower >= tower.maxPower;
 
       let repairTarget: Tower | null = null;
       let repairTargetHpRatio = Infinity;
@@ -407,11 +446,24 @@ const updateCombatTowers = (state: GameState, dt: number, now: number) => {
       }
 
       if (repairTarget) {
-        if (tower.storedPower >= REPAIR_DRONE_REPAIR_COST && now - tower.lastActionTime >= REPAIR_DRONE_REPAIR_COOLDOWN) {
+        if (fullyCharged && now - tower.lastActionTime >= REPAIR_DRONE_REPAIR_COOLDOWN) {
           const targetX = (repairTarget.x + repairTarget.width / 2) * GLOBAL_CONFIG.cellSize;
           const targetY = (repairTarget.y + repairTarget.height / 2) * GLOBAL_CONFIG.cellSize;
           tower.storedPower -= REPAIR_DRONE_REPAIR_COST;
           launchRepairDrone(state, tower, repairTarget.id, targetX, targetY, REPAIR_DRONE_REPAIR_AMOUNT);
+          tower.lastActionTime = now;
+          changed = true;
+        }
+      } else {
+        const attackRange = getTowerRange(tower) ?? REPAIR_DRONE_ATTACK_RANGE;
+        const enemyTarget = findNearestEnemy(state.enemies, baseX, baseY, attackRange);
+        if (
+          enemyTarget &&
+          fullyCharged &&
+          now - tower.lastActionTime >= REPAIR_DRONE_ATTACK_COOLDOWN
+        ) {
+          tower.storedPower -= REPAIR_DRONE_ATTACK_COST;
+          launchAttackDrone(state, tower, enemyTarget, attackRange);
           tower.lastActionTime = now;
           changed = true;
         }
