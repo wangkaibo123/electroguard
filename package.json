@@ -8,6 +8,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "package:taptap": "npm run build && node packaging/taptap/package-taptap.mjs",
+    "desktop:dev": "tauri dev",
+    "build:windows": "node packaging/taptap/build-windows.mjs",
+    "package:taptap:windows": "npm run build:windows && node packaging/taptap/package-windows-taptap.mjs",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit"
   },
@@ -20,6 +23,7 @@
     "vite": "^6.2.0"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2.11.0",
     "@types/node": "^22.14.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",

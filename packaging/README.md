@@ -4,6 +4,28 @@ This directory keeps generated upload packages and platform-specific packaging h
 
 ## TapTap
 
+### Windows
+
+Prerequisites:
+
+- Rust and Cargo available on PATH
+- Microsoft Edge WebView2 Runtime on player machines
+
+Run:
+
+```bash
+npm run package:taptap:windows
+```
+
+Outputs:
+
+- `packaging/taptap/electroguard-windows-taptap.zip`
+- `packaging/taptap/windows_upload/Electroguard/`
+
+Upload the Windows zip to TapTap and set the executable file to `electroguard.exe`.
+
+### H5
+
 Run:
 
 ```bash
@@ -29,7 +51,7 @@ Outputs:
 - `packaging/taptap/electroguard-h5-taptap.zip`
 - `packaging/taptap/tap_upload/electroguard-h5/`
 
-The TapTap zip keeps `index.html` inside a single top-level folder and inlines compatibility CSS for TapTap's H5 preview WebView.
+The TapTap zip keeps `index.html`, `assets/`, and `images/` at the zip root and inlines compatibility CSS for TapTap's H5 preview WebView.
 
 ## Generic H5
 
