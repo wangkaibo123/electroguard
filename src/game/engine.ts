@@ -29,6 +29,12 @@ const PORT_DIRS: PortDirection[] = ['top', 'right', 'bottom', 'left'];
 const NEIGHBOR_OFFSETS = [[0, 1], [1, 0], [0, -1], [-1, 0]] as const;
 const GATLING_RANGE = WEAPON_CONFIG.gatling.range;
 const DIRECT_PORT_OVERLAP_EPS = 0.75;
+const OPPOSITE_PORT_DIR: Record<PortDirection, PortDirection> = {
+  top: 'bottom',
+  right: 'left',
+  bottom: 'top',
+  left: 'right',
+};
 
 const gatlingNeedsPower = (state: GameState, tower: Tower) => {
   if (tower.overloaded) return false;
@@ -114,6 +120,30 @@ const portsOverlap = (towerA: Tower, portA: Port, towerB: Tower, portB: Port): b
   return Math.hypot(posA.x - posB.x, posA.y - posB.y) <= DIRECT_PORT_OVERLAP_EPS;
 };
 
+const cellInsideTowerFootprint = (tower: Tower, cell: Position): boolean =>
+  cell.x >= tower.x &&
+  cell.x < tower.x + tower.width &&
+  cell.y >= tower.y &&
+  cell.y < tower.y + tower.height;
+
+const portsFaceEachOtherOnGrid = (towerA: Tower, portA: Port, towerB: Tower, portB: Port): boolean => {
+  if (OPPOSITE_PORT_DIR[portA.direction] !== portB.direction) return false;
+
+  const cellA = getPortCell(towerA, portA);
+  const cellB = getPortCell(towerB, portB);
+
+  if (!cellInsideTowerFootprint(towerB, cellA) || !cellInsideTowerFootprint(towerA, cellB)) {
+    return false;
+  }
+
+  return portA.direction === 'top' || portA.direction === 'bottom'
+    ? cellA.x === cellB.x
+    : cellA.y === cellB.y;
+};
+
+const portsCanDirectMeet = (towerA: Tower, portA: Port, towerB: Tower, portB: Port): boolean =>
+  portsOverlap(towerA, portA, towerB, portB) || portsFaceEachOtherOnGrid(towerA, portA, towerB, portB);
+
 const isPortLinked = (state: GameState, portId: string, ignoreWireId?: string): boolean =>
   state.wires.some(wire => wire.id !== ignoreWireId && (wire.startPortId === portId || wire.endPortId === portId));
 
@@ -129,7 +159,7 @@ export const canDirectLinkPorts = (
   portA.portType !== portB.portType &&
   !isPortLinked(state, portA.id, ignoreWireId) &&
   !isPortLinked(state, portB.id, ignoreWireId) &&
-  portsOverlap(towerA, portA, towerB, portB);
+  portsCanDirectMeet(towerA, portA, towerB, portB);
 
 const hasDirectLinkCandidate = (
   state: GameState,
@@ -219,7 +249,7 @@ const isDirectPortLinkStillValid = (state: GameState, wire: Wire): boolean => {
   const endPort = endTower?.ports.find(port => port.id === wire.endPortId);
   if (!startTower || !endTower || !startPort || !endPort) return false;
   if (startPort.portType !== 'output' || endPort.portType !== 'input') return false;
-  return portsOverlap(startTower, startPort, endTower, endPort);
+  return portsCanDirectMeet(startTower, startPort, endTower, endPort);
 };
 
 export const syncDirectPortLinks = (
@@ -251,7 +281,7 @@ export const syncDirectPortLinks = (
         for (const portB of towerB.ports) {
           if (portA.portType === portB.portType) continue;
           if (isPortLinked(state, portB.id)) continue;
-          if (!portsOverlap(towerA, portA, towerB, portB)) continue;
+          if (!portsCanDirectMeet(towerA, portA, towerB, portB)) continue;
 
           const endpoint = getDirectLinkEndpoint(towerA, portA, towerB, portB);
           if (!endpoint) continue;
