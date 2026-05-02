@@ -231,6 +231,34 @@ body{position:fixed;inset:0;}
   writeFileSync(htmlPath, html);
 };
 
+const createZip = () => {
+  try {
+    execFileSync('zip', ['-r', zipPath, packageDirName], {
+      cwd: workDir,
+      stdio: 'inherit',
+    });
+    return;
+  } catch (error) {
+    if (process.platform !== 'win32') throw error;
+  }
+
+  const psQuote = (value) => `'${value.replace(/'/g, "''")}'`;
+  execFileSync(
+    'powershell',
+    [
+      '-NoProfile',
+      '-ExecutionPolicy',
+      'Bypass',
+      '-Command',
+      [
+        'Add-Type -AssemblyName System.IO.Compression.FileSystem;',
+        `[System.IO.Compression.ZipFile]::CreateFromDirectory(${psQuote(workDir)}, ${psQuote(zipPath)});`,
+      ].join(' '),
+    ],
+    { stdio: 'inherit' },
+  );
+};
+
 if (!existsSync(distDir)) {
   throw new Error('dist directory does not exist. Run npm run build first.');
 }
@@ -242,9 +270,6 @@ cpSync(distDir, packageDir, { recursive: true });
 
 writeCompatCss();
 
-execFileSync('zip', ['-r', zipPath, packageDirName], {
-  cwd: workDir,
-  stdio: 'inherit',
-});
+createZip();
 
 console.log(`TapTap package written to ${zipPath}`);

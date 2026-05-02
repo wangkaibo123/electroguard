@@ -703,78 +703,147 @@ const createShieldBreakFragments = (): ShieldBreakEffect['fragments'] => {
   return fragments;
 };
 
+type EnemyAiTarget = {
+  kind: 'tower' | 'shield' | 'wire';
+  tower: Tower | null;
+  wire: GameState['wires'][number] | null;
+  x: number;
+  y: number;
+};
+
+const ENEMY_RETARGET_MS = 220;
+const ENEMY_RETARGET_JITTER_MS = 90;
+
+const getEnemyRetargetDelay = (enemyId: string) => {
+  let hash = 0;
+  for (let index = 0; index < enemyId.length; index++) {
+    hash = (hash * 31 + enemyId.charCodeAt(index)) | 0;
+  }
+  return ENEMY_RETARGET_MS + Math.abs(hash % ENEMY_RETARGET_JITTER_MS);
+};
+
+const resolveCachedEnemyTarget = (
+  state: GameState,
+  enemy: GameState['enemies'][number],
+): EnemyAiTarget | null => {
+  if (!enemy.aiTargetKind || !enemy.aiTargetId) return null;
+
+  if (enemy.aiTargetKind === 'wire') {
+    const wire = state.wires.find((item) => item.id === enemy.aiTargetId && item.hp > 0);
+    if (!wire || enemy.aiTargetX === undefined || enemy.aiTargetY === undefined) return null;
+    return { kind: 'wire', tower: null, wire, x: enemy.aiTargetX, y: enemy.aiTargetY };
+  }
+
+  const tower = state.towerMap.get(enemy.aiTargetId);
+  if (!tower || tower.isRuined) return null;
+
+  if (enemy.aiTargetKind === 'shield') {
+    if (tower.shieldHp <= 0 || tower.shieldRadius <= 0 || !tower.powered) return null;
+    const shieldCenterX = (tower.x + tower.width / 2) * GLOBAL_CONFIG.cellSize;
+    const shieldCenterY = (tower.y + tower.height / 2) * GLOBAL_CONFIG.cellSize;
+    const angle = Math.atan2(enemy.y - shieldCenterY, enemy.x - shieldCenterX);
+    return {
+      kind: 'shield',
+      tower,
+      wire: null,
+      x: shieldCenterX + Math.cos(angle) * tower.shieldRadius,
+      y: shieldCenterY + Math.sin(angle) * tower.shieldRadius,
+    };
+  }
+
+  const closest = closestPointOnTower(tower, enemy.x, enemy.y);
+  return { kind: 'tower', tower, wire: null, x: closest.x, y: closest.y };
+};
+
+const findEnemyTarget = (
+  state: GameState,
+  enemy: GameState['enemies'][number],
+  now: number,
+): EnemyAiTarget | null => {
+  let minDistance = Infinity;
+  let target: EnemyAiTarget | null = null;
+  const isSaboteur = enemy.enemyType === 'saboteur';
+
+  for (const tower of state.towers) {
+    if (tower.isRuined) continue;
+
+    const closest = closestPointOnTower(tower, enemy.x, enemy.y);
+    const tx = closest.x;
+    const ty = closest.y;
+    const distance = Math.hypot(tx - enemy.x, ty - enemy.y);
+    const weightedDistance = isSaboteur ? distance * ENEMY_AI_CONFIG.saboteurTowerDistMul : distance;
+
+    if (weightedDistance < minDistance) {
+      minDistance = weightedDistance;
+      target = { kind: 'tower', tower, wire: null, x: tx, y: ty };
+    }
+
+    if (tower.shieldHp <= 0 || tower.shieldRadius <= 0 || !tower.powered) continue;
+
+    const shieldCenterX = (tower.x + tower.width / 2) * GLOBAL_CONFIG.cellSize;
+    const shieldCenterY = (tower.y + tower.height / 2) * GLOBAL_CONFIG.cellSize;
+    const shieldDistance = Math.max(0, Math.hypot(shieldCenterX - enemy.x, shieldCenterY - enemy.y) - tower.shieldRadius);
+    const weightedShieldDistance = isSaboteur ? shieldDistance * ENEMY_AI_CONFIG.saboteurTowerDistMul : shieldDistance;
+    if (weightedShieldDistance < minDistance) {
+      minDistance = weightedShieldDistance;
+      const angle = Math.atan2(enemy.y - shieldCenterY, enemy.x - shieldCenterX);
+      target = {
+        kind: 'shield',
+        tower,
+        wire: null,
+        x: shieldCenterX + Math.cos(angle) * tower.shieldRadius,
+        y: shieldCenterY + Math.sin(angle) * tower.shieldRadius,
+      };
+    }
+  }
+
+  for (const wire of state.wires) {
+    for (const point of wire.path) {
+      const wireX = point.x * GLOBAL_CONFIG.cellSize + GLOBAL_CONFIG.cellSize / 2;
+      const wireY = point.y * GLOBAL_CONFIG.cellSize + GLOBAL_CONFIG.cellSize / 2;
+      const distance = Math.hypot(wireX - enemy.x, wireY - enemy.y);
+      const weightedDistance = isSaboteur ? distance * ENEMY_AI_CONFIG.saboteurWireDistMul : distance;
+
+      if (weightedDistance < minDistance) {
+        minDistance = weightedDistance;
+        target = { kind: 'wire', tower: null, wire, x: wireX, y: wireY };
+      }
+    }
+  }
+
+  if (target) {
+    enemy.aiTargetKind = target.kind;
+    enemy.aiTargetId = target.kind === 'wire' ? target.wire?.id : target.tower?.id;
+    enemy.aiTargetX = target.x;
+    enemy.aiTargetY = target.y;
+    enemy.aiRetargetAt = now + getEnemyRetargetDelay(enemy.id);
+  } else {
+    enemy.aiTargetKind = undefined;
+    enemy.aiTargetId = undefined;
+    enemy.aiTargetX = undefined;
+    enemy.aiTargetY = undefined;
+    enemy.aiRetargetAt = undefined;
+  }
+
+  return target;
+};
+
 const updateEnemyState = (state: GameState, dt: number, now: number) => {
   let changed = false;
 
   for (const enemy of state.enemies) {
     if (enemy.isStatic) continue;
 
-    let minDistance = Infinity;
-    let targetPos = { x: 0, y: 0 };
-    let isShieldTarget = false;
-    let targetTower: Tower | null = null;
-    let targetWire: GameState['wires'][number] | null = null;
-    const isSaboteur = enemy.enemyType === 'saboteur';
-
-    for (const tower of state.towers) {
-      if (tower.isRuined) continue;
-
-      // Query the tower's collider component so enemies must visually touch the body
-      const closest = closestPointOnTower(tower, enemy.x, enemy.y);
-      const tx = closest.x;
-      const ty = closest.y;
-      const distance = Math.hypot(tx - enemy.x, ty - enemy.y);
-      const weightedDistance = isSaboteur ? distance * ENEMY_AI_CONFIG.saboteurTowerDistMul : distance;
-
-      if (weightedDistance < minDistance) {
-        minDistance = weightedDistance;
-        targetTower = tower;
-        targetWire = null;
-        isShieldTarget = false;
-        targetPos = { x: tx, y: ty };
-      }
-
-      if (tower.shieldHp <= 0 || tower.shieldRadius <= 0 || !tower.powered) continue;
-
-      const shieldCenterX = (tower.x + tower.width / 2) * GLOBAL_CONFIG.cellSize;
-      const shieldCenterY = (tower.y + tower.height / 2) * GLOBAL_CONFIG.cellSize;
-      const shieldDistance = Math.max(0, Math.hypot(shieldCenterX - enemy.x, shieldCenterY - enemy.y) - tower.shieldRadius);
-      const weightedShieldDistance = isSaboteur ? shieldDistance * ENEMY_AI_CONFIG.saboteurTowerDistMul : shieldDistance;
-      if (weightedShieldDistance < minDistance) {
-        minDistance = weightedShieldDistance;
-        targetTower = tower;
-        targetWire = null;
-        isShieldTarget = true;
-        const angle = Math.atan2(enemy.y - shieldCenterY, enemy.x - shieldCenterX);
-        targetPos = {
-          x: shieldCenterX + Math.cos(angle) * tower.shieldRadius,
-          y: shieldCenterY + Math.sin(angle) * tower.shieldRadius,
-        };
-      }
+    let target = resolveCachedEnemyTarget(state, enemy);
+    let actualDistance = target ? Math.hypot(target.x - enemy.x, target.y - enemy.y) : Infinity;
+    if (!target || now >= (enemy.aiRetargetAt ?? 0) || actualDistance <= ATTACK_RANGE * 1.5) {
+      target = findEnemyTarget(state, enemy, now);
+      actualDistance = target ? Math.hypot(target.x - enemy.x, target.y - enemy.y) : Infinity;
     }
+    if (!target) continue;
 
-    for (const wire of state.wires) {
-      for (const point of wire.path) {
-        const wireX = point.x * GLOBAL_CONFIG.cellSize + GLOBAL_CONFIG.cellSize / 2;
-        const wireY = point.y * GLOBAL_CONFIG.cellSize + GLOBAL_CONFIG.cellSize / 2;
-        const distance = Math.hypot(wireX - enemy.x, wireY - enemy.y);
-        const weightedDistance = isSaboteur ? distance * ENEMY_AI_CONFIG.saboteurWireDistMul : distance;
-
-        if (weightedDistance < minDistance) {
-          minDistance = weightedDistance;
-          targetTower = null;
-          targetWire = wire;
-          isShieldTarget = false;
-          targetPos = { x: wireX, y: wireY };
-        }
-      }
-    }
-
-    if (!targetTower && !targetWire) continue;
-
-    const actualDistance = Math.hypot(targetPos.x - enemy.x, targetPos.y - enemy.y);
     if (actualDistance > ATTACK_RANGE) {
-      const angle = Math.atan2(targetPos.y - enemy.y, targetPos.x - enemy.x);
+      const angle = Math.atan2(target.y - enemy.y, target.x - enemy.x);
       enemy.x += Math.cos(angle) * enemy.speed * dt;
       enemy.y += Math.sin(angle) * enemy.speed * dt;
       enemy.heading = angle;
@@ -784,10 +853,12 @@ const updateEnemyState = (state: GameState, dt: number, now: number) => {
 
     if (now - enemy.lastAttackTime <= enemy.attackCooldown) continue;
 
+    const targetWire = target.wire;
+    const targetTower = target.tower;
     if (targetWire) {
       targetWire.hp -= enemy.damage * enemy.wireDamageMul;
-      state.hitEffects.push({ x: targetPos.x, y: targetPos.y, life: 0, maxLife: 0.3, color: '#ef4444', radius: 12 });
-      createExplosion(state, targetPos.x, targetPos.y, '#ef4444', 3);
+      state.hitEffects.push({ x: target.x, y: target.y, life: 0, maxLife: 0.3, color: '#ef4444', radius: 12 });
+      createExplosion(state, target.x, target.y, '#ef4444', 3);
       if (targetWire.hp <= 0) {
         state.wires = state.wires.filter((wire) => wire.id !== targetWire!.id);
         updatePowerGrid(state);
@@ -799,11 +870,11 @@ const updateEnemyState = (state: GameState, dt: number, now: number) => {
 
     if (!targetTower) continue;
 
-    if (isShieldTarget) {
+    if (target.kind === 'shield') {
       const previousHp = targetTower.shieldHp;
       targetTower.shieldHp = Math.max(0, targetTower.shieldHp - enemy.damage);
-      state.hitEffects.push({ x: targetPos.x, y: targetPos.y, life: 0, maxLife: 0.35, color: '#22d3ee', radius: 18 });
-      createExplosion(state, targetPos.x, targetPos.y, '#22d3ee', 4);
+      state.hitEffects.push({ x: target.x, y: target.y, life: 0, maxLife: 0.35, color: '#22d3ee', radius: 18 });
+      createExplosion(state, target.x, target.y, '#22d3ee', 4);
 
       if (previousHp > 0 && targetTower.shieldHp <= 0) {
         const shieldCenterX = (targetTower.x + targetTower.width / 2) * GLOBAL_CONFIG.cellSize;
@@ -821,8 +892,8 @@ const updateEnemyState = (state: GameState, dt: number, now: number) => {
     } else {
       targetTower.hp -= enemy.damage;
       targetTower.lastDamagedAt = now;
-      state.hitEffects.push({ x: targetPos.x, y: targetPos.y, life: 0, maxLife: 0.3, color: '#ef4444', radius: 14 });
-      createExplosion(state, targetPos.x, targetPos.y, '#f87171', 4);
+      state.hitEffects.push({ x: target.x, y: target.y, life: 0, maxLife: 0.3, color: '#ef4444', radius: 14 });
+      createExplosion(state, target.x, target.y, '#f87171', 4);
 
       if (targetTower.hp <= 0) {
         if (targetTower.type === 'core') {

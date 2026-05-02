@@ -29,13 +29,19 @@ export const drawPorts = (ctx: CanvasRenderingContext2D, state: GameState) => {
     return Math.sin(t * Math.PI) * distance * (1 - t * 0.28);
   };
 
+  const wireByPortId = new Map<string, GameState['wires'][number]>();
+  for (const wire of state.wires) {
+    wireByPortId.set(wire.startPortId, wire);
+    wireByPortId.set(wire.endPortId, wire);
+  }
+
   for (const tower of state.towers) {
     if (tower.isRuined) continue;
     for (const port of tower.ports) {
       const pos = getPortPos(tower, port);
       const off = portOutward(port.direction);
       const unit = unitForDirection(port.direction);
-      const linkedWire = state.wires.find(w => w.startPortId === port.id || w.endPortId === port.id);
+      const linkedWire = wireByPortId.get(port.id);
       const directWire = linkedWire?.direct ? linkedWire : null;
       const directOutputInsert = directWire && port.portType === 'output' ? DIRECT_OUTPUT_INSERT : 0;
       const recoil = directWire
@@ -44,7 +50,7 @@ export const drawPorts = (ctx: CanvasRenderingContext2D, state: GameState) => {
       const lineX = directWire ? pos.x + unit.x * directOutputInsert - unit.x * recoil : pos.x + off.x;
       const lineY = directWire ? pos.y + unit.y * directOutputInsert - unit.y * recoil : pos.y + off.y;
       const used = Boolean(linkedWire);
-      const accessible = isPortAccessible(state, tower, port);
+      const accessible = used || isPortAccessible(state, tower, port);
       const portColor = port.portType === 'output'
         ? (used ? PORT_OUT_USED : PORT_OUT)
         : (used ? PORT_IN_USED : PORT_IN);

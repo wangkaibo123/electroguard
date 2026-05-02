@@ -47,6 +47,25 @@ const RAF_STALL_FALLBACK_MS = 120;
 const RAF_STALL_POLL_MS = 50;
 const GAMEPLAY_UI_SYNC_INTERVAL_MS = 200;
 const MAX_CANVAS_DPR = 2;
+const MOBILE_CANVAS_DPR = 1.35;
+const MOBILE_FRAME_INTERVAL_MS = 1000 / 30;
+
+const isTapTapPackage = () =>
+  typeof window !== 'undefined' &&
+  Boolean((window as typeof window & { __TAPTAP_PACKAGE__?: boolean }).__TAPTAP_PACKAGE__);
+
+const isMobileRuntime = () => {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
+  return (
+    isTapTapPackage() ||
+    navigator.maxTouchPoints > 0 ||
+    window.matchMedia?.('(pointer: coarse)').matches ||
+    Math.min(window.innerWidth, window.innerHeight) < 700
+  );
+};
+
+const getCanvasDprCap = () => (isMobileRuntime() ? MOBILE_CANVAS_DPR : MAX_CANVAS_DPR);
+const getTargetFrameIntervalMs = () => (isMobileRuntime() ? MOBILE_FRAME_INTERVAL_MS : 0);
 
 export const useGameLoop = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -108,7 +127,9 @@ export const useGameLoop = () => {
   const mouseDownPosRef = useRef<{ x: number; y: number } | null>(null);
   const rotStartAngleRef = useRef(0);
   const lastTimeRef = useRef(0);
+  const lastFrameTimeRef = useRef(0);
   const lastLoopRunAtRef = useRef(0);
+  const targetFrameIntervalRef = useRef(getTargetFrameIntervalMs());
   const isGameLoopStepRef = useRef(false);
   const gameLoopRafRef = useRef<number | null>(null);
   const renderRequestRef = useRef<number | null>(null);
@@ -1483,7 +1504,11 @@ export const useGameLoop = () => {
   }, []);
 
   const gameLoop = useCallback((time: number) => {
-    stepGameLoop(time);
+    const targetFrameInterval = targetFrameIntervalRef.current;
+    if (!lastFrameTimeRef.current || !targetFrameInterval || time - lastFrameTimeRef.current >= targetFrameInterval) {
+      lastFrameTimeRef.current = time;
+      stepGameLoop(time);
+    }
     gameLoopRafRef.current = requestAnimationFrame(gameLoop);
   }, [stepGameLoop]);
 
@@ -1523,7 +1548,8 @@ export const useGameLoop = () => {
       const rect = canvas.getBoundingClientRect();
       const width = Math.max(1, Math.round(rect.width));
       const height = Math.max(1, Math.round(rect.height));
-      const dpr = Math.min(window.devicePixelRatio || 1, MAX_CANVAS_DPR);
+      targetFrameIntervalRef.current = getTargetFrameIntervalMs();
+      const dpr = Math.min(window.devicePixelRatio || 1, getCanvasDprCap());
       const pixelW = Math.max(1, Math.round(width * dpr));
       const pixelH = Math.max(1, Math.round(height * dpr));
 

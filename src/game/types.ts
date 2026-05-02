@@ -119,6 +119,11 @@ export interface Enemy {
   maxShieldAbsorb: number;
   lastSpawnTime: number;   // overlord: last time it spawned minions
   collider: Collider;      // collision shape (circle of `radius`)
+  aiTargetKind?: 'tower' | 'shield' | 'wire';
+  aiTargetId?: string;
+  aiTargetX?: number;
+  aiTargetY?: number;
+  aiRetargetAt?: number;
 }
 
 export interface Projectile {
