@@ -4,7 +4,10 @@
       "Bash(npx tsc:*)",
       "Bash(npm run:*)",
       "Bash(wc -l /c/All/program/H5/electroguard/src/game/*.ts)",
-      "Bash(npx vite:*)"
+      "Bash(npx vite:*)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
     ]
   }
 }
