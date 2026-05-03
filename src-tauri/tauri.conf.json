@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "Electroguard",
+  "productName": "拉电线守核心",
   "version": "0.1.0",
   "identifier": "com.electroguard.game",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Electroguard",
+        "title": "拉电线守核心",
         "width": 1280,
         "height": 720,
         "minWidth": 960,

@@ -24,6 +24,15 @@ Thumbs.db
 # Logs
 *.log
 
+# Android signing secrets
+*.jks
+*.keystore
+*signing-info*.txt
+
+# Tauri generated mobile project/build output
+src-tauri/gen/
+src-tauri/target/
+
 # TypeScript cache
 *.tsbuildinfo
 
