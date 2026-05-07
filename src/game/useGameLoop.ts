@@ -47,8 +47,8 @@ const RAF_STALL_FALLBACK_MS = 120;
 const RAF_STALL_POLL_MS = 50;
 const GAMEPLAY_UI_SYNC_INTERVAL_MS = 200;
 const MAX_CANVAS_DPR = 2;
-const MOBILE_CANVAS_DPR = 1.35;
-const MOBILE_FRAME_INTERVAL_MS = 1000 / 30;
+const MOBILE_CANVAS_DPR = 2;
+const MOBILE_FRAME_INTERVAL_MS = 1000 / 60;
 
 const isTapTapPackage = () =>
   typeof window !== 'undefined' &&
