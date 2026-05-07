@@ -58,9 +58,11 @@ const applySplashDamage = (
 
 export const updateProjectiles = (state: GameState, dt: number) => {
   let changed = false;
-  const enemyMap = state.projectiles.length > 0
-    ? new Map(state.enemies.map((enemy) => [enemy.id, enemy]))
-    : undefined;
+  let enemyMap: Map<string, GameState['enemies'][number]> | undefined;
+  if (state.projectiles.length > 0) {
+    enemyMap = new Map();
+    for (const enemy of state.enemies) enemyMap.set(enemy.id, enemy);
+  }
 
   for (let index = state.projectiles.length - 1; index >= 0; index--) {
     const projectile = state.projectiles[index];
@@ -251,4 +253,3 @@ export const updateProjectiles = (state: GameState, dt: number) => {
 
   return changed;
 };
-

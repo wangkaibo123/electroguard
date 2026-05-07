@@ -21,7 +21,13 @@ export const applyDamageToEnemy = (
 
   if (enemy.hp > 0) return false;
 
-  state.enemies = state.enemies.filter((item) => item.id !== enemy.id);
+  const enemyIndex = state.enemies.indexOf(enemy);
+  if (enemyIndex >= 0) {
+    state.enemies.splice(enemyIndex, 1);
+  } else {
+    const fallbackIndex = state.enemies.findIndex((item) => item.id === enemy.id);
+    if (fallbackIndex >= 0) state.enemies.splice(fallbackIndex, 1);
+  }
   state.score += SCORE_CONFIG[enemy.enemyType] ?? SCORE_CONFIG.default;
   state.gold += enemy.goldReward ?? SHOP_CONFIG.goldPerEnemyKill;
   createExplosion(state, enemy.x, enemy.y, enemy.color, bigExplosion ? 15 : 10);
@@ -36,21 +42,22 @@ export const findNearestEnemy = (
   excludeIds?: Set<string> | string[],
 ) => {
   let best: GameState['enemies'][number] | null = null;
-  let bestDistance = range;
+  let bestDistanceSq = range * range;
 
   for (const enemy of enemies) {
     if (excludeIds && (excludeIds instanceof Set ? excludeIds.has(enemy.id) : excludeIds.includes(enemy.id))) {
       continue;
     }
 
-    const distance = Math.hypot(enemy.x - x, enemy.y - y);
-    if (distance < bestDistance) {
-      bestDistance = distance;
+    const dx = enemy.x - x;
+    const dy = enemy.y - y;
+    const distanceSq = dx * dx + dy * dy;
+    if (distanceSq < bestDistanceSq) {
+      bestDistanceSq = distanceSq;
       best = enemy;
     }
   }
 
   return best;
 };
-
 

@@ -15,6 +15,9 @@ import {
 let cachedBackground:
   | { ctx: CanvasRenderingContext2D; width: number; height: number; gradient: CanvasGradient }
   | null = null;
+let cachedMapLayer:
+  | { width: number; height: number; canvas: HTMLCanvasElement }
+  | null = null;
 
 const getBackgroundGradient = (ctx: CanvasRenderingContext2D, viewWidth: number, viewHeight: number) => {
   if (
@@ -38,6 +41,45 @@ const getBackgroundGradient = (ctx: CanvasRenderingContext2D, viewWidth: number,
   gradient.addColorStop(1, BG_DARK);
   cachedBackground = { ctx, width: viewWidth, height: viewHeight, gradient };
   return gradient;
+};
+
+const getMapLayer = (canvasWidth: number, canvasHeight: number) => {
+  if (
+    cachedMapLayer &&
+    cachedMapLayer.width === canvasWidth &&
+    cachedMapLayer.height === canvasHeight
+  ) {
+    return cachedMapLayer.canvas;
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = canvasWidth;
+  canvas.height = canvasHeight;
+  const layerCtx = canvas.getContext('2d');
+  if (!layerCtx) return null;
+
+  layerCtx.beginPath();
+  for (let i = 0; i <= canvasWidth; i += CELL_SIZE) {
+    layerCtx.moveTo(i, 0);
+    layerCtx.lineTo(i, canvasHeight);
+  }
+  for (let i = 0; i <= canvasHeight; i += CELL_SIZE) {
+    layerCtx.moveTo(0, i);
+    layerCtx.lineTo(canvasWidth, i);
+  }
+  layerCtx.strokeStyle = BG_GRID;
+  layerCtx.lineWidth = 1;
+  layerCtx.stroke();
+
+  const borderW = Math.max(1.5, CELL_SIZE * 0.12);
+  layerCtx.fillStyle = MAP_BORDER;
+  layerCtx.fillRect(0, 0, canvasWidth, borderW);
+  layerCtx.fillRect(0, canvasHeight - borderW, canvasWidth, borderW);
+  layerCtx.fillRect(0, 0, borderW, canvasHeight);
+  layerCtx.fillRect(canvasWidth - borderW, 0, borderW, canvasHeight);
+
+  cachedMapLayer = { width: canvasWidth, height: canvasHeight, canvas };
+  return canvas;
 };
 
 export const renderGame = (
@@ -71,26 +113,8 @@ export const renderGame = (
   const canvasHeight = getCanvasHeight(state);
 
   updateAndDrawDecorations(ctx, canvasWidth, canvasHeight, now);
-
-  ctx.beginPath();
-  for (let i = 0; i <= canvasWidth; i += CELL_SIZE) {
-    ctx.moveTo(i, 0);
-    ctx.lineTo(i, canvasHeight);
-  }
-  for (let i = 0; i <= canvasHeight; i += CELL_SIZE) {
-    ctx.moveTo(0, i);
-    ctx.lineTo(canvasWidth, i);
-  }
-  ctx.strokeStyle = BG_GRID;
-  ctx.lineWidth = 1;
-  ctx.stroke();
-
-  const borderW = Math.max(1.5, CELL_SIZE * 0.12);
-  ctx.fillStyle = MAP_BORDER;
-  ctx.fillRect(0, 0, canvasWidth, borderW);
-  ctx.fillRect(0, canvasHeight - borderW, canvasWidth, borderW);
-  ctx.fillRect(0, 0, borderW, canvasHeight);
-  ctx.fillRect(canvasWidth - borderW, 0, borderW, canvasHeight);
+  const mapLayer = getMapLayer(canvasWidth, canvasHeight);
+  if (mapLayer) ctx.drawImage(mapLayer, 0, 0);
 
   drawOccupiedGround(ctx, state);
   drawWires(ctx, state);
@@ -117,7 +141,12 @@ export const renderGame = (
   drawEnemyPreview(ctx, enemyPreview, now);
 
   drawRepairDrones(ctx, state, now);
-  drawProjectiles(ctx, state);
+  let enemyMap: Map<string, GameState['enemies'][number]> | undefined;
+  if (state.projectiles.some((projectile) => projectile.arcHeight !== undefined)) {
+    enemyMap = new Map();
+    for (const enemy of state.enemies) enemyMap.set(enemy.id, enemy);
+  }
+  drawProjectiles(ctx, state, enemyMap);
   drawChainLightning(ctx, state);
   drawParticles(ctx, state);
   drawHitEffects(ctx, state);

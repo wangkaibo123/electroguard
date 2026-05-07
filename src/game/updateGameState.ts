@@ -144,6 +144,12 @@ const GATLING_SHOT_INTERVAL = 1000 / GATLING_SHOTS_PER_SECOND;
 const TOWER_RETARGET_MS = 150;
 const TOWER_RETARGET_JITTER_MS = 70;
 
+const buildEnemyMap = (enemies: GameState['enemies']) => {
+  const enemyMap = new Map<string, GameState['enemies'][number]>();
+  for (const enemy of enemies) enemyMap.set(enemy.id, enemy);
+  return enemyMap;
+};
+
 const getStableRetargetDelay = (id: string, baseMs: number, jitterMs: number) => {
   let hash = 0;
   for (let index = 0; index < id.length; index++) {
@@ -414,7 +420,7 @@ const updatePulses = (state: GameState, dt: number, now: number) => {
 const updateCombatTowers = (state: GameState, dt: number, now: number) => {
   let changed = false;
   const enemyMap = state.enemies.length > 0
-    ? new Map(state.enemies.map((enemy) => [enemy.id, enemy]))
+    ? buildEnemyMap(state.enemies)
     : null;
 
   const resolveTowerTarget = (tower: Tower, baseX: number, baseY: number, range: number) => {
@@ -756,11 +762,16 @@ const getEnemyRetargetDelay = (enemyId: string) => {
 const resolveCachedEnemyTarget = (
   state: GameState,
   enemy: GameState['enemies'][number],
+  wireMap: Map<string, GameState['wires'][number]>,
 ): EnemyAiTarget | null => {
   if (!enemy.aiTargetKind || !enemy.aiTargetId) return null;
 
   if (enemy.aiTargetKind === 'wire') {
-    const wire = state.wires.find((item) => item.id === enemy.aiTargetId && item.hp > 0);
+    const wire = wireMap.get(enemy.aiTargetId);
+    if (wire && wire.hp <= 0) {
+      wireMap.delete(enemy.aiTargetId);
+      return null;
+    }
     if (!wire || enemy.aiTargetX === undefined || enemy.aiTargetY === undefined) return null;
     return { kind: 'wire', tower: null, wire, x: enemy.aiTargetX, y: enemy.aiTargetY };
   }
@@ -791,9 +802,15 @@ const findEnemyTarget = (
   enemy: GameState['enemies'][number],
   now: number,
 ): EnemyAiTarget | null => {
-  let minDistance = Infinity;
+  let minWeightedDistanceSq = Infinity;
   let target: EnemyAiTarget | null = null;
   const isSaboteur = enemy.enemyType === 'saboteur';
+  const towerDistanceMulSq = isSaboteur
+    ? ENEMY_AI_CONFIG.saboteurTowerDistMul * ENEMY_AI_CONFIG.saboteurTowerDistMul
+    : 1;
+  const wireDistanceMulSq = isSaboteur
+    ? ENEMY_AI_CONFIG.saboteurWireDistMul * ENEMY_AI_CONFIG.saboteurWireDistMul
+    : 1;
 
   for (const tower of state.towers) {
     if (tower.isRuined) continue;
@@ -801,11 +818,12 @@ const findEnemyTarget = (
     const closest = closestPointOnTower(tower, enemy.x, enemy.y);
     const tx = closest.x;
     const ty = closest.y;
-    const distance = Math.hypot(tx - enemy.x, ty - enemy.y);
-    const weightedDistance = isSaboteur ? distance * ENEMY_AI_CONFIG.saboteurTowerDistMul : distance;
+    const dx = tx - enemy.x;
+    const dy = ty - enemy.y;
+    const weightedDistanceSq = (dx * dx + dy * dy) * towerDistanceMulSq;
 
-    if (weightedDistance < minDistance) {
-      minDistance = weightedDistance;
+    if (weightedDistanceSq < minWeightedDistanceSq) {
+      minWeightedDistanceSq = weightedDistanceSq;
       target = { kind: 'tower', tower, wire: null, x: tx, y: ty };
     }
 
@@ -814,9 +832,9 @@ const findEnemyTarget = (
     const shieldCenterX = (tower.x + tower.width / 2) * GLOBAL_CONFIG.cellSize;
     const shieldCenterY = (tower.y + tower.height / 2) * GLOBAL_CONFIG.cellSize;
     const shieldDistance = Math.max(0, Math.hypot(shieldCenterX - enemy.x, shieldCenterY - enemy.y) - tower.shieldRadius);
-    const weightedShieldDistance = isSaboteur ? shieldDistance * ENEMY_AI_CONFIG.saboteurTowerDistMul : shieldDistance;
-    if (weightedShieldDistance < minDistance) {
-      minDistance = weightedShieldDistance;
+    const weightedShieldDistanceSq = shieldDistance * shieldDistance * towerDistanceMulSq;
+    if (weightedShieldDistanceSq < minWeightedDistanceSq) {
+      minWeightedDistanceSq = weightedShieldDistanceSq;
       const angle = Math.atan2(enemy.y - shieldCenterY, enemy.x - shieldCenterX);
       target = {
         kind: 'shield',
@@ -832,11 +850,12 @@ const findEnemyTarget = (
     for (const point of wire.path) {
       const wireX = point.x * GLOBAL_CONFIG.cellSize + GLOBAL_CONFIG.cellSize / 2;
       const wireY = point.y * GLOBAL_CONFIG.cellSize + GLOBAL_CONFIG.cellSize / 2;
-      const distance = Math.hypot(wireX - enemy.x, wireY - enemy.y);
-      const weightedDistance = isSaboteur ? distance * ENEMY_AI_CONFIG.saboteurWireDistMul : distance;
+      const dx = wireX - enemy.x;
+      const dy = wireY - enemy.y;
+      const weightedDistanceSq = (dx * dx + dy * dy) * wireDistanceMulSq;
 
-      if (weightedDistance < minDistance) {
-        minDistance = weightedDistance;
+      if (weightedDistanceSq < minWeightedDistanceSq) {
+        minWeightedDistanceSq = weightedDistanceSq;
         target = { kind: 'wire', tower: null, wire, x: wireX, y: wireY };
       }
     }
@@ -861,11 +880,13 @@ const findEnemyTarget = (
 
 const updateEnemyState = (state: GameState, dt: number, now: number) => {
   let changed = false;
+  const wireMap = new Map<string, GameState['wires'][number]>();
+  for (const wire of state.wires) wireMap.set(wire.id, wire);
 
   for (const enemy of state.enemies) {
     if (enemy.isStatic) continue;
 
-    let target = resolveCachedEnemyTarget(state, enemy);
+    let target = resolveCachedEnemyTarget(state, enemy, wireMap);
     let actualDistance = target ? Math.hypot(target.x - enemy.x, target.y - enemy.y) : Infinity;
     if (!target || now >= (enemy.aiRetargetAt ?? 0) || actualDistance <= ATTACK_RANGE * 1.5) {
       target = findEnemyTarget(state, enemy, now);

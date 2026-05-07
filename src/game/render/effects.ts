@@ -237,7 +237,11 @@ export const drawShields = (ctx: CanvasRenderingContext2D, state: GameState, now
 };
 
 // ── Projectiles ───────────────────────────────────────────────────────────
-export const drawProjectiles = (ctx: CanvasRenderingContext2D, state: GameState) => {
+export const drawProjectiles = (
+  ctx: CanvasRenderingContext2D,
+  state: GameState,
+  enemyMap?: Map<string, GameState['enemies'][number]>,
+) => {
   if (!state.projectiles.length) return;
   for (const p of state.projectiles) {
     const color = p.color ?? PROJ_CLR;
@@ -247,7 +251,7 @@ export const drawProjectiles = (ctx: CanvasRenderingContext2D, state: GameState)
       const flightT = Math.min(1, (p.traveled ?? 0) / Math.max(1, p.initialDistance ?? 1));
       const liftAt = (t: number) => Math.sin(Math.min(1, Math.max(0, t)) * Math.PI) * p.arcHeight!;
       const lift = liftAt(flightT);
-      const target = state.enemies.find((enemy) => enemy.id === p.targetId);
+      const target = enemyMap?.get(p.targetId) ?? state.enemies.find((enemy) => enemy.id === p.targetId);
       const angle = target ? Math.atan2(target.y - (p.y - lift), target.x - p.x) : (p.angle ?? 0);
       const headX = p.x;
       const headY = p.y - lift;

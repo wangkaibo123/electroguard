@@ -1,7 +1,22 @@
 import { GameState, HitEffect } from '../types';
 
+const MAX_CHAIN_LIGHTNINGS = 96;
+const MAX_PARTICLES = 900;
+const MAX_HIT_EFFECTS = 260;
+const MAX_SHIELD_BREAK_EFFECTS = 24;
+
+const trimOldest = <T>(items: T[], maxLength: number) => {
+  const overflow = items.length - maxLength;
+  if (overflow > 0) items.splice(0, overflow);
+};
+
 export const updateTransientEffects = (state: GameState, dt: number) => {
   let changed = false;
+
+  trimOldest(state.chainLightnings, MAX_CHAIN_LIGHTNINGS);
+  trimOldest(state.particles, MAX_PARTICLES);
+  trimOldest(state.hitEffects, MAX_HIT_EFFECTS);
+  trimOldest(state.shieldBreakEffects, MAX_SHIELD_BREAK_EFFECTS);
 
   for (let index = state.chainLightnings.length - 1; index >= 0; index--) {
     state.chainLightnings[index].life += dt;
@@ -40,5 +55,4 @@ export const updateTransientEffects = (state: GameState, dt: number) => {
 
   return changed;
 };
-
 
