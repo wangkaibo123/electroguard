@@ -84,8 +84,18 @@ export const getTapTapBannerAdUnitId = () => {
 
 let rewardedVideoAd: TapRewardedVideoAd | null = null;
 let pendingResolve: ((watchedToEnd: boolean) => void) | null = null;
+let rewardedAdLoaded = false;
+let rewardedAdLoadingPromise: Promise<boolean> | null = null;
+let pendingLoadResolve: ((loaded: boolean) => void) | null = null;
 let pauseBannerAd: TapBannerAd | null = null;
 let pauseBannerResizeListener: ((size: { width?: number; height?: number }) => void) | null = null;
+
+const settleRewardedAdLoad = (loaded: boolean) => {
+  rewardedAdLoaded = loaded;
+  pendingLoadResolve?.(loaded);
+  pendingLoadResolve = null;
+  rewardedAdLoadingPromise = null;
+};
 
 const getRewardedVideoAd = () => {
   if (rewardedVideoAd) return rewardedVideoAd;
@@ -95,12 +105,22 @@ const getRewardedVideoAd = () => {
   if (!tap?.createRewardedVideoAd || !adUnitId) return null;
 
   rewardedVideoAd = tap.createRewardedVideoAd({ adUnitId });
+  rewardedVideoAd.onLoad?.(() => {
+    settleRewardedAdLoad(true);
+  });
   rewardedVideoAd.onError?.((error) => {
+    settleRewardedAdLoad(false);
+    if (pendingResolve) {
+      pendingResolve(false);
+      pendingResolve = null;
+    }
     console.warn('TapTap rewarded video ad error', error);
   });
   rewardedVideoAd.onClose?.((result) => {
+    rewardedAdLoaded = false;
     pendingResolve?.(Boolean(result?.isEnded));
     pendingResolve = null;
+    void loadTapTapRewardedAd();
   });
 
   return rewardedVideoAd;
@@ -109,9 +129,47 @@ const getRewardedVideoAd = () => {
 export const canUseTapTapRewardedAd = () =>
   Boolean(getTapApi()?.createRewardedVideoAd && getTapTapRewardedAdUnitId());
 
+export const loadTapTapRewardedAd = async () => {
+  const ad = getRewardedVideoAd();
+  if (!ad) return false;
+  if (rewardedAdLoaded) return true;
+  if (rewardedAdLoadingPromise) return rewardedAdLoadingPromise;
+
+  if (!ad.load) {
+    return true;
+  }
+
+  rewardedAdLoadingPromise = new Promise<boolean>((resolve) => {
+    let settled = false;
+    const finish = (loaded: boolean) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeoutId);
+      settleRewardedAdLoad(loaded);
+      resolve(loaded);
+    };
+    const timeoutId = window.setTimeout(() => finish(false), 8_000);
+
+    pendingLoadResolve = finish;
+    ad.load?.().then(
+      () => finish(true),
+      (error) => {
+        console.warn('TapTap rewarded video ad load failed', error);
+        finish(false);
+      },
+    );
+  });
+
+  return rewardedAdLoadingPromise;
+};
+
 export const showTapTapRewardedAd = async () => {
   const ad = getRewardedVideoAd();
   if (!ad || pendingResolve) return false;
+
+  if (!rewardedAdLoaded) {
+    await loadTapTapRewardedAd();
+  }
 
   return new Promise<boolean>((resolve) => {
     pendingResolve = resolve;
@@ -120,6 +178,7 @@ export const showTapTapRewardedAd = async () => {
       try {
         await ad.show();
       } catch {
+        rewardedAdLoaded = false;
         if (!ad.load) {
           pendingResolve = null;
           resolve(false);
@@ -127,9 +186,15 @@ export const showTapTapRewardedAd = async () => {
         }
 
         try {
-          await ad.load();
+          const loaded = await loadTapTapRewardedAd();
+          if (!loaded) {
+            pendingResolve = null;
+            resolve(false);
+            return;
+          }
           await ad.show();
         } catch {
+          rewardedAdLoaded = false;
           pendingResolve = null;
           resolve(false);
         }

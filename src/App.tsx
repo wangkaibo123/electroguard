@@ -15,6 +15,7 @@ import {
   canUseTapTapRewardedAd,
   destroyTapTapPauseBannerAd,
   hideTapTapPauseBannerAd,
+  loadTapTapRewardedAd,
   refreshTapTapPauseBannerAdPosition,
   showTapTapPauseBannerAd,
   showTapTapRewardedAd,
@@ -414,6 +415,33 @@ export default function App() {
   const [isMobile, setIsMobile] = useState(getIsMobileViewport);
   const [isPortraitViewport, setIsPortraitViewport] = useState(() => window.innerHeight >= window.innerWidth);
   const hideOrientationSwitch = isTapTapPackage();
+  useEffect(() => {
+    if (!isTapTapPackage()) return;
+
+    let cancelled = false;
+    let retryTimer: number | null = null;
+    let attempts = 0;
+    const maxAttempts = 20;
+
+    const preloadRewardedAd = () => {
+      if (cancelled) return;
+      if (canUseTapTapRewardedAd()) {
+        void loadTapTapRewardedAd();
+        return;
+      }
+
+      if (attempts >= maxAttempts) return;
+      attempts += 1;
+      retryTimer = window.setTimeout(preloadRewardedAd, 500);
+    };
+
+    preloadRewardedAd();
+
+    return () => {
+      cancelled = true;
+      if (retryTimer !== null) window.clearTimeout(retryTimer);
+    };
+  }, []);
   useEffect(() => {
     const onResize = () => {
       setIsMobile(getIsMobileViewport());
