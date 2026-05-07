@@ -4,9 +4,17 @@ import { ENEMY_SCALING, GLOBAL_CONFIG, THEME_WAVE_CONFIG } from '../config';
 
 const {
   bossWaveInterval: BOSS_WAVE_INTERVAL,
-  spawnInterval: SPAWN_INTERVAL,
+  spawnBatchBase: SPAWN_BATCH_BASE,
+  spawnBatchMax: SPAWN_BATCH_MAX,
+  spawnBatchWaveDivisor: SPAWN_BATCH_WAVE_DIVISOR,
+  spawnIntervalBase: SPAWN_INTERVAL_BASE,
+  spawnIntervalMin: SPAWN_INTERVAL_MIN,
+  spawnIntervalWaveReduction: SPAWN_INTERVAL_WAVE_REDUCTION,
   waveClearScoreMul: WAVE_CLEAR_SCORE_MUL,
 } = GLOBAL_CONFIG;
+
+const clamp = (value: number, min: number, max: number) =>
+  Math.max(min, Math.min(max, value));
 
 const getBaseSpawnCount = (wave: number) => {
   const baseCount = Math.floor(
@@ -34,6 +42,36 @@ const getThemeSpawnQueue = (wave: number): GameState['themeEnemiesToSpawn'] => {
   ));
 
   return Array.from({ length: count }, () => enemyType);
+};
+
+const getSpawnBatchSize = (wave: number) =>
+  clamp(
+    Math.floor(SPAWN_BATCH_BASE + wave / SPAWN_BATCH_WAVE_DIVISOR),
+    SPAWN_BATCH_BASE,
+    SPAWN_BATCH_MAX,
+  );
+
+const getSpawnInterval = (wave: number) =>
+  Math.max(
+    SPAWN_INTERVAL_MIN,
+    SPAWN_INTERVAL_BASE - wave * SPAWN_INTERVAL_WAVE_REDUCTION,
+  );
+
+const spawnEnemyBatch = (state: GameState, batchSize: number) => {
+  let spawned = 0;
+
+  while (spawned < batchSize && (state.enemiesToSpawn > 0 || state.themeEnemiesToSpawn.length > 0)) {
+    if (state.enemiesToSpawn > 0) {
+      spawnEnemy(state, state.wave);
+      state.enemiesToSpawn--;
+    } else {
+      const themeEnemyType = state.themeEnemiesToSpawn.shift();
+      if (themeEnemyType) spawnEnemyOfType(state, themeEnemyType, state.wave);
+    }
+    spawned++;
+  }
+
+  return spawned;
 };
 
 const expandMapAfterBoss = (state: GameState) => {
@@ -145,14 +183,8 @@ export const updateWaveState = (state: GameState, dt: number) => {
 
   if (state.enemiesToSpawn > 0 || state.themeEnemiesToSpawn.length > 0) {
     state.spawnTimer += dt;
-    if (state.spawnTimer > SPAWN_INTERVAL) {
-      if (state.enemiesToSpawn > 0) {
-        spawnEnemy(state, state.wave);
-        state.enemiesToSpawn--;
-      } else {
-        const themeEnemyType = state.themeEnemiesToSpawn.shift();
-        if (themeEnemyType) spawnEnemyOfType(state, themeEnemyType, state.wave);
-      }
+    if (state.spawnTimer > getSpawnInterval(state.wave)) {
+      spawnEnemyBatch(state, getSpawnBatchSize(state.wave));
       state.spawnTimer = 0;
       changed = true;
     }
@@ -160,5 +192,4 @@ export const updateWaveState = (state: GameState, dt: number) => {
 
   return changed;
 };
-
 

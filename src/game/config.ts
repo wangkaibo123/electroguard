@@ -43,8 +43,18 @@ export const GLOBAL_CONFIG = {
 
   /** 清波后到下一波开始的休整时间（秒） */
   waveDelay: 30,
-  /** 同一波内，两个敌人之间的刷出间隔（秒） */
-  spawnInterval: 1,
+  /** 每批刷怪的基础数量。 */
+  spawnBatchBase: 2,
+  /** 每经过多少波，每批刷怪数量 +1。 */
+  spawnBatchWaveDivisor: 6,
+  /** 每批刷怪数量上限。 */
+  spawnBatchMax: 8,
+  /** 低波次刷怪批次间隔（秒）。 */
+  spawnIntervalBase: 1.15,
+  /** 每波让批次间隔减少多少秒。 */
+  spawnIntervalWaveReduction: 0.025,
+  /** 高波次刷怪批次间隔下限（秒）。 */
+  spawnIntervalMin: 0.35,
   /** 每隔几波出一个 Boss（Overlord） */
   bossWaveInterval: 5,
   /** 清波奖励得分 = 当前波数 × 此倍率 */

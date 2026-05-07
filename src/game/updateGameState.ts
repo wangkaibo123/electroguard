@@ -39,7 +39,6 @@ const {
   bossWaveInterval: BOSS_WAVE_INTERVAL,
   pulseSpeed: PULSE_SPEED,
   powerInterval: POWER_INTERVAL,
-  spawnInterval: SPAWN_INTERVAL,
   waveClearScoreMul: WAVE_CLEAR_SCORE_MUL,
 } = GLOBAL_CONFIG;
 const {
