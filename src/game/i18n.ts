@@ -11,6 +11,9 @@ export interface I18nStrings {
   tutorial: string;
   continueGame: string;
   highScore: string;
+  restartSaveConfirm: string;
+  restartSaveConfirmRestart: string;
+  restartSaveConfirmCancel: string;
 
   // HUD
   wave: string;
@@ -178,6 +181,9 @@ const en: I18nStrings = {
   tutorial: 'Tutorial',
   continueGame: 'CONTINUE',
   highScore: 'HIGH SCORE',
+  restartSaveConfirm: 'Discard your save and start over?',
+  restartSaveConfirmRestart: 'Restart',
+  restartSaveConfirmCancel: 'Not now',
 
   wave: 'Wave',
   wires: 'Wires',
@@ -461,6 +467,9 @@ const zh: I18nStrings = {
   tutorial: '新手教程',
   continueGame: '继续游戏',
   highScore: '历史最高分',
+  restartSaveConfirm: '确认放弃存档重开一局？',
+  restartSaveConfirmRestart: '重开',
+  restartSaveConfirmCancel: '再想想',
 
   wave: '波次',
   wires: '线缆',

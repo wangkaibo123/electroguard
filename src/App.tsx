@@ -563,6 +563,7 @@ export default function App() {
     coreToTurret: false,
     generatorToTurret: false,
   });
+  const [restartSaveConfirmOpen, setRestartSaveConfirmOpen] = useState(false);
   const tutorialInputLocked = isCameraTransitioning;
   const startTutorial = () => {
     startGame();
@@ -586,7 +587,7 @@ export default function App() {
     tutorialCameraFocusKeyRef.current = null;
     try { localStorage.setItem('electroguard_tutorial_done', '1'); } catch {}
   };
-  const handleStartGame = () => {
+  const startFreshGame = () => {
     startGame();
     try {
       if (localStorage.getItem('electroguard_tutorial_done') !== '1') {
@@ -600,6 +601,17 @@ export default function App() {
         setTutorialStep(0);
       }
     } catch {}
+  };
+  const handleStartGame = () => {
+    if (hasSave) {
+      setRestartSaveConfirmOpen(true);
+      return;
+    }
+    startFreshGame();
+  };
+  const handleConfirmRestartSave = () => {
+    setRestartSaveConfirmOpen(false);
+    startFreshGame();
   };
 
   useEffect(() => {
@@ -1269,6 +1281,30 @@ export default function App() {
                     <Wrench size={18} /> {i.customMode}
                   </span>
                 </button>
+              </div>
+            )}
+
+            {restartSaveConfirmOpen && gameState.status === 'menu' && (
+              <div className="absolute inset-0 z-40 flex items-center justify-center bg-gray-950/70 px-4 backdrop-blur-sm">
+                <div className="w-full max-w-sm rounded-lg border border-blue-400/40 bg-gray-950 p-5 text-center shadow-[0_0_28px_rgba(59,130,246,0.18)]">
+                  <p className="mb-5 text-base font-bold text-white">{i.restartSaveConfirm}</p>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+                    <button
+                      type="button"
+                      onClick={handleConfirmRestartSave}
+                      className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-blue-500"
+                    >
+                      <RotateCcw size={16} /> {i.restartSaveConfirmRestart}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRestartSaveConfirmOpen(false)}
+                      className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-600 bg-gray-900 px-5 py-2.5 text-sm font-bold text-gray-200 transition-colors hover:bg-gray-800"
+                    >
+                      <X size={16} /> {i.restartSaveConfirmCancel}
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
 
