@@ -51,7 +51,9 @@ Outputs:
 - `packaging/taptap/electroguard-h5-taptap.zip`
 - `packaging/taptap/tap_upload/electroguard-h5/`
 
-The TapTap zip keeps `index.html`, `assets/`, and `images/` at the zip root and inlines compatibility CSS for TapTap's H5 preview WebView.
+The TapTap zip contains a single top-level `electroguard-h5/` folder. That
+folder contains `index.html`, `assets/`, and `images/`, and the helper inlines
+compatibility CSS for TapTap's H5 preview WebView.
 
 ## Generic H5
 

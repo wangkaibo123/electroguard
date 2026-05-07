@@ -232,11 +232,9 @@ body{position:fixed;inset:0;}
 };
 
 const createZip = () => {
-  const packageEntries = readdirSync(packageDir);
-
   try {
-    execFileSync('zip', ['-r', zipPath, ...packageEntries], {
-      cwd: packageDir,
+    execFileSync('zip', ['-r', zipPath, packageDirName], {
+      cwd: workDir,
       stdio: 'inherit',
     });
     return;
@@ -254,7 +252,7 @@ const createZip = () => {
       '-Command',
       [
         'Add-Type -AssemblyName System.IO.Compression.FileSystem;',
-        `[System.IO.Compression.ZipFile]::CreateFromDirectory(${psQuote(packageDir)}, ${psQuote(zipPath)});`,
+        `[System.IO.Compression.ZipFile]::CreateFromDirectory(${psQuote(workDir)}, ${psQuote(zipPath)});`,
       ].join(' '),
     ],
     { stdio: 'inherit' },
