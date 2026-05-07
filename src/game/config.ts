@@ -220,7 +220,7 @@ export const ENEMY_CONFIG: Record<EnemyType, {
   /* 破坏者：优先攻击导线，对线伤害 ×2 */
   saboteur: { baseHp: 18,  speedMin: 39, speedMax: 50, baseDamage: 4,  cooldown: 600,  radius: 10, color: '#fbbf24', wireDamageMul: 2, baseShield: 0,  unlockWave: 5 },
   /* 霸主（Boss）：每 N 波出现，自带护盾，体型大 */
-  overlord: { baseHp: 200, speedMin: 14, speedMax: 18, baseDamage: 20, cooldown: 1500, radius: 52, color: '#ef4444', wireDamageMul: 1, baseShield: 50, unlockWave: -1 },
+  overlord: { baseHp: 200, speedMin: 14, speedMax: 18, baseDamage: 20, cooldown: 1500, radius: 45, color: '#ef4444', wireDamageMul: 1, baseShield: 50, unlockWave: -1 },
 };
 
 /** 敌人刷怪数随波次的缩放系数 */
