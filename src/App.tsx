@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type TouchEvent as ReactTouchEvent } from 'react';
-import { Activity, BookOpen, Cable, Clapperboard, Coins, Globe, Keyboard, LogOut, Pause, Play, RotateCcw, Smartphone, Wrench, X } from 'lucide-react';
+import { Activity, BookOpen, Bug, Cable, Clapperboard, Coins, Copy, Globe, Keyboard, LogOut, Pause, Play, RotateCcw, Smartphone, Wrench, X } from 'lucide-react';
 import { useGameLoop } from './game/useGameLoop';
 import type { CodexEntryType, GameState, TowerType } from './game/types';
 import { t, getLocale, setLocale, Locale } from './game/i18n';
@@ -125,6 +125,211 @@ const getIsMobileViewport = () => {
 
 const isTapTapPackage = () =>
   Boolean((window as typeof window & { __TAPTAP_PACKAGE__?: boolean }).__TAPTAP_PACKAGE__);
+
+const ENABLE_WEBVIEW_DEBUG_PANEL = (import.meta as ImportMeta & { env: { DEV: boolean } }).env.DEV;
+
+const getWebViewDebugRuntime = () => {
+  const hostWindow = window as typeof window & {
+    __TAPTAP_PACKAGE__?: boolean;
+    __TAURI_INTERNALS__?: unknown;
+    __wxjs_environment?: string;
+    tap?: unknown;
+    wx?: unknown;
+  };
+  const ua = navigator.userAgent;
+  const isMiniProgram = hostWindow.__wxjs_environment === 'miniprogram' || /miniProgram/i.test(ua);
+  const isAndroidWebView = /\bwv\b|Version\/[\d.]+.*Chrome\/[\d.]+.*Mobile Safari/i.test(ua);
+  const isIosWebView = /iP(ad|hone|od)/i.test(ua) && /AppleWebKit/i.test(ua) && !/Safari/i.test(ua);
+  const isTauri = Boolean(hostWindow.__TAURI_INTERNALS__);
+  const isTapTap = Boolean(hostWindow.__TAPTAP_PACKAGE__ || hostWindow.tap);
+  const labels = [
+    isTapTap ? 'TapTap' : null,
+    isMiniProgram ? 'MiniProgram' : null,
+    isTauri ? 'Tauri' : null,
+    isAndroidWebView ? 'Android WebView' : null,
+    isIosWebView ? 'iOS WebView' : null,
+  ].filter(Boolean) as string[];
+
+  return {
+    isWebView: labels.length > 0,
+    label: labels.join(' / ') || 'Browser',
+  };
+};
+
+const formatDebugValue = (value: number) => {
+  if (!Number.isFinite(value)) return '-';
+  return Number.isInteger(value) ? String(value) : value.toFixed(2);
+};
+
+const WebViewDebugPanel = ({
+  gameState,
+  isMobile,
+  isPortraitViewport,
+  onJumpToWave,
+}: {
+  gameState: GameState;
+  isMobile: boolean;
+  isPortraitViewport: boolean;
+  onJumpToWave: (targetWave: number) => boolean;
+}) => {
+  const runtime = getWebViewDebugRuntime();
+  const [open, setOpen] = useState(false);
+  const [targetWave, setTargetWave] = useState(() => String(Math.max(1, gameState.wave || 1)));
+  const [snapshot, setSnapshot] = useState(() => ({
+    width: window.innerWidth,
+    height: window.innerHeight,
+    visualWidth: window.visualViewport?.width ?? window.innerWidth,
+    visualHeight: window.visualViewport?.height ?? window.innerHeight,
+    dpr: window.devicePixelRatio || 1,
+    online: navigator.onLine,
+  }));
+  const [copied, setCopied] = useState(false);
+  const [jumpMessage, setJumpMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const updateSnapshot = () => {
+      setSnapshot({
+        width: window.innerWidth,
+        height: window.innerHeight,
+        visualWidth: window.visualViewport?.width ?? window.innerWidth,
+        visualHeight: window.visualViewport?.height ?? window.innerHeight,
+        dpr: window.devicePixelRatio || 1,
+        online: navigator.onLine,
+      });
+    };
+    updateSnapshot();
+    window.addEventListener('resize', updateSnapshot);
+    window.addEventListener('orientationchange', updateSnapshot);
+    window.addEventListener('online', updateSnapshot);
+    window.addEventListener('offline', updateSnapshot);
+    window.visualViewport?.addEventListener('resize', updateSnapshot);
+    return () => {
+      window.removeEventListener('resize', updateSnapshot);
+      window.removeEventListener('orientationchange', updateSnapshot);
+      window.removeEventListener('online', updateSnapshot);
+      window.removeEventListener('offline', updateSnapshot);
+      window.visualViewport?.removeEventListener('resize', updateSnapshot);
+    };
+  }, []);
+
+  const rows = [
+    ['runtime', runtime.label],
+    ['webview', runtime.isWebView ? 'yes' : 'no'],
+    ['status', `${gameState.status} / ${gameState.gameMode}`],
+    ['wave', gameState.wave || '-'],
+    ['score', gameState.score],
+    ['gold', gameState.gameMode === 'custom' ? '∞' : gameState.gold],
+    ['wires', `${gameState.wires.length} / inv ${gameState.gameMode === 'custom' ? '∞' : gameState.wireInventory}`],
+    ['towers', gameState.towers.length],
+    ['enemies', `${gameState.enemies.length} / queue ${gameState.enemiesToSpawn + gameState.themeEnemiesToSpawn.length}`],
+    ['projectiles', gameState.projectiles.length],
+    ['effects', gameState.particles.length + gameState.hitEffects.length + gameState.chainLightnings.length + gameState.shieldBreakEffects.length],
+    ['viewport', `${snapshot.width}x${snapshot.height}`],
+    ['visual', `${formatDebugValue(snapshot.visualWidth)}x${formatDebugValue(snapshot.visualHeight)}`],
+    ['dpr', formatDebugValue(snapshot.dpr)],
+    ['screen', `${isMobile ? 'mobile' : 'desktop'} / ${isPortraitViewport ? 'portrait' : 'landscape'}`],
+    ['online', snapshot.online ? 'yes' : 'no'],
+    ['ua', navigator.userAgent],
+  ];
+  const copyPayload = rows.map(([key, value]) => `${key}: ${value}`).join('\n');
+  const copyDebugInfo = async () => {
+    try {
+      await navigator.clipboard?.writeText(copyPayload);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1200);
+    } catch {
+      setCopied(false);
+    }
+  };
+  const jumpTargetWave = () => {
+    const parsed = Number.parseInt(targetWave, 10);
+    if (!Number.isFinite(parsed) || parsed < 1) {
+      setJumpMessage('Invalid wave');
+      return;
+    }
+
+    const ok = onJumpToWave(parsed);
+    setTargetWave(String(Math.floor(parsed)));
+    setJumpMessage(ok ? `Jumped to wave ${Math.floor(parsed)}` : 'Jump unavailable');
+    window.setTimeout(() => setJumpMessage(null), 1400);
+  };
+
+  return (
+    <div className="pointer-events-auto absolute bottom-3 left-3 z-[70] max-w-[calc(100%-1.5rem)]">
+      {open ? (
+        <div className="w-[min(21rem,calc(100vw-1.5rem))] rounded-lg border border-cyan-400/50 bg-gray-950/92 p-3 text-xs text-gray-200 shadow-[0_16px_40px_rgba(0,0,0,0.45)] backdrop-blur-md">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <Bug size={15} className="shrink-0 text-cyan-300" />
+              <span className="truncate font-black uppercase tracking-wider text-cyan-200">WebView Debug</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={copyDebugInfo}
+                className="rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-800 hover:text-white"
+                title={copied ? 'Copied' : 'Copy debug info'}
+              >
+                <Copy size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-800 hover:text-white"
+                title="Close debug panel"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          </div>
+          <dl className="grid grid-cols-[5.5rem_1fr] gap-x-2 gap-y-1.5">
+            {rows.map(([key, value]) => (
+              <div key={key} className="contents">
+                <dt className="font-mono text-[10px] uppercase text-gray-500">{key}</dt>
+                <dd className="min-w-0 break-words font-mono text-[11px] leading-snug text-gray-100">{value}</dd>
+              </div>
+            ))}
+          </dl>
+          <div className="mt-3 border-t border-gray-800 pt-3">
+            <div className="mb-1.5 font-mono text-[10px] uppercase text-gray-500">jump wave</div>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                min={1}
+                step={1}
+                value={targetWave}
+                onChange={event => setTargetWave(event.target.value)}
+                onKeyDown={event => {
+                  event.stopPropagation();
+                  if (event.key === 'Enter') jumpTargetWave();
+                }}
+                className="min-w-0 flex-1 rounded-md border border-gray-700 bg-gray-900 px-2 py-1.5 font-mono text-xs text-white outline-none transition-colors focus:border-cyan-400"
+              />
+              <button
+                type="button"
+                onClick={jumpTargetWave}
+                className="shrink-0 rounded-md border border-cyan-500/60 bg-cyan-600 px-3 py-1.5 text-xs font-black text-white transition-colors hover:bg-cyan-500"
+              >
+                Go
+              </button>
+            </div>
+            {jumpMessage && <div className="mt-2 font-bold text-cyan-200">{jumpMessage}</div>}
+          </div>
+          {copied && <div className="mt-2 font-bold text-emerald-300">Copied</div>}
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="flex h-10 w-10 items-center justify-center rounded-lg border border-cyan-400/50 bg-gray-950/88 text-cyan-200 shadow-[0_10px_24px_rgba(0,0,0,0.35)] backdrop-blur-sm transition-colors hover:bg-gray-900"
+          title="WebView Debug"
+        >
+          <Bug size={17} />
+        </button>
+      )}
+    </div>
+  );
+};
 
 const TapTapPauseBannerAd = ({ active }: { active: boolean }) => {
   const [visible, setVisible] = useState(false);
@@ -307,6 +512,7 @@ export default function App() {
     staticMonster,
     setStaticMonster,
     skipToNextWave,
+    jumpToWave,
     toastMessage,
     handleCanvasPointerDown,
     handleCanvasPointerMove,
@@ -1921,6 +2127,15 @@ export default function App() {
       {/* Machine codex modal */}
       {codexTower && (
         <CodexModal entry={codexTower} labels={i} onClose={() => setCodexTower(null)} />
+      )}
+
+      {ENABLE_WEBVIEW_DEBUG_PANEL && (
+        <WebViewDebugPanel
+          gameState={gameState}
+          isMobile={isMobile}
+          isPortraitViewport={isPortraitViewport}
+          onJumpToWave={jumpToWave}
+        />
       )}
     </div>
   );

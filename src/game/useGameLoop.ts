@@ -49,6 +49,7 @@ const GAMEPLAY_UI_SYNC_INTERVAL_MS = 200;
 const MAX_CANVAS_DPR = 2;
 const MOBILE_CANVAS_DPR = 2;
 const MOBILE_FRAME_INTERVAL_MS = 1000 / 60;
+const ENABLE_DEBUG_ACTIONS = (import.meta as ImportMeta & { env: { DEV: boolean } }).env.DEV;
 
 const isTapTapPackage = () =>
   typeof window !== 'undefined' &&
@@ -680,6 +681,47 @@ export const useGameLoop = () => {
     const state = stateRef.current;
     if (startNextWave(state)) sync();
   };
+
+  const jumpToWave = ENABLE_DEBUG_ACTIONS ? (targetWave: number) => {
+    const state = stateRef.current;
+    if (state.gameMode === 'custom') return false;
+    if (state.status === 'menu' || state.status === 'gameover') return false;
+
+    const wave = Math.max(1, Math.floor(targetWave));
+    state.status = 'playing';
+    state.wave = wave - 1;
+    state.needsPick = false;
+    state.pendingBossBonusPick = false;
+    state.bossBonusPickQueued = false;
+    state.pickUiPhase = 'standard';
+    state.pickOptions = [];
+    state.enemies = [];
+    state.projectiles = [];
+    state.chainLightnings = [];
+    state.particles = [];
+    state.hitEffects = [];
+    state.shieldBreakEffects = [];
+    state.repairDrones = [];
+    state.incomingDrops = [];
+    state.pulses = [];
+    state.enemiesToSpawn = 0;
+    state.themeEnemiesToSpawn = [];
+    state.waveTimer = 0;
+    state.spawnTimer = 0;
+    updateRotating(null);
+    setActiveCommandCard(null);
+    setActiveRepair(false);
+    clearTowerDragState();
+    clearWireDragState();
+
+    if (startNextWave(state)) {
+      sync();
+      return true;
+    }
+
+    sync();
+    return false;
+  } : undefined;
 
   const placeTowerFromSelection = (state: GameState, towerType: TowerType, x: number, y: number) => {
     if (!canPlace(x, y, towerType, state)) return false;
@@ -1650,7 +1692,7 @@ export const useGameLoop = () => {
     focusCameraOnWorld, isCameraTransitioning,
     openCustomPick, buyShopPack, refreshShopOffers, grantGold, grantTowerInventory, grantTowerDropNearCore, reviveAfterRewardedAd, sellTower, rotatingTowerId,
     startCommandCardUse, activeCommandCard, startRepair, activeRepair,
-    selectedTower, setSelectedTower, placeMonsterMode, setPlaceMonsterMode, skipToNextWave, toastMessage,
+    selectedTower, setSelectedTower, placeMonsterMode, setPlaceMonsterMode, skipToNextWave, jumpToWave, toastMessage,
     selectedMonsterType, setSelectedMonsterType, staticMonster, setStaticMonster,
     isTowerDragging,
     handleCanvasPointerDown, handleCanvasPointerMove, handleCanvasPointerUp, handleCanvasPointerCancel,
