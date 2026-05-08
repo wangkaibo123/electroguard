@@ -7,9 +7,8 @@ const {
   spawnBatchBase: SPAWN_BATCH_BASE,
   spawnBatchMax: SPAWN_BATCH_MAX,
   spawnBatchWaveDivisor: SPAWN_BATCH_WAVE_DIVISOR,
-  spawnIntervalBase: SPAWN_INTERVAL_BASE,
+  spawnIntervalMax: SPAWN_INTERVAL_MAX,
   spawnIntervalMin: SPAWN_INTERVAL_MIN,
-  spawnIntervalWaveReduction: SPAWN_INTERVAL_WAVE_REDUCTION,
   waveClearScoreMul: WAVE_CLEAR_SCORE_MUL,
 } = GLOBAL_CONFIG;
 
@@ -44,17 +43,24 @@ const getThemeSpawnQueue = (wave: number): GameState['themeEnemiesToSpawn'] => {
   return Array.from({ length: count }, () => enemyType);
 };
 
+const getSpawnBatchStep = (wave: number) =>
+  Math.floor(Math.max(0, wave - 1) / SPAWN_BATCH_WAVE_DIVISOR);
+
 const getSpawnBatchSize = (wave: number) =>
   clamp(
-    Math.floor(SPAWN_BATCH_BASE + wave / SPAWN_BATCH_WAVE_DIVISOR),
+    SPAWN_BATCH_BASE + getSpawnBatchStep(wave),
     SPAWN_BATCH_BASE,
     SPAWN_BATCH_MAX,
   );
 
 const getSpawnInterval = (wave: number) =>
-  Math.max(
+  clamp(
+    SPAWN_INTERVAL_MIN +
+      getSpawnBatchStep(wave) *
+        ((SPAWN_INTERVAL_MAX - SPAWN_INTERVAL_MIN) /
+          (SPAWN_BATCH_MAX - SPAWN_BATCH_BASE)),
     SPAWN_INTERVAL_MIN,
-    SPAWN_INTERVAL_BASE - wave * SPAWN_INTERVAL_WAVE_REDUCTION,
+    SPAWN_INTERVAL_MAX,
   );
 
 const spawnEnemyBatch = (state: GameState, batchSize: number) => {
@@ -192,4 +198,3 @@ export const updateWaveState = (state: GameState, dt: number) => {
 
   return changed;
 };
-
