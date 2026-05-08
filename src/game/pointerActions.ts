@@ -12,7 +12,7 @@ import {
   updatePowerGrid,
 } from './engine';
 import { CELL_SIZE, GameState, WIRE_MAX_HP, Wire, getGridHeight, getGridWidth } from './types';
-import { getDeleteButtonLayout, getRotationKnobLayout } from './render/towers';
+import { getCodexButtonLayout, getDeleteButtonLayout, getDetailsButtonLayout, getRotationKnobLayout } from './render/towers';
 import { isWorldPointInTowerFootprint } from './footprint';
 
 export const getGridCell = (wx: number, wy: number) => ({
@@ -88,7 +88,7 @@ export const hitRotatingControl = (
   wx: number,
   wy: number,
   touchPadding = 0,
-): 'delete' | 'rotate' | null => {
+): 'delete' | 'rotate' | 'details' | 'codex' | null => {
   if (!towerId) return null;
   const tower = state.towerMap.get(towerId);
   if (!tower) return null;
@@ -102,6 +102,30 @@ export const hitRotatingControl = (
       wy <= buttonY + buttonHeight + touchPadding
     ) {
       return 'delete';
+    }
+  }
+
+  if (!tower.isRuined) {
+    const { buttonX, buttonY, buttonWidth, buttonHeight } = getDetailsButtonLayout(tower);
+    if (
+      wx >= buttonX - touchPadding &&
+      wx <= buttonX + buttonWidth + touchPadding &&
+      wy >= buttonY - touchPadding &&
+      wy <= buttonY + buttonHeight + touchPadding
+    ) {
+      return 'details';
+    }
+  }
+
+  if (!tower.isRuined) {
+    const { buttonX, buttonY, buttonWidth, buttonHeight } = getCodexButtonLayout(tower);
+    if (
+      wx >= buttonX - touchPadding &&
+      wx <= buttonX + buttonWidth + touchPadding &&
+      wy >= buttonY - touchPadding &&
+      wy <= buttonY + buttonHeight + touchPadding
+    ) {
+      return 'codex';
     }
   }
 

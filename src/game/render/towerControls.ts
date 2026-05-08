@@ -1,4 +1,6 @@
+import { __iconNode as bookOpenIconNode } from 'lucide-react/dist/esm/icons/book-open.js';
 import { __iconNode as coinsIconNode } from 'lucide-react/dist/esm/icons/coins.js';
+import { __iconNode as infoIconNode } from 'lucide-react/dist/esm/icons/info.js';
 import { __iconNode as trash2IconNode } from 'lucide-react/dist/esm/icons/trash-2.js';
 import { getTowerSellPrice } from '../config';
 import { CELL_SIZE, GameState, Tower } from '../types';
@@ -7,10 +9,14 @@ import { addRoundedRectPath } from './helpers';
 import { drawLucideIconNode, LucideIconNode } from './towerDrawingUtils';
 
 const ROTATION_KNOB_BASE_OFFSET = 20;
-export const ROTATION_BUTTON_WIDTH = 58;
-export const ROTATION_BUTTON_HEIGHT = 28;
-export const DELETE_BUTTON_WIDTH = 78;
-export const DELETE_BUTTON_HEIGHT = 28;
+export const TOWER_CONTROL_BUTTON_WIDTH = 72;
+export const TOWER_CONTROL_BUTTON_HEIGHT = 28;
+export const SIDE_CONTROL_BUTTON_WIDTH = 56;
+export const SIDE_CONTROL_BUTTON_HEIGHT = 28;
+export const ROTATION_BUTTON_WIDTH = TOWER_CONTROL_BUTTON_WIDTH;
+export const ROTATION_BUTTON_HEIGHT = TOWER_CONTROL_BUTTON_HEIGHT;
+export const DELETE_BUTTON_WIDTH = TOWER_CONTROL_BUTTON_WIDTH;
+export const DELETE_BUTTON_HEIGHT = TOWER_CONTROL_BUTTON_HEIGHT;
 
 export const getRotationKnobLayout = (tower: Tower) => {
   const tpx = tower.x * CELL_SIZE;
@@ -42,6 +48,67 @@ export const getDeleteButtonLayout = (tower: Tower) => {
   const buttonY = tpy + tth + 22;
 
   return { buttonX, buttonY, buttonWidth, buttonHeight };
+};
+
+export const getDetailsButtonLayout = (tower: Tower) => {
+  const tpx = tower.x * CELL_SIZE;
+  const tpy = tower.y * CELL_SIZE;
+  const tth = tower.height * CELL_SIZE;
+  const buttonWidth = SIDE_CONTROL_BUTTON_WIDTH;
+  const buttonHeight = SIDE_CONTROL_BUTTON_HEIGHT;
+  const buttonX = tpx - buttonWidth - 18;
+  const buttonY = tpy + tth / 2 - buttonHeight / 2;
+
+  return { buttonX, buttonY, buttonWidth, buttonHeight };
+};
+
+export const getCodexButtonLayout = (tower: Tower) => {
+  const tpx = tower.x * CELL_SIZE;
+  const tpy = tower.y * CELL_SIZE;
+  const ttw = tower.width * CELL_SIZE;
+  const tth = tower.height * CELL_SIZE;
+  const buttonWidth = SIDE_CONTROL_BUTTON_WIDTH;
+  const buttonHeight = SIDE_CONTROL_BUTTON_HEIGHT;
+  const buttonX = tpx + ttw + 18;
+  const buttonY = tpy + tth / 2 - buttonHeight / 2;
+
+  return { buttonX, buttonY, buttonWidth, buttonHeight };
+};
+
+const drawControlButton = (
+  ctx: CanvasRenderingContext2D,
+  layout: { buttonX: number; buttonY: number; buttonWidth: number; buttonHeight: number },
+  fillStyle: string,
+  strokeStyle: string,
+  label: string,
+  iconNode?: LucideIconNode,
+) => {
+  const { buttonX, buttonY, buttonWidth, buttonHeight } = layout;
+
+  ctx.fillStyle = fillStyle;
+  ctx.strokeStyle = strokeStyle;
+  ctx.lineWidth = 1;
+  ctx.shadowColor = 'rgba(0,0,0,0.35)';
+  ctx.shadowBlur = 10;
+  ctx.shadowOffsetY = 3;
+  ctx.beginPath();
+  addRoundedRectPath(ctx, buttonX, buttonY, buttonWidth, buttonHeight, 8);
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
+  ctx.stroke();
+
+  const centerY = buttonY + buttonHeight / 2;
+  const contentCx = buttonX + buttonWidth / 2;
+  const hasIcon = Boolean(iconNode);
+  if (iconNode) drawLucideIconNode(ctx, iconNode, contentCx - 15, centerY, 13, '#ffffff');
+
+  ctx.font = 'bold 12px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(label, contentCx + (hasIcon ? 8 : 0), centerY + 0.5);
 };
 
 export const drawRotationKnob = (ctx: CanvasRenderingContext2D, state: GameState, rotatingTowerId: string | null) => {
@@ -150,4 +217,27 @@ export const drawDeleteButton = (ctx: CanvasRenderingContext2D, state: GameState
   ctx.fillText(String(getTowerSellPrice(tower)), contentCx, centerY + 0.5);
 
   drawLucideIconNode(ctx, coinsIconNode as LucideIconNode, coinX, centerY, 13, 'rgba(250,204,21,0.96)');
+};
+
+export const drawTowerInfoButtons = (ctx: CanvasRenderingContext2D, state: GameState, rotatingTowerId: string | null) => {
+  if (!rotatingTowerId) return;
+  const tower = state.towerMap.get(rotatingTowerId);
+  if (!tower || tower.isRuined) return;
+
+  drawControlButton(
+    ctx,
+    getDetailsButtonLayout(tower),
+    'rgba(37,99,235,0.92)',
+    'rgba(96,165,250,0.9)',
+    '详情',
+    infoIconNode as LucideIconNode,
+  );
+  drawControlButton(
+    ctx,
+    getCodexButtonLayout(tower),
+    'rgba(75,85,99,0.92)',
+    'rgba(156,163,175,0.9)',
+    '图鉴',
+    bookOpenIconNode as LucideIconNode,
+  );
 };

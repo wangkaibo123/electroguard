@@ -9,6 +9,7 @@ import { findTowerAtWorldPoint } from './game/gameActions';
 import { PickOverlay } from './game/ui/PickOverlay';
 import { ShopPanel } from './game/ui/ShopPanel';
 import { CodexModal } from './game/ui/CodexModal';
+import { TowerDetailsModal } from './game/ui/TowerDetailsModal';
 import { TowerIcon } from './game/ui/icons';
 import {
   canUseTapTapBannerAd,
@@ -535,6 +536,10 @@ export default function App() {
     grantTowerDropNearCore,
     reviveAfterRewardedAd,
     isTowerDragging,
+    towerDetailsType,
+    setTowerDetailsType,
+    towerControlCodexType,
+    setTowerControlCodexType,
   } = useGameLoop();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -2125,8 +2130,19 @@ export default function App() {
       </div>
 
       {/* Machine codex modal */}
-      {codexTower && (
-        <CodexModal entry={codexTower} labels={i} onClose={() => setCodexTower(null)} />
+      {(codexTower || towerControlCodexType) && (
+        <CodexModal
+          entry={codexTower || towerControlCodexType!}
+          labels={i}
+          onClose={() => {
+            setCodexTower(null);
+            setTowerControlCodexType(null);
+          }}
+        />
+      )}
+
+      {towerDetailsType && (
+        <TowerDetailsModal type={towerDetailsType} labels={i} onClose={() => setTowerDetailsType(null)} />
       )}
 
       {ENABLE_WEBVIEW_DEBUG_PANEL && (

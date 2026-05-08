@@ -13,9 +13,12 @@ export {
   DELETE_BUTTON_WIDTH,
   ROTATION_BUTTON_HEIGHT,
   ROTATION_BUTTON_WIDTH,
+  drawTowerInfoButtons,
   drawDeleteButton,
   drawRotationKnob,
+  getCodexButtonLayout,
   getDeleteButtonLayout,
+  getDetailsButtonLayout,
   getRotationKnobLayout,
 } from './towerControls';
 export { drawOccupiedGround } from './towerGround';

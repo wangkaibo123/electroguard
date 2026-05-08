@@ -91,6 +91,8 @@ export const useGameLoop = () => {
 
   const selectedTowerRef = useRef<TowerType | null>(null);
   const [selectedTower, _setSelectedTower] = useState<TowerType | null>(null);
+  const [towerDetailsType, setTowerDetailsType] = useState<TowerType | null>(null);
+  const [towerControlCodexType, setTowerControlCodexType] = useState<TowerType | null>(null);
   const setSelectedTower = (v: TowerType | null) => {
     if (v) {
       if (activeRepairRef.current) markRepairTargetBarsForFade();
@@ -1019,6 +1021,16 @@ export const useGameLoop = () => {
       sync();
       return;
     }
+    if (rotatingControl === 'details' && rotatingRef.current) {
+      const tower = state.towerMap.get(rotatingRef.current);
+      if (tower) setTowerDetailsType(tower.type);
+      return;
+    }
+    if (rotatingControl === 'codex' && rotatingRef.current) {
+      const tower = state.towerMap.get(rotatingRef.current);
+      if (tower) setTowerControlCodexType(tower.type);
+      return;
+    }
 
     const wireDrag = startWireDragAt(state, wx, wy, options.wireHitRadius);
     if (wireDrag.kind === 'direct_wire') return;
@@ -1693,6 +1705,7 @@ export const useGameLoop = () => {
     openCustomPick, buyShopPack, refreshShopOffers, grantGold, grantTowerInventory, grantTowerDropNearCore, reviveAfterRewardedAd, sellTower, rotatingTowerId,
     startCommandCardUse, activeCommandCard, startRepair, activeRepair,
     selectedTower, setSelectedTower, placeMonsterMode, setPlaceMonsterMode, skipToNextWave, jumpToWave, toastMessage,
+    towerDetailsType, setTowerDetailsType, towerControlCodexType, setTowerControlCodexType,
     selectedMonsterType, setSelectedMonsterType, staticMonster, setStaticMonster,
     isTowerDragging,
     handleCanvasPointerDown, handleCanvasPointerMove, handleCanvasPointerUp, handleCanvasPointerCancel,
