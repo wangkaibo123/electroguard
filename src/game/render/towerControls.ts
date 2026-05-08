@@ -9,6 +9,7 @@ import { addRoundedRectPath } from './helpers';
 import { drawLucideIconNode, LucideIconNode } from './towerDrawingUtils';
 
 const ROTATION_KNOB_BASE_OFFSET = 20;
+const SIDE_CONTROL_BUTTON_OFFSET = 30;
 export const TOWER_CONTROL_BUTTON_WIDTH = 72;
 export const TOWER_CONTROL_BUTTON_HEIGHT = 28;
 export const SIDE_CONTROL_BUTTON_WIDTH = 56;
@@ -56,7 +57,7 @@ export const getDetailsButtonLayout = (tower: Tower) => {
   const tth = tower.height * CELL_SIZE;
   const buttonWidth = SIDE_CONTROL_BUTTON_WIDTH;
   const buttonHeight = SIDE_CONTROL_BUTTON_HEIGHT;
-  const buttonX = tpx - buttonWidth - 18;
+  const buttonX = tpx - buttonWidth - SIDE_CONTROL_BUTTON_OFFSET;
   const buttonY = tpy + tth / 2 - buttonHeight / 2;
 
   return { buttonX, buttonY, buttonWidth, buttonHeight };
@@ -69,7 +70,7 @@ export const getCodexButtonLayout = (tower: Tower) => {
   const tth = tower.height * CELL_SIZE;
   const buttonWidth = SIDE_CONTROL_BUTTON_WIDTH;
   const buttonHeight = SIDE_CONTROL_BUTTON_HEIGHT;
-  const buttonX = tpx + ttw + 18;
+  const buttonX = tpx + ttw + SIDE_CONTROL_BUTTON_OFFSET;
   const buttonY = tpy + tth / 2 - buttonHeight / 2;
 
   return { buttonX, buttonY, buttonWidth, buttonHeight };

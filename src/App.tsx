@@ -166,16 +166,18 @@ const WebViewDebugPanel = ({
   gameState,
   isMobile,
   isPortraitViewport,
+  onGrantGold,
   onJumpToWave,
 }: {
   gameState: GameState;
   isMobile: boolean;
   isPortraitViewport: boolean;
+  onGrantGold: (amount: number) => void;
   onJumpToWave: (targetWave: number) => boolean;
 }) => {
   const runtime = getWebViewDebugRuntime();
   const [open, setOpen] = useState(false);
-  const [targetWave, setTargetWave] = useState(() => String(Math.max(1, gameState.wave || 1)));
+  const [debugValue, setDebugValue] = useState(() => String(Math.max(1, gameState.wave || 1)));
   const [snapshot, setSnapshot] = useState(() => ({
     width: window.innerWidth,
     height: window.innerHeight,
@@ -185,7 +187,7 @@ const WebViewDebugPanel = ({
     online: navigator.onLine,
   }));
   const [copied, setCopied] = useState(false);
-  const [jumpMessage, setJumpMessage] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const updateSnapshot = () => {
@@ -243,16 +245,29 @@ const WebViewDebugPanel = ({
     }
   };
   const jumpTargetWave = () => {
-    const parsed = Number.parseInt(targetWave, 10);
+    const parsed = Number.parseInt(debugValue, 10);
     if (!Number.isFinite(parsed) || parsed < 1) {
-      setJumpMessage('Invalid wave');
+      setActionMessage('Invalid wave');
       return;
     }
 
     const ok = onJumpToWave(parsed);
-    setTargetWave(String(Math.floor(parsed)));
-    setJumpMessage(ok ? `Jumped to wave ${Math.floor(parsed)}` : 'Jump unavailable');
-    window.setTimeout(() => setJumpMessage(null), 1400);
+    setDebugValue(String(Math.floor(parsed)));
+    setActionMessage(ok ? `Jumped to wave ${Math.floor(parsed)}` : 'Jump unavailable');
+    window.setTimeout(() => setActionMessage(null), 1400);
+  };
+  const grantDebugGold = () => {
+    const parsed = Number.parseInt(debugValue, 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      setActionMessage('Invalid gold');
+      return;
+    }
+
+    const amount = Math.floor(parsed);
+    onGrantGold(amount);
+    setDebugValue(String(amount));
+    setActionMessage(`Granted ${amount} gold`);
+    window.setTimeout(() => setActionMessage(null), 1400);
   };
 
   return (
@@ -292,29 +307,38 @@ const WebViewDebugPanel = ({
             ))}
           </dl>
           <div className="mt-3 border-t border-gray-800 pt-3">
-            <div className="mb-1.5 font-mono text-[10px] uppercase text-gray-500">jump wave</div>
-            <div className="flex gap-2">
+            <div className="grid gap-2">
               <input
                 type="number"
                 min={1}
                 step={1}
-                value={targetWave}
-                onChange={event => setTargetWave(event.target.value)}
+                value={debugValue}
+                onChange={event => setDebugValue(event.target.value)}
                 onKeyDown={event => {
                   event.stopPropagation();
                   if (event.key === 'Enter') jumpTargetWave();
                 }}
-                className="min-w-0 flex-1 rounded-md border border-gray-700 bg-gray-900 px-2 py-1.5 font-mono text-xs text-white outline-none transition-colors focus:border-cyan-400"
+                className="min-w-0 rounded-md border border-gray-700 bg-gray-900 px-2 py-1.5 font-mono text-xs text-white outline-none transition-colors focus:border-cyan-400"
+                aria-label="Debug numeric value"
               />
-              <button
-                type="button"
-                onClick={jumpTargetWave}
-                className="shrink-0 rounded-md border border-cyan-500/60 bg-cyan-600 px-3 py-1.5 text-xs font-black text-white transition-colors hover:bg-cyan-500"
-              >
-                Go
-              </button>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={jumpTargetWave}
+                  className="rounded-md border border-cyan-500/60 bg-cyan-600 px-3 py-1.5 text-xs font-black uppercase text-white transition-colors hover:bg-cyan-500"
+                >
+                  Jump Wave
+                </button>
+                <button
+                  type="button"
+                  onClick={grantDebugGold}
+                  className="rounded-md border border-amber-500/60 bg-amber-600 px-3 py-1.5 text-xs font-black uppercase text-white transition-colors hover:bg-amber-500"
+                >
+                  Grant Gold
+                </button>
+              </div>
             </div>
-            {jumpMessage && <div className="mt-2 font-bold text-cyan-200">{jumpMessage}</div>}
+            {actionMessage && <div className="mt-2 font-bold text-cyan-200">{actionMessage}</div>}
           </div>
           {copied && <div className="mt-2 font-bold text-emerald-300">Copied</div>}
         </div>
@@ -2150,6 +2174,7 @@ export default function App() {
           gameState={gameState}
           isMobile={isMobile}
           isPortraitViewport={isPortraitViewport}
+          onGrantGold={grantGold}
           onJumpToWave={jumpToWave}
         />
       )}

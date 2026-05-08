@@ -45,8 +45,8 @@ export const GLOBAL_CONFIG = {
   waveDelay: 30,
   /** 每批刷怪的基础数量。 */
   spawnBatchBase: 1,
-  /** 每个 Boss 波后的下一波进入新阶段，每阶段每批刷怪数量 +1。 */
-  spawnBatchWaveDivisor: 5,
+  /** 每经过多少波进入新阶段，每阶段每批刷怪数量 +1。 */
+  spawnBatchWaveDivisor: 10,
   /** 每批刷怪数量上限。 */
   spawnBatchMax: 20,
   /** 刷怪批次间隔下限（秒）。 */
@@ -55,6 +55,8 @@ export const GLOBAL_CONFIG = {
   spawnIntervalMax: 5,
   /** 每隔几波出一个 Boss（Overlord） */
   bossWaveInterval: 5,
+  /** Boss 波每经过多少波额外刷新 1 只 Boss。 */
+  bossCountWaveDivisor: 25,
   /** 清波奖励得分 = 当前波数 × 此倍率 */
   waveClearScoreMul: 20,
 

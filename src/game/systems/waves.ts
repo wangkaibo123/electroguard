@@ -3,6 +3,7 @@ import { generatePickOptions, spawnBoss, spawnEnemy, spawnEnemyOfType } from '..
 import { ENEMY_SCALING, GLOBAL_CONFIG, THEME_WAVE_CONFIG } from '../config';
 
 const {
+  bossCountWaveDivisor: BOSS_COUNT_WAVE_DIVISOR,
   bossWaveInterval: BOSS_WAVE_INTERVAL,
   spawnBatchBase: SPAWN_BATCH_BASE,
   spawnBatchMax: SPAWN_BATCH_MAX,
@@ -62,6 +63,9 @@ const getSpawnInterval = (wave: number) =>
     SPAWN_INTERVAL_MIN,
     SPAWN_INTERVAL_MAX,
   );
+
+const getBossSpawnCount = (wave: number) =>
+  1 + Math.floor(wave / BOSS_COUNT_WAVE_DIVISOR);
 
 const spawnEnemyBatch = (state: GameState, batchSize: number) => {
   let spawned = 0;
@@ -163,7 +167,11 @@ export const startNextWave = (state: GameState) => {
   state.waveTimer = 0;
   state.spawnTimer = 0;
   state.needsPick = true;
-  if (state.wave % BOSS_WAVE_INTERVAL === 0) spawnBoss(state, state.wave);
+  if (state.wave % BOSS_WAVE_INTERVAL === 0) {
+    for (let index = 0; index < getBossSpawnCount(state.wave); index++) {
+      spawnBoss(state, state.wave);
+    }
+  }
   return true;
 };
 
