@@ -7,6 +7,7 @@
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "vite build",
     "preview": "vite preview",
+    "tauri": "tauri",
     "package:taptap": "npm run build && node packaging/taptap/package-taptap.mjs",
     "desktop:dev": "tauri dev",
     "build:windows": "node packaging/taptap/build-windows.mjs",

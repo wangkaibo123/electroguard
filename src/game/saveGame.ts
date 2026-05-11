@@ -15,6 +15,22 @@ const TRANSIENT_KEYS = new Set<keyof GameState>([
   'repairDrones',
 ]);
 
+const normalizeLoadedRuntimeState = (state: GameState) => {
+  for (const tower of state.towers) {
+    tower.incomingPower = 0;
+    tower.lastActionTime = 0;
+    tower.lastDamagedAt = 0;
+    tower.sniperAimSince = undefined;
+    tower.coreTurretLastShot = 0;
+    tower.aiTargetId = undefined;
+    tower.aiRetargetAt = undefined;
+  }
+
+  for (const wire of state.wires) {
+    wire.createdAt = undefined;
+  }
+};
+
 export const hasSavedGame = (): boolean => {
   try {
     return !!localStorage.getItem(SAVE_KEY);
@@ -64,6 +80,7 @@ export const loadSavedGame = (): GameState | null => {
     parsed.themeEnemiesToSpawn = [];
     parsed.spawnTimer = 0;
     parsed.waveTimer = 0;
+    normalizeLoadedRuntimeState(parsed);
     return parsed;
   } catch {
     clearSavedGame();
