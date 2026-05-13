@@ -10,26 +10,29 @@
     "tauri": "tauri",
     "package:taptap": "npm run build && node packaging/taptap/package-taptap.mjs",
     "desktop:dev": "tauri dev",
+    "build:android": "node packaging/taptap/build-android.mjs",
+    "package:taptap:android": "npm run build:android",
     "build:windows": "node packaging/taptap/build-windows.mjs",
     "package:taptap:windows": "npm run build:windows && node packaging/taptap/package-windows-taptap.mjs",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "@tailwindcss/vite": "^4.1.14",
-    "@vitejs/plugin-react": "^5.0.4",
     "lucide-react": "^0.546.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "vite": "^6.2.0"
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.1.14",
     "@tauri-apps/cli": "^2.11.0",
     "@types/node": "^22.14.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.0.4",
     "autoprefixer": "^10.4.21",
+    "lightningcss": "^1.32.0",
     "tailwindcss": "^4.1.14",
-    "typescript": "~5.8.2"
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0"
   }
 }
